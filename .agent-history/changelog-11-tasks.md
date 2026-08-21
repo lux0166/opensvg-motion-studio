@@ -1,4 +1,4 @@
-﻿# Technical Changelog - OpenSVG Motion Studio
+# Technical Changelog - OpenSVG Motion Studio
 
 ## Sprint Roadmap: 11 Feature Enhancements (Empirically Verified & Tested)
 
@@ -96,7 +96,42 @@
 
 ### 18. Task: Rive-Style Multi-Document Browser Tab System (`feat/browser-tabs-system`)
 - **Data Model**: Added `DocumentTab` in `src/engine/types.ts` encapsulating Scene Graph (`rootFrame`, `nodes`, `nodeOrder`), History Stacks (`past`, `future`), Viewport State (`zoom`, `panX`, `panY`, `currentTime`, `selectedId`), and Extras (`audioTrack`, `markers`).
-- **Store Core**: Implemented `openNewTab`, `closeTab`, `switchTab`, `renameTab`, `duplicateTab`, `reorderTabs` in `src/store/useStudioStore.ts` with automatic state freezing & hydrating on tab transitions.
+- **Store Core**: Implemented `openNewTab`, `closeTab`, `switchTab`, `renameTab`, `duplicateTab`, `reorderTabs`, `closeOtherTabs`, `closeTabsToRight` in `src/store/useStudioStore.ts` with automatic state freezing & hydrating on tab transitions.
 - **UI Component**: Created `src/components/TabBar.tsx` featuring macOS window dots, OpenSVG branding, scrollable tabs with active state elevation, inline double-click rename, duplicate, close, and `+` new tab button.
 - **Keyboard Shortcuts**: Added `Ctrl+T` (New Tab), `Ctrl+W` (Close Tab), `Ctrl+Tab` / `Ctrl+Shift+Tab` (Switch Tabs), `Ctrl+1..9` (Direct Tab Jump) in `src/hooks/useStudioShortcuts.ts`.
 - **Tests**: `src/engine/__tests__/tabs.test.ts` (9/9 passing, total 72/72 tests passing).
+
+### 19. Task: Tab-Browser UI Harmonization & Rive-Style Context Menu (`feat/tab-bar-light-harmonization`)
+- **Design Alignment**: Completely removed the dark `#121316` bar; harmonized `TabBar.tsx` with OpenSVG Studio's light design system (`bg-slate-100/90`, elevated white active cards, blue indicator dot `bg-blue-500`, subtle borders).
+- **Rive Feature Parity**:
+  - Double-click inline renaming (`<input>` with blue focus ring).
+  - Right-click Context Menu (`onContextMenu`) with Rename, Duplicate, Close Tab, Close Other Tabs, Close Tabs to Right.
+  - Quick-action buttons (Duplicate & Close) with keyboard `group-focus-within` and accessible ARIA attributes (`role="tablist"`, `role="tab"`, `aria-selected`, `aria-label`).
+  - Active artboard resolution & FPS indicator (`rootFrame.width × rootFrame.height • fps FPS`).
+- **Store Engine**: Added `closeOtherTabs` and `closeTabsToRight` methods in `src/store/useStudioStore.ts`.
+- **Tests & Verification**: `src/engine/__tests__/tabs.test.ts` (11/11 passing, 100% test matrix passing across 21 test files, 74 tests). Production build (`npm run build`) succeeded in 8.13s.
+
+### 20. Task: UI Decluttering & Red-Circle Elements Removal (`refactor/ui-declutter`)
+- **macOS Window Dots**: Removed decorative traffic dots from `TabBar.tsx` for a clean, minimalist tab-strip header.
+- **Desktop Studio Badge**: Removed the redundant badge next to the `OpenSVG` logo in `Header.tsx`.
+- **Toast Notifications**: Removed automatic spammy toast notifications on tab actions (`openNewTab`, `closeTab`, `duplicateTab`, etc.) and the startup toast in `App.tsx`; modernized toast styling to sleek light glassmorphism (`bg-white/95 text-slate-800 border-slate-200`).
+- **Build Verification**: `npm test` passed (74/74 unit tests), `npm run build` succeeded in 7.78s with 0 errors.
+
+### 21. Task: Drag-and-Drop Tab Reordering & Tab Visual Sizing / Contrast Upgrade (`feat/tab-dnd-and-contrast`)
+- **Drag & Drop Engine**: Implemented native HTML5 Drag and Drop (`draggable={!isEditing}`, `handleDragStart`, `handleDragOver`, `handleDrop`, `handleDragEnd`) with live blue vertical insertion marker (`w-1 bg-blue-600 rounded-full animate-pulse`) appearing dynamically on left or right edge based on cursor midpoint calculation.
+- **Tab Size & Geometry Alignment**: Increased Tab height from `30px` (`h-7.5`) to `36px` (`h-9`) matching the OpenSVG brand button and center tools pill for a uniform visual baseline.
+- **High-Contrast Surface Colors**:
+  - **Active Tab**: Elevated solid white card (`bg-white border-slate-300 shadow-xs ring-1 ring-black/5`), bold text (`text-slate-900 font-semibold text-xs`), and pulsating blue dot (`w-2 h-2 rounded-full bg-blue-600 shadow-xs ring-2 ring-blue-100`).
+  - **Inactive Tabs**: Defined container pills (`bg-slate-100/80 hover:bg-slate-200/70 border-slate-200/90 hover:border-slate-300`), crisp text (`text-slate-600 hover:text-slate-900 font-medium text-xs`), and soft gray indicator dots.
+  - **New Tab Button (`+`)**: Upgraded to 36px pill (`h-9 px-3 rounded-2xl bg-white/80 border-slate-200 hover:border-blue-300 hover:bg-white text-slate-600 hover:text-blue-600 shadow-2xs`).
+- **Build & Verification**: 74/74 unit tests passing in Vitest across 21 test suites; production build (`tsc && vite build`) passing cleanly.
+
+### 22. Task: Dead-Center Locked Tools Pill, Zero-Scrollbar Strip & Accessibility Hardening (`feat/center-tools-and-tab-bar`)
+- **Dead-Center Locked Tools Pill**: Switched central tool group to `absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-30 pointer-events-auto`, mathematically anchoring the tools pill to the 50% midpoint of the Studio window so it never shifts regardless of how many tabs are open.
+- **Bounded Tab Bar Container**: Set `max-w-[calc(50%-195px)] min-w-0` on left header container, completely preventing tabs from ever colliding with the center tools.
+- **Zero-Scrollbar Horizontal Navigation**: Completely eliminated native horizontal scrollbar lines via `.no-scrollbar::-webkit-scrollbar { display: none !important; width: 0 !important; height: 0 !important; }` and `scrollbar-width: none !important`, while adding `onWheel` listener for smooth mouse-wheel tab scrolling.
+- **Quick Artboard Switcher Dropdown (`(N) ⌄`)**: Placed fixed `+` and `(N) ⌄` counter dropdown buttons outside the scrollable tablist, enabling 1-click artboard jumping across unlimited open tabs.
+- **Accessibility & Motion Hardening**: Added `role="menu"`, `aria-label="Artboard options"`, `tabIndex={isActive ? 0 : -1}` on inactive tab close buttons, `motion-safe:animate-pulse`, and `@media (prefers-reduced-motion: reduce)` system query.
+- **Verification**: All 74 unit tests passing (`vitest run`), production build (`tsc && vite build`) 100% clean.
+
+

@@ -1,4 +1,4 @@
-﻿import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import { useStudioStore, createDefaultTab } from '../../store/useStudioStore';
 
 describe('Rive-Style Multi-Document Tab System Engine', () => {
@@ -129,5 +129,31 @@ describe('Rive-Style Multi-Document Tab System Engine', () => {
     useStudioStore.getState().reorderTabs(2, 0);
     const titles = useStudioStore.getState().tabs.map((t) => t.title);
     expect(titles).toEqual(['Tab 3', 'moon_scan', 'Tab 2']);
+  });
+
+  it('closes all other tabs except the target tab', () => {
+    useStudioStore.getState().openNewTab('Tab 2');
+    useStudioStore.getState().openNewTab('Tab 3');
+    expect(useStudioStore.getState().tabs.length).toBe(3);
+
+    useStudioStore.getState().closeOtherTabs('tab-1');
+    const state = useStudioStore.getState();
+    expect(state.tabs.length).toBe(1);
+    expect(state.tabs[0].id).toBe('tab-1');
+    expect(state.activeTabId).toBe('tab-1');
+  });
+
+  it('closes all tabs to the right of the target tab', () => {
+    useStudioStore.getState().openNewTab('Tab 2');
+    useStudioStore.getState().openNewTab('Tab 3');
+    useStudioStore.getState().openNewTab('Tab 4');
+    expect(useStudioStore.getState().tabs.length).toBe(4);
+
+    const tab2Id = useStudioStore.getState().tabs[1].id;
+    useStudioStore.getState().closeTabsToRight(tab2Id);
+
+    const state = useStudioStore.getState();
+    expect(state.tabs.length).toBe(2);
+    expect(state.tabs.map((t) => t.title)).toEqual(['moon_scan', 'Tab 2']);
   });
 });

@@ -303,6 +303,8 @@ interface StudioState {
   renameTab: (tabId: string, newTitle: string) => void;
   duplicateTab: (tabId: string) => void;
   reorderTabs: (sourceIndex: number, destinationIndex: number) => void;
+  closeOtherTabs: (tabId: string) => void;
+  closeTabsToRight: (tabId: string) => void;
 
   // Interactive State Machine Triggers
   addTrigger: (nodeId: string, trigger: NodeTrigger) => void;
@@ -314,12 +316,13 @@ interface StudioState {
   showToast: (msg: string, type?: 'success' | 'info' | 'error') => void;
 }
 
-const initialTab = createDefaultTab('tab-default', 'moon_scan');
+const initialTab1 = createDefaultTab('tab-1', 'Frame 1');
+const initialTab2 = createDefaultTab('tab-2', 'Composition 2');
 
 export const useStudioStore = create<StudioState>()(
   immer((set, get) => ({
-    tabs: [initialTab],
-    activeTabId: initialTab.id,
+    tabs: [initialTab1, initialTab2],
+    activeTabId: initialTab1.id,
 
     isPlaying: false,
     currentTime: 1.05,
@@ -1065,8 +1068,6 @@ export const useStudioStore = create<StudioState>()(
 
         state.tabs.push(newTab);
         loadTabState(state, newTab);
-        state.toastMessage = `Opened tab: ${newTab.title}`;
-        state.toastType = 'info';
       }),
 
     closeTab: (tabId) =>
@@ -1080,8 +1081,6 @@ export const useStudioStore = create<StudioState>()(
           freshTab.markers = [];
           state.tabs = [freshTab];
           loadTabState(state, freshTab);
-          state.toastMessage = 'Reset to new composition';
-          state.toastType = 'info';
           return;
         }
 
@@ -1134,8 +1133,6 @@ export const useStudioStore = create<StudioState>()(
 
         state.tabs.push(newTab);
         loadTabState(state, newTab);
-        state.toastMessage = `Duplicated tab: ${newTab.title}`;
-        state.toastType = 'success';
       }),
 
     reorderTabs: (sourceIndex, destinationIndex) =>
@@ -1143,6 +1140,27 @@ export const useStudioStore = create<StudioState>()(
         const [moved] = state.tabs.splice(sourceIndex, 1);
         if (moved) {
           state.tabs.splice(destinationIndex, 0, moved);
+        }
+      }),
+
+    closeOtherTabs: (tabId) =>
+      set((state) => {
+        const targetTab = state.tabs.find((t) => t.id === tabId);
+        if (!targetTab) return;
+        syncCurrentTabState(state);
+        state.tabs = [targetTab];
+        loadTabState(state, targetTab);
+      }),
+
+    closeTabsToRight: (tabId) =>
+      set((state) => {
+        const targetIdx = state.tabs.findIndex((t) => t.id === tabId);
+        if (targetIdx === -1 || targetIdx === state.tabs.length - 1) return;
+        syncCurrentTabState(state);
+        state.tabs = state.tabs.slice(0, targetIdx + 1);
+        const currentActiveStillExists = state.tabs.some((t) => t.id === state.activeTabId);
+        if (!currentActiveStillExists) {
+          loadTabState(state, state.tabs[state.tabs.length - 1]);
         }
       }),
 

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { useStudioStore } from '../store/useStudioStore';
 import { ToolMode } from '../engine/types';
 import { openProjectFromFile, serializeProject } from '../engine/projectManager';
@@ -22,8 +22,20 @@ import {
   Save,
   FilePlus,
   UploadCloud,
-  ChevronDown
+  ChevronDown,
+  X,
+  Copy,
+  Edit2,
+  ShieldClose,
+  ArrowRightToLine,
+  Check
 } from 'lucide-react';
+
+interface ContextMenuState {
+  tabId: string;
+  x: number;
+  y: number;
+}
 
 export const Header: React.FC = () => {
   const {
@@ -43,11 +55,140 @@ export const Header: React.FC = () => {
     redo,
     past,
     future,
-    showToast
+    showToast,
+    // Tab Management
+    tabs,
+    activeTabId,
+    openNewTab,
+    closeTab,
+    switchTab,
+    renameTab,
+    duplicateTab,
+    reorderTabs,
+    closeOtherTabs,
+    closeTabsToRight
   } = useStudioStore();
 
   const [shapesDropdownOpen, setShapesDropdownOpen] = useState(false);
   const [fileMenuOpen, setFileMenuOpen] = useState(false);
+  const [tabsDropdownOpen, setTabsDropdownOpen] = useState(false);
+  const [editingTabId, setEditingTabId] = useState<string | null>(null);
+  const [editingTitle, setEditingTitle] = useState('');
+  const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
+
+  // Drag and Drop Tab Reordering State
+  const [draggedTabIndex, setDraggedTabIndex] = useState<number | null>(null);
+  const [dragOverTabIndex, setDragOverTabIndex] = useState<number | null>(null);
+  const [dropPosition, setDropPosition] = useState<'left' | 'right' | null>(null);
+
+  const inputRef = useRef<HTMLInputElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
+  const tabsMenuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (editingTabId && inputRef.current) {
+      inputRef.current.focus();
+      inputRef.current.select();
+    }
+  }, [editingTabId]);
+
+  // Click outside to dismiss context menu and dropdowns
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setContextMenu(null);
+      }
+      if (tabsMenuRef.current && !tabsMenuRef.current.contains(e.target as Node)) {
+        setTabsDropdownOpen(false);
+      }
+    };
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setContextMenu(null);
+        setEditingTabId(null);
+        setFileMenuOpen(false);
+        setShapesDropdownOpen(false);
+        setTabsDropdownOpen(false);
+      }
+    };
+    window.addEventListener('mousedown', handleClickOutside);
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      window.removeEventListener('mousedown', handleClickOutside);
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, []);
+
+  const handleStartRename = (tabId: string, currentTitle: string, e?: React.MouseEvent) => {
+    e?.stopPropagation();
+    setContextMenu(null);
+    setEditingTabId(tabId);
+    setEditingTitle(currentTitle);
+  };
+
+  const handleSaveRename = (tabId: string) => {
+    if (editingTitle.trim()) {
+      renameTab(tabId, editingTitle.trim());
+    }
+    setEditingTabId(null);
+  };
+
+  const handleContextMenu = (tabId: string, e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setContextMenu({
+      tabId,
+      x: e.clientX,
+      y: e.clientY
+    });
+  };
+
+  // Drag and drop handlers
+  const handleDragStart = (e: React.DragEvent, index: number) => {
+    if (editingTabId) {
+      e.preventDefault();
+      return;
+    }
+    setDraggedTabIndex(index);
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/plain', tabs[index].id);
+  };
+
+  const handleDragOver = (e: React.DragEvent, index: number) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    if (draggedTabIndex === null) return;
+
+    const rect = e.currentTarget.getBoundingClientRect();
+    const midX = rect.left + rect.width / 2;
+    const position = e.clientX < midX ? 'left' : 'right';
+
+    setDragOverTabIndex(index);
+    setDropPosition(position);
+  };
+
+  const handleDrop = (e: React.DragEvent, targetIndex: number) => {
+    e.preventDefault();
+    if (draggedTabIndex === null) return;
+    if (draggedTabIndex !== targetIndex) {
+      let dest = targetIndex;
+      if (dropPosition === 'right') {
+        dest = draggedTabIndex < targetIndex ? targetIndex : targetIndex + 1;
+      } else {
+        dest = draggedTabIndex < targetIndex ? (targetIndex > 0 ? targetIndex - 1 : 0) : targetIndex;
+      }
+      reorderTabs(draggedTabIndex, dest);
+    }
+    setDraggedTabIndex(null);
+    setDragOverTabIndex(null);
+    setDropPosition(null);
+  };
+
+  const handleDragEnd = () => {
+    setDraggedTabIndex(null);
+    setDragOverTabIndex(null);
+    setDropPosition(null);
+  };
 
   const tools: { id: ToolMode; label: string; icon: React.ReactNode }[] = [
     { id: 'select', label: 'Select Tool (V)', icon: <MousePointer className="w-3.5 h-3.5" /> },
@@ -151,83 +292,259 @@ export const Header: React.FC = () => {
   };
 
   return (
-    <header className="h-16 flex items-center justify-between px-6 border-b border-app-border shrink-0 z-10 bg-white/80 backdrop-blur-md select-none">
-      {/* Brand & File Menu */}
-      <div className="flex items-center gap-3 relative">
-        <button
-          onClick={() => setFileMenuOpen(!fileMenuOpen)}
-          className="bg-white px-4 py-2 rounded-full shadow-sm font-semibold flex items-center gap-2 hover:bg-gray-50 border border-gray-100 transition-all active:scale-95"
+    <header className="h-14 flex items-center justify-between px-4 border-b border-app-border shrink-0 z-20 bg-white/90 backdrop-blur-md select-none relative">
+      {/* Left: Brand & Dynamic Auto-Shrinking Document Tabs */}
+      <div className="flex items-center gap-2 max-w-[calc(50%-195px)] min-w-0 z-10">
+        {/* Brand Menu Button */}
+        <div className="relative shrink-0">
+          <button
+            type="button"
+            onClick={() => setFileMenuOpen(!fileMenuOpen)}
+            className="h-9 bg-white px-3.5 py-1.5 rounded-2xl shadow-2xs font-semibold flex items-center gap-1.5 hover:bg-gray-50 border border-gray-200 hover:border-gray-300 transition-all active:scale-95 text-xs text-slate-800 shrink-0"
+          >
+            <Compass className="w-4 h-4 text-blue-600" />
+            <span className="bg-gradient-to-r from-gray-900 to-gray-700 bg-clip-text text-transparent font-bold">
+              OpenSVG
+            </span>
+            <ChevronDown className="w-3 h-3 text-gray-400" />
+          </button>
+
+          {/* File Dropdown Menu */}
+          {fileMenuOpen && (
+            <div className="absolute top-11 left-0 w-52 bg-white/95 backdrop-blur-md rounded-2xl shadow-xl border border-gray-100 p-1.5 flex flex-col gap-0.5 z-50 animate-in fade-in zoom-in-95">
+              <button
+                type="button"
+                onClick={() => {
+                  createNewProject();
+                  setFileMenuOpen(false);
+                }}
+                className="flex items-center gap-2.5 px-3 py-2 text-xs font-semibold text-gray-700 hover:bg-gray-100 rounded-xl transition-colors text-left"
+              >
+                <FilePlus className="w-4 h-4 text-gray-500" />
+                New Project
+              </button>
+              <button
+                type="button"
+                onClick={handleOpenProject}
+                className="flex items-center gap-2.5 px-3 py-2 text-xs font-semibold text-gray-700 hover:bg-gray-100 rounded-xl transition-colors text-left"
+              >
+                <FolderOpen className="w-4 h-4 text-blue-500" />
+                Open File (.kinetic)
+              </button>
+              <button
+                type="button"
+                onClick={handleImportSvg}
+                className="flex items-center gap-2.5 px-3 py-2 text-xs font-semibold text-gray-700 hover:bg-gray-100 rounded-xl transition-colors text-left"
+              >
+                <UploadCloud className="w-4 h-4 text-purple-500" />
+                Import SVG Asset...
+              </button>
+              <button
+                type="button"
+                onClick={handleSaveProject}
+                className="flex items-center gap-2.5 px-3 py-2 text-xs font-semibold text-gray-700 hover:bg-gray-100 rounded-xl transition-colors text-left"
+              >
+                <Save className="w-4 h-4 text-emerald-500" />
+                Save Project (Ctrl+S)
+              </button>
+              <div className="h-[1px] bg-gray-100 my-0.5" />
+              <button
+                type="button"
+                onClick={() => {
+                  setExportOpen(true);
+                  setFileMenuOpen(false);
+                }}
+                className="flex items-center gap-2.5 px-3 py-2 text-xs font-semibold text-gray-700 hover:bg-blue-50 hover:text-blue-600 rounded-xl transition-colors text-left"
+              >
+                <Download className="w-4 h-4 text-indigo-500" />
+                Export Assets...
+              </button>
+            </div>
+          )}
+        </div>
+
+        <div className="w-[1px] h-4 bg-gray-200 shrink-0 mx-0.5" />
+
+        {/* Dynamic Artboard Tab Bar with Smooth Wheel-Scroll (Zero Scrollbar) */}
+        <div
+          role="tablist"
+          aria-label="Document Artboard Tabs"
+          onWheel={(e) => {
+            e.currentTarget.scrollLeft += e.deltaY;
+          }}
+          className="flex items-center gap-1.5 flex-1 min-w-0 overflow-x-auto no-scrollbar py-0.5"
         >
-          <Compass className="w-4 h-4 text-blue-600" />
-          <span className="bg-gradient-to-r from-gray-900 to-gray-700 bg-clip-text text-transparent font-bold">
-            OpenSVG
-          </span>
-          <ChevronDown className="w-3.5 h-3.5 text-gray-400" />
-        </button>
+          {tabs.map((tab, index) => {
+            const isActive = tab.id === activeTabId;
+            const isEditing = editingTabId === tab.id;
+            const isDragging = draggedTabIndex === index;
+            const isOver = dragOverTabIndex === index;
 
-        {/* File Dropdown Menu */}
-        {fileMenuOpen && (
-          <div className="absolute top-14 left-0 w-52 bg-white rounded-2xl shadow-xl border border-gray-100 p-1.5 flex flex-col gap-1 z-50 animate-in fade-in zoom-in-95">
-            <button
-              onClick={() => {
-                createNewProject();
-                setFileMenuOpen(false);
-              }}
-              className="flex items-center gap-2.5 px-3 py-2 text-xs font-semibold text-gray-700 hover:bg-gray-100 rounded-xl transition-colors text-left"
-            >
-              <FilePlus className="w-4 h-4 text-gray-500" />
-              New Project
-            </button>
-            <button
-              onClick={handleOpenProject}
-              className="flex items-center gap-2.5 px-3 py-2 text-xs font-semibold text-gray-700 hover:bg-gray-100 rounded-xl transition-colors text-left"
-            >
-              <FolderOpen className="w-4 h-4 text-blue-500" />
-              Open File (.kinetic)
-            </button>
-            <button
-              onClick={handleImportSvg}
-              className="flex items-center gap-2.5 px-3 py-2 text-xs font-semibold text-gray-700 hover:bg-gray-100 rounded-xl transition-colors text-left"
-            >
-              <UploadCloud className="w-4 h-4 text-purple-500" />
-              Import SVG Asset...
-            </button>
-            <button
-              onClick={handleSaveProject}
-              className="flex items-center gap-2.5 px-3 py-2 text-xs font-semibold text-gray-700 hover:bg-gray-100 rounded-xl transition-colors text-left"
-            >
-              <Save className="w-4 h-4 text-emerald-500" />
-              Save Project (Ctrl+S)
-            </button>
-            <div className="h-[1px] bg-gray-100 my-0.5" />
-            <button
-              onClick={() => {
-                setExportOpen(true);
-                setFileMenuOpen(false);
-              }}
-              className="flex items-center gap-2.5 px-3 py-2 text-xs font-semibold text-gray-700 hover:bg-blue-50 hover:text-blue-600 rounded-xl transition-colors text-left"
-            >
-              <Download className="w-4 h-4 text-indigo-500" />
-              Export Assets...
-            </button>
-          </div>
-        )}
+            return (
+              <div
+                key={tab.id}
+                role="tab"
+                aria-selected={isActive}
+                tabIndex={0}
+                draggable={!isEditing}
+                onDragStart={(e) => handleDragStart(e, index)}
+                onDragOver={(e) => handleDragOver(e, index)}
+                onDrop={(e) => handleDrop(e, index)}
+                onDragEnd={handleDragEnd}
+                onClick={() => switchTab(tab.id)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    if (!isEditing) switchTab(tab.id);
+                  } else if (e.key === 'F2') {
+                    handleStartRename(tab.id, tab.title);
+                  }
+                }}
+                onDoubleClick={(e) => handleStartRename(tab.id, tab.title, e)}
+                onContextMenu={(e) => handleContextMenu(tab.id, e)}
+                className={`group relative h-9 shrink-0 max-w-[155px] min-w-[100px] px-3 rounded-2xl flex items-center justify-between text-xs cursor-grab active:cursor-grabbing transition-all select-none outline-none focus-visible:ring-2 focus-visible:ring-blue-500 ${
+                  isDragging
+                    ? 'opacity-40 scale-95 border-2 border-dashed border-blue-400 bg-blue-50/50'
+                    : isActive
+                    ? 'bg-white text-slate-900 border border-slate-300 shadow-xs ring-1 ring-black/5 font-semibold z-10'
+                    : 'bg-slate-100/80 text-slate-600 hover:bg-slate-200/70 hover:text-slate-900 border border-slate-200/90 hover:border-slate-300 font-medium'
+                }`}
+              >
+                {/* Drop Insertion Bar Indicator */}
+                {isOver && !isDragging && (
+                  <div
+                    className={`absolute top-1 bottom-1 w-1 bg-blue-600 rounded-full z-30 motion-safe:animate-pulse pointer-events-none ${
+                      dropPosition === 'left' ? '-left-1' : '-right-1'
+                    }`}
+                  />
+                )}
 
-        <span className="text-xs bg-blue-50 text-blue-600 font-medium px-2.5 py-1 rounded-full border border-blue-100 hidden sm:inline-block">
-          Desktop Studio
-        </span>
+                {/* Tab Title / Inline Input */}
+                <div className="flex items-center gap-1.5 truncate mr-1 flex-1 min-w-0">
+                  <div
+                    className={`w-2 h-2 rounded-full shrink-0 transition-colors ${
+                      isActive ? 'bg-blue-600 shadow-xs ring-2 ring-blue-100' : 'bg-slate-300 group-hover:bg-slate-400'
+                    }`}
+                  />
+                  {isEditing ? (
+                    <input
+                      ref={inputRef}
+                      type="text"
+                      value={editingTitle}
+                      onChange={(e) => setEditingTitle(e.target.value)}
+                      onBlur={() => handleSaveRename(tab.id)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') handleSaveRename(tab.id);
+                        if (e.key === 'Escape') setEditingTabId(null);
+                      }}
+                      className="bg-white text-slate-900 text-xs px-1.5 py-0.5 rounded-lg border border-blue-500 ring-2 ring-blue-100 outline-none w-full font-medium"
+                      onClick={(e) => e.stopPropagation()}
+                    />
+                  ) : (
+                    <span className="truncate text-xs tracking-tight" title={`${tab.title} (Double-click to rename, Drag to reorder)`}>
+                      {tab.title}
+                    </span>
+                  )}
+                </div>
+
+                {/* Tab Actions: Close */}
+                <div className="flex items-center gap-0.5 shrink-0">
+                  <button
+                    type="button"
+                    title="Close Tab (Ctrl+W)"
+                    aria-label={`Close ${tab.title}`}
+                    tabIndex={isActive ? 0 : -1}
+                    aria-hidden={!isActive}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      closeTab(tab.id);
+                    }}
+                    className={`p-1 rounded-lg hover:bg-red-50 hover:text-red-500 transition-all outline-none ${
+                      isActive ? 'text-slate-400' : 'opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 focus:opacity-100 text-slate-400'
+                    }`}
+                  >
+                    <X className="w-3 h-3" />
+                  </button>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Fixed New Tab Button (+) & Artboards Quick Switcher */}
+        <div className="flex items-center gap-1 shrink-0">
+          <button
+            type="button"
+            title="New Artboard / Composition (Ctrl+T)"
+            aria-label="New Artboard / Composition"
+            onClick={() => openNewTab()}
+            className="h-9 w-9 flex items-center justify-center rounded-2xl bg-white/80 hover:bg-white text-slate-600 hover:text-blue-600 border border-slate-200 hover:border-blue-300 shadow-2xs hover:shadow-xs transition-all shrink-0 outline-none focus-visible:ring-2 focus-visible:ring-blue-500 font-semibold text-xs"
+          >
+            <Plus className="w-3.5 h-3.5" />
+          </button>
+
+          {/* All Tabs Quick Switcher Dropdown (Shown when >= 3 tabs) */}
+          {tabs.length >= 3 && (
+            <div className="relative shrink-0">
+              <button
+                type="button"
+                title={`View all ${tabs.length} open artboards`}
+                aria-label={`View all ${tabs.length} open artboards`}
+                onClick={() => setTabsDropdownOpen(!tabsDropdownOpen)}
+                className="h-9 px-2 flex items-center justify-center gap-1 rounded-2xl bg-slate-100 hover:bg-slate-200/80 text-slate-600 hover:text-slate-900 border border-slate-200 hover:border-slate-300 transition-all text-xs font-semibold"
+              >
+                <span>{tabs.length}</span>
+                <ChevronDown className="w-3 h-3 text-slate-400" />
+              </button>
+
+              {tabsDropdownOpen && (
+                <div
+                  ref={tabsMenuRef}
+                  className="absolute top-11 left-0 w-56 max-h-80 overflow-y-auto bg-white/95 backdrop-blur-md rounded-2xl shadow-xl border border-slate-200 p-1.5 flex flex-col gap-0.5 z-50 animate-in fade-in zoom-in-95"
+                >
+                  <div className="px-2.5 py-1 text-[11px] font-bold uppercase tracking-wider text-slate-500">
+                    Open Artboards ({tabs.length})
+                  </div>
+                  {tabs.map((tab) => {
+                    const isTabActive = tab.id === activeTabId;
+                    return (
+                      <button
+                        key={tab.id}
+                        type="button"
+                        onClick={() => {
+                          switchTab(tab.id);
+                          setTabsDropdownOpen(false);
+                        }}
+                        className={`flex items-center justify-between px-2.5 py-1.5 text-xs rounded-xl transition-colors text-left ${
+                          isTabActive ? 'bg-blue-50 text-blue-700 font-semibold' : 'text-slate-700 hover:bg-slate-100 font-medium'
+                        }`}
+                      >
+                        <div className="flex items-center gap-2 truncate">
+                          <div className={`w-2 h-2 rounded-full shrink-0 ${isTabActive ? 'bg-blue-600' : 'bg-slate-300'}`} />
+                          <span className="truncate">{tab.title}</span>
+                        </div>
+                        {isTabActive && <Check className="w-3.5 h-3.5 text-blue-600 shrink-0" />}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
       </div>
 
-      {/* Tool Group Center */}
-      <div className="flex items-center bg-gray-100/90 rounded-full p-1 shadow-inner border border-gray-200/80 relative">
+      {/* Center: Tool Group Floating Pill (PERMANENTLY DEAD-CENTERED) */}
+      <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 flex items-center bg-gray-100/90 rounded-full p-1 shadow-inner border border-gray-200/80 z-30 pointer-events-auto">
         {tools.map((t) => {
           const isActive = selectedTool === t.id;
           return (
             <button
               key={t.id}
+              type="button"
               title={t.label}
+              aria-label={t.label}
               onClick={() => setSelectedTool(t.id)}
-              className={`w-9 h-9 rounded-full flex items-center justify-center transition-all duration-150 ${
+              className={`w-8 h-8 rounded-full flex items-center justify-center transition-all duration-150 ${
                 isActive
                   ? 'bg-blue-500 text-white shadow-sm'
                   : 'text-gray-600 hover:bg-white hover:text-gray-900'
@@ -241,9 +558,11 @@ export const Header: React.FC = () => {
         {/* Shapes Menu */}
         <div className="relative">
           <button
+            type="button"
             title="Shapes Tool"
+            aria-label="Shapes Tool"
             onClick={() => setShapesDropdownOpen(!shapesDropdownOpen)}
-            className={`w-9 h-9 rounded-full flex items-center justify-center transition-all duration-150 ${
+            className={`w-8 h-8 rounded-full flex items-center justify-center transition-all duration-150 ${
               shapesDropdownOpen
                 ? 'bg-blue-500 text-white shadow-sm'
                 : 'text-gray-600 hover:bg-white hover:text-gray-900'
@@ -253,24 +572,27 @@ export const Header: React.FC = () => {
           </button>
 
           {shapesDropdownOpen && (
-            <div className="absolute top-11 left-0 bg-white rounded-2xl shadow-xl border border-gray-100 p-2 flex flex-col gap-1 min-w-[140px] z-50 animate-in fade-in zoom-in-95">
+            <div className="absolute top-10 left-0 bg-white/95 backdrop-blur-md rounded-2xl shadow-xl border border-gray-100 p-1.5 flex flex-col gap-0.5 min-w-[140px] z-50 animate-in fade-in zoom-in-95">
               <button
+                type="button"
                 onClick={() => handleAddShape('rect')}
-                className="flex items-center gap-2 px-3 py-2 text-xs font-semibold text-gray-700 hover:bg-gray-100 rounded-xl transition-colors text-left"
+                className="flex items-center gap-2 px-3 py-1.5 text-xs font-semibold text-gray-700 hover:bg-gray-100 rounded-xl transition-colors text-left"
               >
                 <Square className="w-3.5 h-3.5 text-purple-500" />
                 Rectangle
               </button>
               <button
+                type="button"
                 onClick={() => handleAddShape('circle')}
-                className="flex items-center gap-2 px-3 py-2 text-xs font-semibold text-gray-700 hover:bg-gray-100 rounded-xl transition-colors text-left"
+                className="flex items-center gap-2 px-3 py-1.5 text-xs font-semibold text-gray-700 hover:bg-gray-100 rounded-xl transition-colors text-left"
               >
                 <Circle className="w-3.5 h-3.5 text-emerald-500" />
                 Circle / Oval
               </button>
               <button
+                type="button"
                 onClick={() => handleAddShape('star')}
-                className="flex items-center gap-2 px-3 py-2 text-xs font-semibold text-gray-700 hover:bg-gray-100 rounded-xl transition-colors text-left"
+                className="flex items-center gap-2 px-3 py-1.5 text-xs font-semibold text-gray-700 hover:bg-gray-100 rounded-xl transition-colors text-left"
               >
                 <Star className="w-3.5 h-3.5 text-amber-500" />
                 Star Shape
@@ -280,9 +602,11 @@ export const Header: React.FC = () => {
         </div>
 
         <button
-          title="Text Tool"
+          type="button"
+          title="Text Tool (T)"
+          aria-label="Text Tool (T)"
           onClick={() => setSelectedTool('text')}
-          className={`w-9 h-9 rounded-full flex items-center justify-center transition-all duration-150 ${
+          className={`w-8 h-8 rounded-full flex items-center justify-center transition-all duration-150 ${
             selectedTool === 'text'
               ? 'bg-blue-500 text-white shadow-sm'
               : 'text-gray-600 hover:bg-white hover:text-gray-900'
@@ -291,52 +615,133 @@ export const Header: React.FC = () => {
           <Type className="w-3.5 h-3.5" />
         </button>
 
-        <div className="w-[1px] h-5 bg-gray-300 mx-1" />
+        <div className="w-[1px] h-4 bg-gray-300 mx-1" />
 
         <button
+          type="button"
           title="Undo (Ctrl+Z)"
+          aria-label="Undo (Ctrl+Z)"
           onClick={undo}
           disabled={past.length === 0}
-          className="w-9 h-9 rounded-full flex items-center justify-center text-gray-500 hover:text-gray-900 hover:bg-white transition-all disabled:opacity-30 disabled:pointer-events-none"
+          className="w-8 h-8 rounded-full flex items-center justify-center text-gray-500 hover:text-gray-900 hover:bg-white transition-all disabled:opacity-30 disabled:pointer-events-none"
         >
           <RotateCcw className="w-3.5 h-3.5" />
         </button>
         <button
+          type="button"
           title="Redo (Ctrl+Y / Ctrl+Shift+Z)"
+          aria-label="Redo (Ctrl+Y)"
           onClick={redo}
           disabled={future.length === 0}
-          className="w-9 h-9 rounded-full flex items-center justify-center text-gray-500 hover:text-gray-900 hover:bg-white transition-all disabled:opacity-30 disabled:pointer-events-none"
+          className="w-8 h-8 rounded-full flex items-center justify-center text-gray-500 hover:text-gray-900 hover:bg-white transition-all disabled:opacity-30 disabled:pointer-events-none"
         >
           <RotateCw className="w-3.5 h-3.5" />
         </button>
 
-        <div className="w-[1px] h-5 bg-gray-300 mx-1" />
+        <div className="w-[1px] h-4 bg-gray-300 mx-1" />
 
         <button
+          type="button"
           title="Export Animation (Ctrl+E)"
+          aria-label="Export Animation"
           onClick={() => setExportOpen(true)}
-          className="w-9 h-9 rounded-full flex items-center justify-center text-gray-600 hover:bg-blue-50 hover:text-blue-600 transition-all"
+          className="w-8 h-8 rounded-full flex items-center justify-center text-gray-600 hover:bg-blue-50 hover:text-blue-600 transition-all"
         >
           <Download className="w-3.5 h-3.5" />
         </button>
         <button
+          type="button"
           title="Project Settings"
+          aria-label="Project Settings"
           onClick={() => setSettingsOpen(true)}
-          className="w-9 h-9 rounded-full flex items-center justify-center text-gray-600 hover:bg-white hover:text-gray-900 transition-all"
+          className="w-8 h-8 rounded-full flex items-center justify-center text-gray-600 hover:bg-white hover:text-gray-900 transition-all"
         >
           <Settings className="w-3.5 h-3.5" />
         </button>
       </div>
 
-      {/* Right Quick Actions */}
-      <div className="flex items-center gap-2">
+      {/* Right: Resolution Info & New Element */}
+      <div className="flex items-center gap-2.5 shrink-0 z-10">
+        <span className="text-xs font-mono bg-gray-100 text-gray-600 px-2.5 py-1 rounded-full border border-gray-200 hidden xl:inline-block">
+          {rootFrame.width} × {rootFrame.height} • {fps} FPS
+        </span>
+
         <button
+          type="button"
           onClick={() => handleAddShape('rect')}
-          className="bg-blue-500 hover:bg-blue-600 text-white px-3.5 py-1.5 rounded-full text-xs font-semibold shadow-sm flex items-center gap-1.5 transition-all active:scale-95"
+          className="bg-blue-500 hover:bg-blue-600 text-white px-3.5 py-1.5 rounded-full text-xs font-semibold shadow-xs flex items-center gap-1.5 transition-all active:scale-95"
         >
           <Plus className="w-3.5 h-3.5" /> New Element
         </button>
       </div>
+
+      {/* Tab Right-Click Context Menu Popup */}
+      {contextMenu && (
+        <div
+          ref={menuRef}
+          role="menu"
+          aria-label="Artboard options"
+          style={{ top: contextMenu.y + 4, left: Math.min(contextMenu.x, window.innerWidth - 190) }}
+          className="fixed bg-white/95 backdrop-blur-md rounded-2xl shadow-xl border border-slate-200/90 p-1.5 flex flex-col gap-0.5 z-50 min-w-[170px] text-xs text-slate-700 animate-in fade-in zoom-in-95 select-none"
+        >
+          <button
+            type="button"
+            onClick={() => {
+              const tab = tabs.find((t) => t.id === contextMenu.tabId);
+              if (tab) handleStartRename(tab.id, tab.title);
+            }}
+            className="flex items-center gap-2 px-2.5 py-1.5 rounded-xl hover:bg-slate-100 transition-colors text-left font-medium"
+          >
+            <Edit2 className="w-3.5 h-3.5 text-slate-500" />
+            Rename Artboard
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              duplicateTab(contextMenu.tabId);
+              setContextMenu(null);
+            }}
+            className="flex items-center gap-2 px-2.5 py-1.5 rounded-xl hover:bg-slate-100 transition-colors text-left font-medium"
+          >
+            <Copy className="w-3.5 h-3.5 text-slate-500" />
+            Duplicate Artboard
+          </button>
+          <div className="h-[1px] bg-slate-100 my-0.5" />
+          <button
+            type="button"
+            onClick={() => {
+              closeTab(contextMenu.tabId);
+              setContextMenu(null);
+            }}
+            className="flex items-center gap-2 px-2.5 py-1.5 rounded-xl hover:bg-red-50 text-red-600 transition-colors text-left font-medium"
+          >
+            <X className="w-3.5 h-3.5 text-red-500" />
+            Close Artboard
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              closeOtherTabs(contextMenu.tabId);
+              setContextMenu(null);
+            }}
+            className="flex items-center gap-2 px-2.5 py-1.5 rounded-xl hover:bg-slate-100 transition-colors text-left font-medium"
+          >
+            <ShieldClose className="w-3.5 h-3.5 text-slate-500" />
+            Close Other Artboards
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              closeTabsToRight(contextMenu.tabId);
+              setContextMenu(null);
+            }}
+            className="flex items-center gap-2 px-2.5 py-1.5 rounded-xl hover:bg-slate-100 transition-colors text-left font-medium"
+          >
+            <ArrowRightToLine className="w-3.5 h-3.5 text-slate-500" />
+            Close Tabs to the Right
+          </button>
+        </div>
+      )}
     </header>
   );
 };
