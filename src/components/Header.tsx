@@ -31,7 +31,10 @@ import {
   ArrowRightToLine,
   Check,
   Sun,
-  Moon
+  Moon,
+  Sparkles,
+  LayoutTemplate,
+  Monitor
 } from 'lucide-react';
 
 interface ContextMenuState {
@@ -47,6 +50,7 @@ export const Header: React.FC = () => {
     setSelectedTool,
     setExportOpen,
     setSettingsOpen,
+    setPresetsModalOpen,
     addNode,
     rootFrame,
     nodes,
@@ -70,12 +74,16 @@ export const Header: React.FC = () => {
     duplicateTab,
     reorderTabs,
     closeOtherTabs,
-    closeTabsToRight
+    closeTabsToRight,
+    workspace,
+    setWorkspacePreset,
+    resetWorkspace
   } = useStudioStore();
 
   const [shapesDropdownOpen, setShapesDropdownOpen] = useState(false);
   const [fileMenuOpen, setFileMenuOpen] = useState(false);
   const [tabsDropdownOpen, setTabsDropdownOpen] = useState(false);
+  const [workspaceMenuOpen, setWorkspaceMenuOpen] = useState(false);
   const [editingTabId, setEditingTabId] = useState<string | null>(null);
   const [editingTitle, setEditingTitle] = useState('');
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
@@ -646,6 +654,16 @@ export const Header: React.FC = () => {
 
         <button
           type="button"
+          title="Motion Presets & Transitions Library"
+          aria-label="Motion Presets & Transitions"
+          onClick={() => setPresetsModalOpen(true)}
+          className="w-8 h-8 rounded-full flex items-center justify-center text-amber-500 dark:text-amber-400 hover:bg-amber-50 hover:dark:bg-amber-950/40 hover:text-amber-600 hover:dark:text-amber-300 transition-all"
+        >
+          <Sparkles className="w-3.5 h-3.5" />
+        </button>
+
+        <button
+          type="button"
           title="Export Animation (Ctrl+E)"
           aria-label="Export Animation"
           onClick={() => setExportOpen(true)}
@@ -669,6 +687,105 @@ export const Header: React.FC = () => {
         <span className="text-xs font-mono bg-gray-100 dark:bg-zinc-800 text-gray-600 dark:text-zinc-400 px-2.5 py-1 rounded-full border border-gray-200 dark:border-zinc-700 hidden xl:inline-block">
           {rootFrame.width} × {rootFrame.height} • {fps} FPS
         </span>
+
+        {/* Workspace Layout Presets Dropdown */}
+        <div className="relative">
+          <button
+            type="button"
+            title="Switch Workspace Layout"
+            onClick={() => setWorkspaceMenuOpen(!workspaceMenuOpen)}
+            className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-2xl border text-xs font-medium transition-all ${
+              workspaceMenuOpen
+                ? 'bg-blue-50 dark:bg-blue-950/60 border-blue-300 dark:border-blue-700 text-blue-600 dark:text-blue-400 shadow-2xs font-semibold'
+                : 'bg-white dark:bg-zinc-800 border-gray-200 dark:border-zinc-700 text-slate-700 dark:text-zinc-300 hover:bg-slate-50 dark:hover:bg-zinc-700 shadow-2xs'
+            }`}
+          >
+            <LayoutTemplate className="w-3.5 h-3.5 text-blue-500" />
+            <span className="hidden md:inline capitalize">{workspace.activePreset} Layout</span>
+            <ChevronDown className="w-3 h-3 opacity-60" />
+          </button>
+
+          {workspaceMenuOpen && (
+            <div
+              className="absolute right-0 top-full mt-2 w-52 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-2xl shadow-xl p-1.5 z-50 flex flex-col gap-0.5 text-xs animate-in fade-in zoom-in-95"
+              onMouseLeave={() => setWorkspaceMenuOpen(false)}
+            >
+              <div className="px-2.5 py-1 text-[10px] font-semibold text-slate-400 dark:text-zinc-500 uppercase">
+                Workspace Presets
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setWorkspacePreset('default');
+                  setWorkspaceMenuOpen(false);
+                }}
+                className={`flex items-center justify-between px-2.5 py-1.5 rounded-xl transition-colors text-left font-medium ${
+                  workspace.activePreset === 'default'
+                    ? 'bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 font-semibold'
+                    : 'hover:bg-slate-100 hover:dark:bg-zinc-800 text-slate-700 dark:text-zinc-300'
+                }`}
+              >
+                <div className="flex items-center gap-2">
+                  <LayoutTemplate className="w-3.5 h-3.5" />
+                  <span>Default Studio</span>
+                </div>
+                {workspace.activePreset === 'default' && <Check className="w-3.5 h-3.5" />}
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setWorkspacePreset('animation');
+                  setWorkspaceMenuOpen(false);
+                }}
+                className={`flex items-center justify-between px-2.5 py-1.5 rounded-xl transition-colors text-left font-medium ${
+                  workspace.activePreset === 'animation'
+                    ? 'bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 font-semibold'
+                    : 'hover:bg-slate-100 hover:dark:bg-zinc-800 text-slate-700 dark:text-zinc-300'
+                }`}
+              >
+                <div className="flex items-center gap-2">
+                  <Monitor className="w-3.5 h-3.5 text-indigo-500" />
+                  <span>Animation Focus</span>
+                </div>
+                {workspace.activePreset === 'animation' && <Check className="w-3.5 h-3.5" />}
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setWorkspacePreset('design');
+                  setWorkspaceMenuOpen(false);
+                }}
+                className={`flex items-center justify-between px-2.5 py-1.5 rounded-xl transition-colors text-left font-medium ${
+                  workspace.activePreset === 'design'
+                    ? 'bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 font-semibold'
+                    : 'hover:bg-slate-100 hover:dark:bg-zinc-800 text-slate-700 dark:text-zinc-300'
+                }`}
+              >
+                <div className="flex items-center gap-2">
+                  <Sparkles className="w-3.5 h-3.5 text-amber-500" />
+                  <span>Design Focus</span>
+                </div>
+                {workspace.activePreset === 'design' && <Check className="w-3.5 h-3.5" />}
+              </button>
+
+              <div className="h-[1px] bg-slate-100 dark:bg-zinc-800 my-1" />
+
+              <button
+                type="button"
+                onClick={() => {
+                  resetWorkspace();
+                  setWorkspaceMenuOpen(false);
+                }}
+                className="flex items-center gap-2 px-2.5 py-1.5 rounded-xl hover:bg-slate-100 hover:dark:bg-zinc-800 text-slate-600 dark:text-zinc-400 transition-colors text-left font-medium"
+              >
+                <RotateCcw className="w-3.5 h-3.5" />
+                <span>Reset Workspace</span>
+              </button>
+            </div>
+          )}
+        </div>
 
         {/* Circular Reveal Theme Switcher Button with Dynamic Micro-Animation & Glow Hover */}
         <button

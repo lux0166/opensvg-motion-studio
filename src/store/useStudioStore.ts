@@ -5,6 +5,8 @@ import { SnapLine } from '../engine/snapping';
 import { StudioSnapshot, createStudioSnapshot, MAX_HISTORY_STEPS } from '../engine/history';
 import { BooleanOpType, executeBooleanOperation } from '../engine/booleanOps';
 import { detectSyntheticBeats } from '../engine/audioEngine';
+import { applyMotionPresetToNode, PresetOptions } from '../engine/motionPresets';
+import { WorkspaceLayoutState, WORKSPACE_PRESETS, PanelId, SnapPosition, DockContainer, ActiveDraggingState, DragHoverTargetState } from '../engine/workspaceTypes';
 
 function pushDraftSnapshot(state: any) {
   const snap = createStudioSnapshot(state.rootFrame, state.nodes, state.nodeOrder);
@@ -225,6 +227,7 @@ interface StudioState {
   // Modals
   isExportOpen: boolean;
   isSettingsOpen: boolean;
+  isGraphEditorOpen: boolean;
   toastMessage: string | null;
   toastType: 'success' | 'info' | 'error';
 
@@ -233,6 +236,7 @@ interface StudioState {
   setCurrentTime: (time: number) => void;
   setDuration: (duration: number) => void;
   setLoop: (loop: boolean) => void;
+  toggleGraphEditor: () => void;
   setTimelineMode: (mode: TimelineMode) => void;
   setZoom: (zoom: number) => void;
   setPan: (x: number, y: number) => void;
@@ -309,6 +313,26 @@ interface StudioState {
   // Interactive State Machine Triggers
   addTrigger: (nodeId: string, trigger: NodeTrigger) => void;
   removeTrigger: (nodeId: string, triggerId: string) => void;
+
+  // Motion Presets & Transitions Engine
+  isPresetsModalOpen: boolean;
+  setPresetsModalOpen: (open: boolean) => void;
+  applyMotionPreset: (nodeId: string, presetId: string, options?: Partial<PresetOptions>) => void;
+  applyMotionPresetToSelection: (presetId: string, options?: Partial<PresetOptions>) => void;
+
+  // Flexible Workspace & Dockable Panels Engine
+  workspace: WorkspaceLayoutState;
+  activeDraggingPanel: ActiveDraggingState | null;
+  dragHoverTarget: DragHoverTargetState | null;
+  movePanel: (sourceContainerId: string, targetContainerId: string, position: SnapPosition, panelId: PanelId) => void;
+  setActivePanelInContainer: (containerId: string, panelId: PanelId) => void;
+  resizeWorkspaceColumn: (column: 'left' | 'right' | 'bottom' | 'graphEditor', deltaPx: number) => void;
+  resizeContainerInColumn: (column: 'left' | 'right', index: number, stepDeltaPx: number) => void;
+  toggleWorkspaceCollapse: (column: 'left' | 'right' | 'bottom') => void;
+  setWorkspacePreset: (preset: 'default' | 'animation' | 'design') => void;
+  resetWorkspace: () => void;
+  setDraggingPanel: (drag: ActiveDraggingState | null) => void;
+  setDragHoverTarget: (target: DragHoverTargetState | null) => void;
 
   // Modals & Feedback
   theme: 'light' | 'dark';
@@ -478,6 +502,7 @@ export const useStudioStore = create<StudioState>()(
 
     isExportOpen: false,
     isSettingsOpen: false,
+    isGraphEditorOpen: true,
     toastMessage: null,
     toastType: 'info',
 
@@ -532,6 +557,7 @@ export const useStudioStore = create<StudioState>()(
     setCurrentTime: (time) => set({ currentTime: Math.max(0, Math.min(get().duration, time)) }),
     setDuration: (duration) => set({ duration: Math.max(1, duration) }),
     setLoop: (loop) => set({ loop }),
+    toggleGraphEditor: () => set((state) => ({ isGraphEditorOpen: !state.isGraphEditorOpen })),
     setTimelineMode: (mode) => set({ timelineMode: mode }),
     setZoom: (zoom) => set({ zoom: Math.max(0.15, Math.min(3.0, zoom)) }),
     setPan: (panX, panY) => set({ panX, panY }),
@@ -1188,6 +1214,218 @@ export const useStudioStore = create<StudioState>()(
         node.triggers = node.triggers.filter((t) => t.id !== triggerId);
         state.toastMessage = 'Removed trigger';
         state.toastType = 'info';
+      }),
+
+    isPresetsModalOpen: false,
+    setPresetsModalOpen: (open) => set({ isPresetsModalOpen: open }),
+
+    applyMotionPreset: (nodeId, presetId, options) =>
+      set((state) => {
+        pushDraftSnapshot(state);
+        const node = state.nodes[nodeId];
+        if (!node) return;
+        state.nodes[nodeId] = applyMotionPresetToNode(node, presetId, options);
+        state.toastMessage = `Applied motion preset to ${node.name}`;
+        state.toastType = 'success';
+      }),
+
+    applyMotionPresetToSelection: (presetId, options) =>
+      set((state) => {
+        const targetIds = state.selectedIds.length > 0
+          ? state.selectedIds
+          : state.selectedId
+          ? [state.selectedId]
+          : [];
+
+        if (targetIds.length === 0) {
+          state.toastMessage = 'Please select at least one layer to apply preset';
+          state.toastType = 'info';
+          return;
+        }
+
+        pushDraftSnapshot(state);
+        for (const id of targetIds) {
+          const node = state.nodes[id];
+          if (node && node.id !== 'frame-1') {
+            state.nodes[id] = applyMotionPresetToNode(node, presetId, options);
+          }
+        }
+        state.toastMessage = `Applied preset to ${targetIds.length} layer${targetIds.length > 1 ? 's' : ''}`;
+        state.toastType = 'success';
+      }),
+
+    // Flexible Workspace & Dockable Panels State & Actions
+    workspace: (() => {
+      if (typeof window !== 'undefined') {
+        try {
+          const saved = localStorage.getItem('opensvg_workspace_v2');
+          if (saved) return JSON.parse(saved);
+        } catch {
+          // fallback
+        }
+      }
+      return WORKSPACE_PRESETS.default;
+    })(),
+
+    activeDraggingPanel: null,
+    dragHoverTarget: null,
+
+    setDraggingPanel: (drag) => set({ activeDraggingPanel: drag }),
+    setDragHoverTarget: (target) => set({ dragHoverTarget: target }),
+
+    setActivePanelInContainer: (containerId, panelId) =>
+      set((state) => {
+        const findAndSet = (containers: DockContainer[]) => {
+          const c = containers.find((item) => item.id === containerId);
+          if (c && c.panels.includes(panelId)) {
+            c.activePanelId = panelId;
+            return true;
+          }
+          return false;
+        };
+        findAndSet(state.workspace.leftContainers) ||
+          findAndSet(state.workspace.rightContainers) ||
+          findAndSet(state.workspace.bottomContainers);
+        if (typeof window !== 'undefined') {
+          localStorage.setItem('opensvg_workspace_v2', JSON.stringify(state.workspace));
+        }
+      }),
+
+    movePanel: (sourceContainerId, targetContainerId, position, panelId) =>
+      set((state) => {
+        const allColumns: DockContainer[][] = [
+          state.workspace.leftContainers,
+          state.workspace.rightContainers,
+          state.workspace.bottomContainers
+        ];
+
+        // 1. Remove panel from source container
+        for (const col of allColumns) {
+          const srcIdx = col.findIndex((c) => c.id === sourceContainerId);
+          if (srcIdx !== -1) {
+            const srcCont = col[srcIdx];
+            srcCont.panels = srcCont.panels.filter((p) => p !== panelId);
+            if (srcCont.panels.length === 0) {
+              if (col.length > 1) {
+                col.splice(srcIdx, 1);
+              }
+            } else if (srcCont.activePanelId === panelId) {
+              srcCont.activePanelId = srcCont.panels[0];
+            }
+          }
+        }
+
+        // 2. Insert into target
+        for (const col of allColumns) {
+          const tgtIdx = col.findIndex((c) => c.id === targetContainerId);
+          if (tgtIdx !== -1) {
+            const tgtCont = col[tgtIdx];
+            if (position === 'tab') {
+              if (!tgtCont.panels.includes(panelId)) {
+                tgtCont.panels.push(panelId);
+              }
+              tgtCont.activePanelId = panelId;
+            } else if (position === 'top' || position === 'left') {
+              const newCont: DockContainer = {
+                id: `dock-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+                panels: [panelId],
+                activePanelId: panelId,
+                sizePercent: 50
+              };
+              tgtCont.sizePercent = 50;
+              col.splice(tgtIdx, 0, newCont);
+            } else if (position === 'bottom' || position === 'right') {
+              const newCont: DockContainer = {
+                id: `dock-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+                panels: [panelId],
+                activePanelId: panelId,
+                sizePercent: 50
+              };
+              tgtCont.sizePercent = 50;
+              col.splice(tgtIdx + 1, 0, newCont);
+            }
+            break;
+          }
+        }
+
+        state.workspace.activePreset = 'custom';
+        state.activeDraggingPanel = null;
+        state.dragHoverTarget = null;
+        if (typeof window !== 'undefined') {
+          localStorage.setItem('opensvg_workspace_v2', JSON.stringify(state.workspace));
+        }
+      }),
+
+    resizeWorkspaceColumn: (column, deltaPx) =>
+      set((state) => {
+        if (column === 'left') {
+          state.workspace.leftWidth = Math.max(160, Math.min(600, state.workspace.leftWidth + deltaPx));
+        } else if (column === 'right') {
+          state.workspace.rightWidth = Math.max(200, Math.min(600, state.workspace.rightWidth - deltaPx));
+        } else if (column === 'bottom') {
+          state.workspace.bottomHeight = Math.max(80, Math.min(650, state.workspace.bottomHeight - deltaPx));
+        } else if (column === 'graphEditor') {
+          state.workspace.graphEditorWidth = Math.max(200, Math.min(600, (state.workspace.graphEditorWidth || 320) - deltaPx));
+        }
+        if (typeof window !== 'undefined') {
+          localStorage.setItem('opensvg_workspace_v2', JSON.stringify(state.workspace));
+        }
+      }),
+
+    resizeContainerInColumn: (column, index, stepDeltaPx) =>
+      set((state) => {
+        const containers = column === 'left' ? state.workspace.leftContainers : state.workspace.rightContainers;
+        if (index < 0 || index >= containers.length - 1) return;
+        const topCont = containers[index];
+        const bottomCont = containers[index + 1];
+        if (!topCont || !bottomCont) return;
+
+        const percentDelta = (stepDeltaPx / 400) * 100;
+        const currentTop = topCont.sizePercent || 50;
+        const currentBottom = bottomCont.sizePercent || 50;
+
+        const newTop = Math.max(15, Math.min(85, currentTop + percentDelta));
+        const newBottom = Math.max(15, Math.min(85, currentBottom - percentDelta));
+
+        topCont.sizePercent = newTop;
+        bottomCont.sizePercent = newBottom;
+
+        if (typeof window !== 'undefined') {
+          localStorage.setItem('opensvg_workspace_v2', JSON.stringify(state.workspace));
+        }
+      }),
+
+    toggleWorkspaceCollapse: (column) =>
+      set((state) => {
+        if (column === 'left') state.workspace.isLeftCollapsed = !state.workspace.isLeftCollapsed;
+        if (column === 'right') state.workspace.isRightCollapsed = !state.workspace.isRightCollapsed;
+        if (column === 'bottom') state.workspace.isBottomCollapsed = !state.workspace.isBottomCollapsed;
+        if (typeof window !== 'undefined') {
+          localStorage.setItem('opensvg_workspace_v2', JSON.stringify(state.workspace));
+        }
+      }),
+
+    setWorkspacePreset: (preset) =>
+      set((state) => {
+        const config = WORKSPACE_PRESETS[preset];
+        if (config) {
+          state.workspace = JSON.parse(JSON.stringify(config));
+          if (typeof window !== 'undefined') {
+            localStorage.setItem('opensvg_workspace_v2', JSON.stringify(state.workspace));
+          }
+          state.toastMessage = `Switched to ${preset.toUpperCase()} workspace`;
+          state.toastType = 'info';
+        }
+      }),
+
+    resetWorkspace: () =>
+      set((state) => {
+        state.workspace = JSON.parse(JSON.stringify(WORKSPACE_PRESETS.default));
+        if (typeof window !== 'undefined') {
+          localStorage.removeItem('opensvg_workspace_v2');
+        }
+        state.toastMessage = 'Reset workspace to default layout';
+        state.toastType = 'success';
       }),
 
     setExportOpen: (open) => set({ isExportOpen: open }),

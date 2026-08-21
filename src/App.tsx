@@ -3,11 +3,9 @@ import { useStudioStore } from './store/useStudioStore';
 import { useStudioShortcuts } from './hooks/useStudioShortcuts';
 import { useThemeInitialization } from './hooks/useThemeSwitcher';
 import { Header } from './components/Header';
-import { Canvas } from './components/Canvas';
-import { LayersPanel } from './components/LayersPanel';
-import { PropertiesPanel } from './components/PropertiesPanel';
-import { Timeline } from './components/Timeline';
+import { WorkspaceLayout } from './components/workspace/WorkspaceLayout';
 import { ExportModal } from './components/ExportModal';
+import { MotionPresetsModal } from './components/MotionPresetsModal';
 
 export const App: React.FC = () => {
   const { toastMessage } = useStudioStore();
@@ -29,19 +27,13 @@ export const App: React.FC = () => {
       )}
 
       {/* Main Studio Frame Window */}
-      <div className="bg-app-bg rounded-3xl shadow-soft border border-app-border dark:border-zinc-800 flex-1 flex flex-col overflow-hidden relative">
+      <div className="bg-app-bg rounded-3xl shadow-soft border border-app-border dark:border-zinc-800 flex-1 min-h-0 flex flex-col overflow-hidden relative">
         <Header />
-
-        <main className="flex-1 flex overflow-hidden relative">
-          <LayersPanel />
-          <Canvas />
-          <PropertiesPanel />
-        </main>
-
-        <Timeline />
+        <WorkspaceLayout />
       </div>
 
       <ExportModal />
+      <MotionPresetsModal />
     </div>
   );
 };

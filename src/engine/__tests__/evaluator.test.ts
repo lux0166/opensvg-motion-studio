@@ -25,6 +25,20 @@ describe('Cubic Bézier Solver', () => {
     // At t=0.8, progress should be further than linear
     expect(solveCubicBezier(easeInOut, 0.8)).toBeGreaterThan(0.8);
   });
+
+  it('correctly calculates overshoot and back curves', () => {
+    const backCurve = { x1: 0.34, y1: 1.56, x2: 0.64, y2: 1 };
+    const midVal = solveCubicBezier(backCurve, 0.7);
+    expect(midVal).toBeGreaterThan(1.0); // Overshoots 1.0!
+    expect(solveCubicBezier(backCurve, 1.0)).toBeCloseTo(1.0, 3);
+  });
+
+  it('correctly calculates anticipation curves', () => {
+    const anticipateCurve = { x1: 0.36, y1: 0, x2: 0.66, y2: -0.56 };
+    const startVal = solveCubicBezier(anticipateCurve, 0.3);
+    expect(startVal).toBeLessThan(0.0); // Undershoots before going up!
+    expect(solveCubicBezier(anticipateCurve, 1.0)).toBeCloseTo(1.0, 3);
+  });
 });
 
 describe('Keyframe Segment Binary Search (O(log N))', () => {

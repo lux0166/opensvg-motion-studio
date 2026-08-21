@@ -1,6 +1,6 @@
 import React from 'react';
 import { useStudioStore } from '../store/useStudioStore';
-import { Layers, Square, Eye, EyeOff, Lock, Unlock, ChevronDown, Folder, Circle, Star, PenTool, Type } from 'lucide-react';
+import { Square, Eye, EyeOff, Lock, Unlock, ChevronDown, Folder, Circle, Star, PenTool, Type } from 'lucide-react';
 import { SceneNode } from '../engine/types';
 
 export const LayersPanel: React.FC = () => {
@@ -116,19 +116,9 @@ export const LayersPanel: React.FC = () => {
   const topLevelOrder = nodeOrder.filter((id) => !nodes[id]?.parentId);
 
   return (
-    <aside className="w-64 bg-white dark:bg-zinc-900 m-3 rounded-2xl shadow-sm border border-gray-100 dark:border-zinc-800 flex flex-col z-10 select-none overflow-hidden">
-      {/* Header */}
-      <div className="px-4 py-3 border-b border-gray-100 dark:border-zinc-800 flex justify-between items-center font-semibold text-gray-800 dark:text-zinc-200">
-        <span className="flex items-center gap-2 text-xs">
-          <Layers className="w-3.5 h-3.5 text-blue-500" /> Layers
-        </span>
-        <span className="text-xs bg-gray-100 dark:bg-zinc-800 text-gray-600 dark:text-zinc-400 px-2 py-0.5 rounded-full font-medium">
-          {Object.keys(nodes).length} items
-        </span>
-      </div>
-
+    <aside className="w-full h-full min-h-0 bg-white dark:bg-zinc-900 flex flex-col z-10 select-none overflow-hidden">
       {/* Layer List */}
-      <div role="listbox" aria-label="Scene Layers" className="flex-1 overflow-y-auto p-2 flex flex-col gap-1">
+      <div role="listbox" aria-label="Scene Layers" className="flex-1 min-h-0 overflow-y-auto p-2 flex flex-col gap-1">
         {/* Root Frame Item */}
         <div
           role="option"

@@ -34,6 +34,8 @@ export const PropertiesPanel: React.FC = () => {
     applyBooleanOp,
     addTrigger,
     removeTrigger,
+    setPresetsModalOpen,
+    applyMotionPreset,
     updateRootFrame,
     updateNode,
     deleteNode,
@@ -43,8 +45,8 @@ export const PropertiesPanel: React.FC = () => {
   // 1. Root Frame Selected
   if (selectedId === 'frame-1' || !selectedId) {
     return (
-      <aside className="w-72 bg-white dark:bg-zinc-900 m-3 rounded-2xl shadow-sm border border-gray-100 dark:border-zinc-800 flex flex-col z-10 overflow-y-auto select-none">
-        <div className="px-5 py-4 border-b border-gray-100 dark:border-zinc-800 flex justify-between items-center bg-gray-50/50 dark:bg-zinc-800/50">
+      <aside className="w-full h-full min-h-0 bg-white dark:bg-zinc-900 flex flex-col z-10 overflow-y-auto select-none">
+        <div className="px-3.5 py-2 border-b border-gray-100 dark:border-zinc-800 flex justify-between items-center bg-gray-50/50 dark:bg-zinc-800/50">
           <div className="flex items-center gap-2">
             <Square className="w-3.5 h-3.5 text-blue-500" />
             <h2 className="font-bold text-gray-800 dark:text-zinc-200 text-xs">{rootFrame.name}</h2>
@@ -141,9 +143,9 @@ export const PropertiesPanel: React.FC = () => {
   if (!selectedNode) return null;
 
   return (
-    <aside className="w-72 bg-white dark:bg-zinc-900 m-3 rounded-2xl shadow-sm border border-gray-100 dark:border-zinc-800 flex flex-col z-10 overflow-y-auto select-none">
+    <aside className="w-full h-full min-h-0 bg-white dark:bg-zinc-900 flex flex-col z-10 overflow-y-auto select-none">
       {/* Header */}
-      <div className="px-5 py-4 border-b border-gray-100 dark:border-zinc-800 flex justify-between items-center bg-gray-50/50 dark:bg-zinc-800/50">
+      <div className="px-3.5 py-2 border-b border-gray-100 dark:border-zinc-800 flex justify-between items-center bg-gray-50/50 dark:bg-zinc-800/50">
         <div className="flex items-center gap-2">
           <div
             className="w-3.5 h-3.5 rounded-sm"
@@ -1082,6 +1084,59 @@ export const PropertiesPanel: React.FC = () => {
                 </div>
               ))
             )}
+          </div>
+        </div>
+
+        <hr className="border-gray-100 dark:border-zinc-800" />
+
+        {/* Quick Motion Presets */}
+        <div>
+          <div className="flex justify-between items-center mb-2">
+            <label className="text-[11px] text-gray-400 dark:text-zinc-500 font-semibold uppercase tracking-wider flex items-center gap-1.5">
+              <Sparkles className="w-3 h-3 text-amber-500" /> Motion Presets
+            </label>
+            <button
+              type="button"
+              onClick={() => setPresetsModalOpen(true)}
+              className="text-[10px] font-bold text-amber-600 dark:text-amber-400 hover:text-amber-700 bg-amber-50 dark:bg-amber-950/50 hover:bg-amber-100 hover:dark:bg-amber-900/50 px-2 py-0.5 rounded-md transition-colors shadow-xs"
+            >
+              Browse All
+            </button>
+          </div>
+
+          <div className="grid grid-cols-2 gap-1.5">
+            <button
+              type="button"
+              onClick={() => applyMotionPreset(selectedId, 'elastic-pop-in')}
+              className="px-2.5 py-1.5 rounded-lg bg-gray-50 dark:bg-zinc-800/70 hover:bg-blue-50 hover:dark:bg-blue-950/40 border border-gray-200/80 dark:border-zinc-700/80 hover:border-blue-300 text-[11px] font-medium text-gray-700 dark:text-zinc-300 hover:text-blue-600 dark:hover:text-blue-400 flex items-center gap-1.5 transition-all"
+            >
+              <span className="w-1.5 h-1.5 rounded-full bg-blue-500" />
+              <span>Elastic Pop</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => applyMotionPreset(selectedId, 'slide-fade-up')}
+              className="px-2.5 py-1.5 rounded-lg bg-gray-50 dark:bg-zinc-800/70 hover:bg-indigo-50 hover:dark:bg-indigo-950/40 border border-gray-200/80 dark:border-zinc-700/80 hover:border-indigo-300 text-[11px] font-medium text-gray-700 dark:text-zinc-300 hover:text-indigo-600 dark:hover:text-indigo-400 flex items-center gap-1.5 transition-all"
+            >
+              <span className="w-1.5 h-1.5 rounded-full bg-indigo-500" />
+              <span>Slide Up</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => applyMotionPreset(selectedId, 'heartbeat-pulse')}
+              className="px-2.5 py-1.5 rounded-lg bg-gray-50 dark:bg-zinc-800/70 hover:bg-rose-50 hover:dark:bg-rose-950/40 border border-gray-200/80 dark:border-zinc-700/80 hover:border-rose-300 text-[11px] font-medium text-gray-700 dark:text-zinc-300 hover:text-rose-600 dark:hover:text-rose-400 flex items-center gap-1.5 transition-all"
+            >
+              <span className="w-1.5 h-1.5 rounded-full bg-rose-500" />
+              <span>Pulse Loop</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => applyMotionPreset(selectedId, 'floating-levitation')}
+              className="px-2.5 py-1.5 rounded-lg bg-gray-50 dark:bg-zinc-800/70 hover:bg-teal-50 hover:dark:bg-teal-950/40 border border-gray-200/80 dark:border-zinc-700/80 hover:border-teal-300 text-[11px] font-medium text-gray-700 dark:text-zinc-300 hover:text-teal-600 dark:hover:text-teal-400 flex items-center gap-1.5 transition-all"
+            >
+              <span className="w-1.5 h-1.5 rounded-full bg-teal-500" />
+              <span>Hover Float</span>
+            </button>
           </div>
         </div>
 
