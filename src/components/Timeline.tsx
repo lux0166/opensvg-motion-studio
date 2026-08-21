@@ -563,12 +563,12 @@ export const Timeline: React.FC = () => {
           ) : (
             /* Graph Editor SVG Curve View with Interactive Handles */
             <div className="relative w-full flex-1 flex flex-col items-center justify-between p-3 bg-white">
-              {/* Easing Preset Chips */}
-              <div className="flex items-center gap-1.5 z-10 bg-gray-50 p-1 rounded-xl border border-gray-200 text-[11px]">
+              {/* Easing & Spring Preset Chips */}
+              <div className="flex flex-wrap items-center gap-1.5 z-10 bg-gray-50 p-1.5 rounded-xl border border-gray-200 text-[11px]">
                 <span className="font-semibold text-gray-500 px-2 flex items-center gap-1">
-                  <Sparkles className="w-3 h-3 text-blue-500" /> Curve Presets:
+                  <Sparkles className="w-3 h-3 text-blue-500" /> Curves:
                 </span>
-                {['linear', 'ease', 'ease-in', 'ease-out', 'ease-in-out', 'bounce'].map((p) => (
+                {['linear', 'ease', 'ease-in', 'ease-out', 'ease-in-out', 'spring'].map((p) => (
                   <button
                     key={p}
                     onClick={() => applyCurvePreset(p)}

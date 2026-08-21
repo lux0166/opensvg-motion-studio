@@ -1,4 +1,5 @@
-﻿import { CubicBezierCurve, Keyframe, PropertyTrack, SceneNode, BezierPoint } from './types';
+import { CubicBezierCurve, Keyframe, PropertyTrack, SceneNode, BezierPoint } from './types';
+import { evaluateSpring } from './physics';
 
 /**
  * Cubic Bezier solver using Newton-Raphson approximation
@@ -28,16 +29,13 @@ export function solveCubicBezier(curve: CubicBezierCurve, t: number): number {
   // Find u for given t with Newton-Raphson
   let u = t;
   for (let i = 0; i < 8; i++) {
-    const xVal = sampleCurveX(u) - t;
-    if (Math.abs(xVal) < 1e-5) break;
-    const dVal = sampleCurveDerivativeX(u);
-    if (Math.abs(dVal) < 1e-5) break;
-    u -= xVal / dVal;
+    const x = sampleCurveX(u) - t;
+    if (Math.abs(x) < 1e-4) break;
+    const d = sampleCurveDerivativeX(u);
+    if (Math.abs(d) < 1e-4) break;
+    u = u - x / d;
   }
-
-  // Fallback binary subdivision if Newton diverges
-  u = Math.max(0, Math.min(1, u));
-  return sampleCurveY(u);
+  return sampleCurveY(Math.max(0, Math.min(1, u)));
 }
 
 export const EASING_CURVES: Record<string, CubicBezierCurve> = {
@@ -46,11 +44,12 @@ export const EASING_CURVES: Record<string, CubicBezierCurve> = {
   'ease-in': { x1: 0.42, y1: 0.0, x2: 1.0, y2: 1.0 },
   'ease-out': { x1: 0.0, y1: 0.0, x2: 0.58, y2: 1.0 },
   'ease-in-out': { x1: 0.42, y1: 0.0, x2: 0.58, y2: 1.0 },
-  bounce: { x1: 0.68, y1: -0.55, x2: 0.265, y2: 1.55 }
+  'cubic-bezier': { x1: 0.42, y1: 0.0, x2: 0.58, y2: 1.0 },
+  spring: { x1: 0.175, y1: 0.885, x2: 0.32, y2: 1.275 }
 };
 
 /**
- * Interpolates numeric value between two keyframes
+ * Interpolates numeric value between two keyframes (with Spring support)
  */
 export function interpolateNumeric(
   k0: Keyframe<number>,
@@ -58,9 +57,17 @@ export function interpolateNumeric(
   time: number
 ): number {
   if (time <= k0.time) return k0.value;
-  if (time >= k1.time) return k1.value;
+  if (time >= k1.time && !k0.spring && k0.easing !== 'spring') return k1.value;
 
-  const rawProgress = (time - k0.time) / (k1.time - k0.time);
+  const duration = Math.max(0.01, k1.time - k0.time);
+  const elapsed = time - k0.time;
+  const rawProgress = elapsed / duration;
+
+  if (k0.easing === 'spring' || k0.spring) {
+    // Spring physics animation
+    return evaluateSpring(k0.value, k1.value, elapsed, k0.spring);
+  }
+
   const curve = k0.curve || (k0.easing ? EASING_CURVES[k0.easing] : EASING_CURVES['ease-in-out']);
   const easedProgress = solveCubicBezier(curve, rawProgress);
 

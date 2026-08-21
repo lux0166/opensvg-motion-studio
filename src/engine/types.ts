@@ -21,7 +21,14 @@ export interface CubicBezierCurve {
   y2: number; // typically 0 to 1
 }
 
-export type EasingType = 'linear' | 'ease' | 'ease-in' | 'ease-out' | 'ease-in-out' | 'cubic-bezier';
+export interface SpringConfig {
+  mass: number;
+  stiffness: number;
+  damping: number;
+  velocity?: number;
+}
+
+export type EasingType = 'linear' | 'ease' | 'ease-in' | 'ease-out' | 'ease-in-out' | 'cubic-bezier' | 'spring';
 
 export interface Keyframe<T = number | string> {
   id: string;
@@ -29,6 +36,7 @@ export interface Keyframe<T = number | string> {
   value: T;
   easing?: EasingType;
   curve?: CubicBezierCurve; // Custom Bézier handles for graph editor
+  spring?: SpringConfig; // Spring dynamics configuration
 }
 
 export type AnimatableProperty =
