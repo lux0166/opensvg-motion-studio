@@ -1,4 +1,4 @@
-﻿import React from 'react';
+import React from 'react';
 import { useStudioStore } from '../store/useStudioStore';
 import { Layers, Square, Eye, EyeOff, Lock, Unlock, ChevronDown, Folder, Circle, Star, PenTool, Type } from 'lucide-react';
 import { SceneNode } from '../engine/types';
@@ -16,12 +16,12 @@ export const LayersPanel: React.FC = () => {
     showToast
   } = useStudioStore();
 
-  const getNodeIcon = (node: SceneNode) => {
-    if (node.type === 'group') return <Folder className="w-3.5 h-3.5 text-amber-500 shrink-0" />;
-    if (node.type === 'circle') return <Circle className="w-3 h-3 text-emerald-500 shrink-0" />;
-    if (node.type === 'star') return <Star className="w-3 h-3 text-amber-400 shrink-0" />;
-    if (node.type === 'path') return <PenTool className="w-3 h-3 text-blue-500 shrink-0" />;
-    if (node.type === 'text') return <Type className="w-3 h-3 text-purple-500 shrink-0" />;
+  const getNodeIcon = (node: SceneNode, isSelected: boolean) => {
+    if (node.type === 'group') return <Folder className={`w-3.5 h-3.5 shrink-0 ${isSelected ? 'text-white' : 'text-amber-500'}`} />;
+    if (node.type === 'circle') return <Circle className={`w-3 h-3 shrink-0 ${isSelected ? 'text-white' : 'text-emerald-500'}`} />;
+    if (node.type === 'star') return <Star className={`w-3 h-3 shrink-0 ${isSelected ? 'text-white' : 'text-amber-400'}`} />;
+    if (node.type === 'path') return <PenTool className={`w-3 h-3 shrink-0 ${isSelected ? 'text-white' : 'text-blue-500'}`} />;
+    if (node.type === 'text') return <Type className={`w-3 h-3 shrink-0 ${isSelected ? 'text-white' : 'text-purple-500'}`} />;
     return (
       <div
         className="w-3 h-3 rounded-xs shrink-0 border border-black/10"
@@ -39,36 +39,41 @@ export const LayersPanel: React.FC = () => {
     return (
       <React.Fragment key={id}>
         <div
-          onClick={(e) => {
-            if (e.shiftKey) {
-              toggleSelectId(id, true);
-            } else {
-              setSelectedId(id);
-            }
-          }}
-          className={`flex items-center justify-between px-2.5 py-1.5 rounded-lg cursor-pointer transition-all text-xs ${
+          className={`flex items-center justify-between px-2.5 py-1 rounded-lg transition-all text-xs ${
             isChild ? 'ml-4' : ''
           } ${
             isSelected
               ? 'bg-blue-500 text-white font-medium shadow-xs'
-              : 'hover:bg-gray-100 text-gray-700'
+              : 'hover:bg-gray-100 hover:dark:bg-zinc-800/70 text-gray-700 dark:text-zinc-300'
           }`}
         >
-          <div className="flex items-center gap-2 truncate flex-1">
-            {getNodeIcon(node)}
+          <button
+            type="button"
+            onClick={(e) => {
+              if (e.shiftKey) {
+                toggleSelectId(id, true);
+              } else {
+                setSelectedId(id);
+              }
+            }}
+            className="flex items-center gap-2 truncate flex-1 text-left outline-none py-0.5 focus-visible:underline"
+          >
+            {getNodeIcon(node, isSelected)}
             <span className="truncate">{node.name}</span>
-          </div>
+          </button>
 
-          <div className="flex items-center gap-1">
+          <div className="flex items-center gap-1 shrink-0">
             <button
+              type="button"
               title={node.visible ? 'Hide' : 'Show'}
+              aria-label={node.visible ? `Hide ${node.name}` : `Show ${node.name}`}
               onClick={(e) => {
                 e.stopPropagation();
                 updateNode(id, { visible: !node.visible });
                 showToast(node.visible ? `Hidden ${node.name}` : `Shown ${node.name}`);
               }}
-              className={`p-1 rounded hover:bg-black/10 transition-colors ${
-                isSelected ? 'text-white' : 'text-gray-400 hover:text-gray-600'
+              className={`p-1 rounded hover:bg-black/10 dark:hover:bg-white/10 transition-colors ${
+                isSelected ? 'text-white' : 'text-gray-400 dark:text-zinc-500 hover:text-gray-600 hover:dark:text-zinc-300'
               }`}
             >
               {node.visible ? (
@@ -79,13 +84,15 @@ export const LayersPanel: React.FC = () => {
             </button>
 
             <button
+              type="button"
               title={node.locked ? 'Unlock' : 'Lock'}
+              aria-label={node.locked ? `Unlock ${node.name}` : `Lock ${node.name}`}
               onClick={(e) => {
                 e.stopPropagation();
                 updateNode(id, { locked: !node.locked });
               }}
-              className={`p-1 rounded hover:bg-black/10 transition-colors ${
-                isSelected ? 'text-white' : 'text-gray-400 hover:text-gray-600'
+              className={`p-1 rounded hover:bg-black/10 dark:hover:bg-white/10 transition-colors ${
+                isSelected ? 'text-white' : 'text-gray-400 dark:text-zinc-500 hover:text-gray-600 hover:dark:text-zinc-300'
               }`}
             >
               {node.locked ? (
@@ -109,32 +116,41 @@ export const LayersPanel: React.FC = () => {
   const topLevelOrder = nodeOrder.filter((id) => !nodes[id]?.parentId);
 
   return (
-    <aside className="w-64 bg-white m-3 rounded-2xl shadow-sm border border-gray-100 flex flex-col z-10 select-none overflow-hidden">
+    <aside className="w-64 bg-white dark:bg-zinc-900 m-3 rounded-2xl shadow-sm border border-gray-100 dark:border-zinc-800 flex flex-col z-10 select-none overflow-hidden">
       {/* Header */}
-      <div className="px-4 py-3 border-b border-gray-100 flex justify-between items-center font-semibold text-gray-800">
+      <div className="px-4 py-3 border-b border-gray-100 dark:border-zinc-800 flex justify-between items-center font-semibold text-gray-800 dark:text-zinc-200">
         <span className="flex items-center gap-2 text-xs">
           <Layers className="w-3.5 h-3.5 text-blue-500" /> Layers
         </span>
-        <span className="text-[11px] bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full font-medium">
+        <span className="text-xs bg-gray-100 dark:bg-zinc-800 text-gray-600 dark:text-zinc-400 px-2 py-0.5 rounded-full font-medium">
           {Object.keys(nodes).length} items
         </span>
       </div>
 
       {/* Layer List */}
-      <div className="flex-1 overflow-y-auto p-2 flex flex-col gap-1">
+      <div role="listbox" aria-label="Scene Layers" className="flex-1 overflow-y-auto p-2 flex flex-col gap-1">
         {/* Root Frame Item */}
         <div
+          role="option"
+          aria-selected={selectedId === 'frame-1'}
+          tabIndex={0}
           onClick={() => setSelectedId('frame-1')}
-          className={`flex items-center gap-2 px-3 py-2 rounded-xl cursor-pointer transition-all text-xs ${
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault();
+              setSelectedId('frame-1');
+            }
+          }}
+          className={`flex items-center gap-2 px-3 py-2 rounded-xl cursor-pointer transition-all text-xs outline-none focus-visible:ring-2 focus-visible:ring-blue-500 ${
             selectedId === 'frame-1'
-              ? 'bg-blue-50 text-blue-600 font-semibold border border-blue-200'
-              : 'hover:bg-gray-50 text-gray-700'
+              ? 'bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 font-semibold border border-blue-200 dark:border-blue-800'
+              : 'hover:bg-gray-50 hover:dark:bg-zinc-800/60 text-gray-700 dark:text-zinc-300'
           }`}
         >
-          <ChevronDown className="w-3 h-3 text-gray-400" />
+          <ChevronDown className="w-3 h-3 text-gray-400 dark:text-zinc-500" />
           <Square className="w-3.5 h-3.5 text-blue-500" />
           <span className="flex-1 truncate">{rootFrame.name}</span>
-          <span className="text-[10px] text-gray-400">{topLevelOrder.length}</span>
+          <span className="text-xs text-gray-400 dark:text-zinc-500">{topLevelOrder.length}</span>
         </div>
 
         {/* Children Rows */}

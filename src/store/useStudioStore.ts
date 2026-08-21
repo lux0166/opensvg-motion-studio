@@ -311,6 +311,8 @@ interface StudioState {
   removeTrigger: (nodeId: string, triggerId: string) => void;
 
   // Modals & Feedback
+  theme: 'light' | 'dark';
+  setTheme: (theme: 'light' | 'dark') => void;
   setExportOpen: (open: boolean) => void;
   setSettingsOpen: (open: boolean) => void;
   showToast: (msg: string, type?: 'success' | 'info' | 'error') => void;
@@ -321,6 +323,9 @@ const initialTab2 = createDefaultTab('tab-2', 'Composition 2');
 
 export const useStudioStore = create<StudioState>()(
   immer((set, get) => ({
+    theme: (typeof window !== 'undefined' && localStorage.getItem('theme') as 'light' | 'dark') || 'light',
+    setTheme: (theme) => set({ theme }),
+
     tabs: [initialTab1, initialTab2],
     activeTabId: initialTab1.id,
 

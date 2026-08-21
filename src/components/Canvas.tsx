@@ -603,7 +603,7 @@ export const Canvas: React.FC = () => {
       }}
       onDragLeave={() => setIsDraggingFile(false)}
       onDrop={handleDrop}
-      className={`flex-1 relative flex items-center justify-center overflow-hidden bg-[#f1f2f5] select-none ${
+      className={`flex-1 relative flex items-center justify-center overflow-hidden bg-app-bg select-none ${
         isPanning || isSpacePressed ? 'cursor-grab active:cursor-grabbing' : 'cursor-default'
       }`}
     >
@@ -625,10 +625,10 @@ export const Canvas: React.FC = () => {
         }}
       >
         {/* Canvas Frame Label */}
-        <div className="absolute -top-7 left-0 text-xs font-semibold text-gray-600 flex items-center gap-2">
+        <div className="absolute -top-7 left-0 text-xs font-semibold text-gray-600 dark:text-zinc-300 flex items-center gap-2">
           <Square className="w-3.5 h-3.5 text-blue-500" />
           <span>{rootFrame.name}</span>
-          <span className="text-[10px] text-gray-400 font-mono">
+          <span className="text-[10px] text-gray-400 dark:text-zinc-500 font-mono">
             {rootFrame.width} × {rootFrame.height}
           </span>
         </div>
@@ -636,7 +636,7 @@ export const Canvas: React.FC = () => {
         {/* 2D Vector Canvas */}
         <canvas
           ref={canvasRef}
-          className="rounded-2xl shadow-xl border border-gray-200/80 bg-white"
+          className="rounded-2xl shadow-xl border border-gray-200/80 dark:border-zinc-700/80 bg-white"
         />
 
         {/* In-Place Live Text Editor */}
@@ -652,7 +652,7 @@ export const Canvas: React.FC = () => {
                 setEditingTextId(null);
               }
             }}
-            className="absolute z-30 bg-white/95 border-2 border-blue-500 rounded-lg px-2 py-1 shadow-lg text-gray-900 outline-none"
+            className="absolute z-30 bg-white/95 dark:bg-zinc-900/95 border-2 border-blue-500 rounded-lg px-2 py-1 shadow-lg text-gray-900 dark:text-zinc-100 outline-none"
             style={{
               left: `${nodes[editingTextId].x}px`,
               top: `${nodes[editingTextId].y}px`,
@@ -666,32 +666,32 @@ export const Canvas: React.FC = () => {
       </div>
 
       {/* Floating Canvas Controls */}
-      <div className="absolute bottom-5 right-5 flex items-center gap-1 bg-white/90 backdrop-blur-md px-3 py-1.5 rounded-full shadow-md border border-gray-200 text-xs font-medium text-gray-700">
+      <div className="absolute bottom-5 right-5 flex items-center gap-1 bg-white/90 dark:bg-zinc-900/90 backdrop-blur-md px-3 py-1.5 rounded-full shadow-md border border-gray-200 dark:border-zinc-800 text-xs font-medium text-gray-700 dark:text-zinc-300">
         <button
           title="Zoom Out"
           onClick={() => setZoom(zoom * 0.9)}
-          className="p-1 hover:bg-gray-100 rounded-full transition-colors"
+          className="p-1 hover:bg-gray-100 hover:dark:bg-zinc-800 rounded-full transition-colors"
         >
           <Minus className="w-3.5 h-3.5" />
         </button>
-        <span className="w-12 text-center font-mono font-bold text-gray-800">
+        <span className="w-12 text-center font-mono font-bold text-gray-800 dark:text-zinc-100">
           {Math.round(zoom * 100)}%
         </span>
         <button
           title="Zoom In"
           onClick={() => setZoom(zoom * 1.1)}
-          className="p-1 hover:bg-gray-100 rounded-full transition-colors"
+          className="p-1 hover:bg-gray-100 hover:dark:bg-zinc-800 rounded-full transition-colors"
         >
           <Plus className="w-3.5 h-3.5" />
         </button>
-        <div className="w-[1px] h-4 bg-gray-200 mx-1" />
+        <div className="w-[1px] h-4 bg-gray-200 dark:bg-zinc-800 mx-1" />
         <button
           title="Fit Viewport"
           onClick={() => {
             setZoom(0.56);
             setPan(0, 0);
           }}
-          className="p-1 hover:bg-gray-100 rounded-full transition-colors"
+          className="p-1 hover:bg-gray-100 hover:dark:bg-zinc-800 rounded-full transition-colors"
         >
           <Maximize2 className="w-3.5 h-3.5" />
         </button>

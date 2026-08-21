@@ -126,12 +126,22 @@
   - **New Tab Button (`+`)**: Upgraded to 36px pill (`h-9 px-3 rounded-2xl bg-white/80 border-slate-200 hover:border-blue-300 hover:bg-white text-slate-600 hover:text-blue-600 shadow-2xs`).
 - **Build & Verification**: 74/74 unit tests passing in Vitest across 21 test suites; production build (`tsc && vite build`) passing cleanly.
 
-### 22. Task: Dead-Center Locked Tools Pill, Zero-Scrollbar Strip & Accessibility Hardening (`feat/center-tools-and-tab-bar`)
-- **Dead-Center Locked Tools Pill**: Switched central tool group to `absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-30 pointer-events-auto`, mathematically anchoring the tools pill to the 50% midpoint of the Studio window so it never shifts regardless of how many tabs are open.
-- **Bounded Tab Bar Container**: Set `max-w-[calc(50%-195px)] min-w-0` on left header container, completely preventing tabs from ever colliding with the center tools.
-- **Zero-Scrollbar Horizontal Navigation**: Completely eliminated native horizontal scrollbar lines via `.no-scrollbar::-webkit-scrollbar { display: none !important; width: 0 !important; height: 0 !important; }` and `scrollbar-width: none !important`, while adding `onWheel` listener for smooth mouse-wheel tab scrolling.
-- **Quick Artboard Switcher Dropdown (`(N) ⌄`)**: Placed fixed `+` and `(N) ⌄` counter dropdown buttons outside the scrollable tablist, enabling 1-click artboard jumping across unlimited open tabs.
-- **Accessibility & Motion Hardening**: Added `role="menu"`, `aria-label="Artboard options"`, `tabIndex={isActive ? 0 : -1}` on inactive tab close buttons, `motion-safe:animate-pulse`, and `@media (prefers-reduced-motion: reduce)` system query.
-- **Verification**: All 74 unit tests passing (`vitest run`), production build (`tsc && vite build`) 100% clean.
+### 23. Task: Animated Dark Mode with Circular Reveal Sweep & Dynamic Glow Hover Effects (`feat/animated-dark-mode`)
+- **Obsidian Knowledge Graph Retrieval**: Retrieved knowledge entities (`[[Circular Reveal Theme Switcher]]`, `[[380ms Corner Sweep]]`, `[[Zero-Flicker View Transitions]]`, `[[Synchronous Dark Mode]]`, `[[Color System]]`) from Obsidian vault.
+- **View Transitions Circular Reveal Architecture**:
+  - Implemented `toggleThemeWithAnimation(event)` in `src/hooks/useThemeSwitcher.ts` using `document.startViewTransition`.
+  - Calculates radial sweep geometry `Math.hypot(...) + 150` with `380ms cubic-bezier(0.4, 0, 0.2, 1)` easing.
+  - Added zero-flicker CSS pseudo-element rules in `src/theme/theme.css` (`::view-transition-old(root)`, `::view-transition-new(root)` with z-index ordering and `mix-blend-mode: normal`).
+- **Dynamic Theme Switcher Micro-Interactions & Hover Effects**:
+  - Added interactive Theme Toggle button in `Header.tsx` with smooth scale elevation (`hover:scale-105 active:scale-95`).
+  - **Dark Mode Hover State**: Sun icon smoothly rotates `+90deg`, scales to `1.15x` with warm amber glow drop-shadow (`drop-shadow-[0_0_6px_rgba(251,191,36,0.5)]`) and amber accent border halo.
+  - **Light Mode Hover State**: Moon icon smoothly tilts `-20deg`, scales to `1.15x` with indigo glow drop-shadow (`drop-shadow-[0_0_6px_rgba(99,102,241,0.4)]`) and blue accent border.
+- **100% Studio Surface Theming (Zero Bright Spots)**:
+  - Configured `darkMode: 'class'` and CSS variable design tokens (`--app-bg: #090a0f`, `--app-surface: #12131a`, `--app-border: #232634`, `--app-card-bg: #161822`) in `tailwind.config.js`, `theme.css`, and `theme-config.ts`.
+  - Applied dark mode classes across all panels and components: `Header.tsx` (brand, tabs, search, context menu), `LayersPanel.tsx` (accessible button semantics, high contrast icons), `Canvas.tsx` (artboard viewport, zoom widget), `PropertiesPanel.tsx` (transforms, typography, gradients, color harmonies, effects, state machine), `Timeline.tsx` (controls bar, time scrubber, track rows, keyframe diamonds, waveform box, Graph Editor Bézier canvas), `ExportModal.tsx`, and `App.tsx`.
+- **Empirical Runtime Evidence & Verification**:
+  - `npm test`: 74/74 unit tests passed across 21 test suites.
+  - `npm run build`: Production build succeeded in 8.13s with 0 errors.
+  - Automated CDP visual capture: Verified both Light Mode and Dark Mode rendering (`studio_dark_mode.png`, `studio_light_mode.png`, `studio_hover_dark.png`, `studio_hover_light.png`) confirming 100% surface coverage and zero bright spots.
 
 

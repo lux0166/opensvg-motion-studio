@@ -3,6 +3,7 @@ import { useStudioStore } from '../store/useStudioStore';
 import { ToolMode } from '../engine/types';
 import { openProjectFromFile, serializeProject } from '../engine/projectManager';
 import { importSvgString } from '../engine/svgImporter';
+import { toggleThemeWithAnimation } from '../hooks/useThemeSwitcher';
 import {
   Compass,
   MousePointer,
@@ -28,7 +29,9 @@ import {
   Edit2,
   ShieldClose,
   ArrowRightToLine,
-  Check
+  Check,
+  Sun,
+  Moon
 } from 'lucide-react';
 
 interface ContextMenuState {
@@ -39,6 +42,7 @@ interface ContextMenuState {
 
 export const Header: React.FC = () => {
   const {
+    theme,
     selectedTool,
     setSelectedTool,
     setExportOpen,
@@ -292,78 +296,78 @@ export const Header: React.FC = () => {
   };
 
   return (
-    <header className="h-14 flex items-center justify-between px-4 border-b border-app-border shrink-0 z-20 bg-white/90 backdrop-blur-md select-none relative">
+    <header className="h-14 flex items-center justify-between px-4 border-b border-app-border dark:border-zinc-800 shrink-0 z-20 bg-white/90 dark:bg-zinc-900/90 backdrop-blur-md select-none relative">
       {/* Left: Brand & Dynamic Auto-Shrinking Document Tabs */}
-      <div className="flex items-center gap-2 max-w-[calc(50%-195px)] min-w-0 z-10">
+      <div className="flex items-center gap-2 max-w-[calc(50%-220px)] min-w-0 z-10">
         {/* Brand Menu Button */}
         <div className="relative shrink-0">
           <button
             type="button"
             onClick={() => setFileMenuOpen(!fileMenuOpen)}
-            className="h-9 bg-white px-3.5 py-1.5 rounded-2xl shadow-2xs font-semibold flex items-center gap-1.5 hover:bg-gray-50 border border-gray-200 hover:border-gray-300 transition-all active:scale-95 text-xs text-slate-800 shrink-0"
+            className="h-9 bg-white dark:bg-zinc-800 px-3.5 py-1.5 rounded-2xl shadow-2xs font-semibold flex items-center gap-1.5 hover:bg-gray-50 hover:dark:bg-zinc-700/80 border border-gray-200 dark:border-zinc-700 transition-all active:scale-95 text-xs text-slate-800 dark:text-zinc-100 shrink-0"
           >
-            <Compass className="w-4 h-4 text-blue-600" />
-            <span className="bg-gradient-to-r from-gray-900 to-gray-700 bg-clip-text text-transparent font-bold">
+            <Compass className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+            <span className="bg-gradient-to-r from-gray-900 to-gray-700 dark:from-zinc-100 dark:to-zinc-300 bg-clip-text text-transparent font-bold">
               OpenSVG
             </span>
-            <ChevronDown className="w-3 h-3 text-gray-400" />
+            <ChevronDown className="w-3 h-3 text-gray-400 dark:text-zinc-500" />
           </button>
 
           {/* File Dropdown Menu */}
           {fileMenuOpen && (
-            <div className="absolute top-11 left-0 w-52 bg-white/95 backdrop-blur-md rounded-2xl shadow-xl border border-gray-100 p-1.5 flex flex-col gap-0.5 z-50 animate-in fade-in zoom-in-95">
+            <div className="absolute top-11 left-0 w-52 bg-white/95 dark:bg-zinc-900/95 backdrop-blur-md rounded-2xl shadow-xl border border-gray-100 dark:border-zinc-800 p-1.5 flex flex-col gap-0.5 z-50 animate-in fade-in zoom-in-95">
               <button
                 type="button"
                 onClick={() => {
                   createNewProject();
                   setFileMenuOpen(false);
                 }}
-                className="flex items-center gap-2.5 px-3 py-2 text-xs font-semibold text-gray-700 hover:bg-gray-100 rounded-xl transition-colors text-left"
+                className="flex items-center gap-2.5 px-3 py-2 text-xs font-semibold text-gray-700 dark:text-zinc-300 hover:bg-gray-100 hover:dark:bg-zinc-800 rounded-xl transition-colors text-left"
               >
-                <FilePlus className="w-4 h-4 text-gray-500" />
+                <FilePlus className="w-4 h-4 text-gray-500 dark:text-zinc-400" />
                 New Project
               </button>
               <button
                 type="button"
                 onClick={handleOpenProject}
-                className="flex items-center gap-2.5 px-3 py-2 text-xs font-semibold text-gray-700 hover:bg-gray-100 rounded-xl transition-colors text-left"
+                className="flex items-center gap-2.5 px-3 py-2 text-xs font-semibold text-gray-700 dark:text-zinc-300 hover:bg-gray-100 hover:dark:bg-zinc-800 rounded-xl transition-colors text-left"
               >
-                <FolderOpen className="w-4 h-4 text-blue-500" />
+                <FolderOpen className="w-4 h-4 text-blue-500 dark:text-blue-400" />
                 Open File (.kinetic)
               </button>
               <button
                 type="button"
                 onClick={handleImportSvg}
-                className="flex items-center gap-2.5 px-3 py-2 text-xs font-semibold text-gray-700 hover:bg-gray-100 rounded-xl transition-colors text-left"
+                className="flex items-center gap-2.5 px-3 py-2 text-xs font-semibold text-gray-700 dark:text-zinc-300 hover:bg-gray-100 hover:dark:bg-zinc-800 rounded-xl transition-colors text-left"
               >
-                <UploadCloud className="w-4 h-4 text-purple-500" />
+                <UploadCloud className="w-4 h-4 text-purple-500 dark:text-purple-400" />
                 Import SVG Asset...
               </button>
               <button
                 type="button"
                 onClick={handleSaveProject}
-                className="flex items-center gap-2.5 px-3 py-2 text-xs font-semibold text-gray-700 hover:bg-gray-100 rounded-xl transition-colors text-left"
+                className="flex items-center gap-2.5 px-3 py-2 text-xs font-semibold text-gray-700 dark:text-zinc-300 hover:bg-gray-100 hover:dark:bg-zinc-800 rounded-xl transition-colors text-left"
               >
-                <Save className="w-4 h-4 text-emerald-500" />
+                <Save className="w-4 h-4 text-emerald-500 dark:text-emerald-400" />
                 Save Project (Ctrl+S)
               </button>
-              <div className="h-[1px] bg-gray-100 my-0.5" />
+              <div className="h-[1px] bg-gray-100 dark:bg-zinc-800 my-0.5" />
               <button
                 type="button"
                 onClick={() => {
                   setExportOpen(true);
                   setFileMenuOpen(false);
                 }}
-                className="flex items-center gap-2.5 px-3 py-2 text-xs font-semibold text-gray-700 hover:bg-blue-50 hover:text-blue-600 rounded-xl transition-colors text-left"
+                className="flex items-center gap-2.5 px-3 py-2 text-xs font-semibold text-gray-700 dark:text-zinc-300 hover:bg-blue-50 hover:dark:bg-blue-950/40 hover:text-blue-600 hover:dark:text-blue-400 rounded-xl transition-colors text-left"
               >
-                <Download className="w-4 h-4 text-indigo-500" />
+                <Download className="w-4 h-4 text-indigo-500 dark:text-indigo-400" />
                 Export Assets...
               </button>
             </div>
           )}
         </div>
 
-        <div className="w-[1px] h-4 bg-gray-200 shrink-0 mx-0.5" />
+        <div className="w-[1px] h-4 bg-gray-200 dark:bg-zinc-800 shrink-0 mx-0.5" />
 
         {/* Dynamic Artboard Tab Bar with Smooth Wheel-Scroll (Zero Scrollbar) */}
         <div
@@ -403,10 +407,10 @@ export const Header: React.FC = () => {
                 onContextMenu={(e) => handleContextMenu(tab.id, e)}
                 className={`group relative h-9 shrink-0 max-w-[155px] min-w-[100px] px-3 rounded-2xl flex items-center justify-between text-xs cursor-grab active:cursor-grabbing transition-all select-none outline-none focus-visible:ring-2 focus-visible:ring-blue-500 ${
                   isDragging
-                    ? 'opacity-40 scale-95 border-2 border-dashed border-blue-400 bg-blue-50/50'
+                    ? 'opacity-40 scale-95 border-2 border-dashed border-blue-400 bg-blue-50/50 dark:bg-blue-950/30'
                     : isActive
-                    ? 'bg-white text-slate-900 border border-slate-300 shadow-xs ring-1 ring-black/5 font-semibold z-10'
-                    : 'bg-slate-100/80 text-slate-600 hover:bg-slate-200/70 hover:text-slate-900 border border-slate-200/90 hover:border-slate-300 font-medium'
+                    ? 'bg-white dark:bg-zinc-800 text-slate-900 dark:text-zinc-100 border border-slate-300 dark:border-zinc-700 shadow-xs ring-1 ring-black/5 dark:ring-white/10 font-semibold z-10'
+                    : 'bg-slate-100/80 dark:bg-zinc-800/60 text-slate-600 dark:text-zinc-400 hover:bg-slate-200/70 hover:dark:bg-zinc-800 hover:text-slate-900 hover:dark:text-zinc-200 border border-slate-200/90 dark:border-zinc-700/80 hover:border-slate-300 hover:dark:border-zinc-600 font-medium'
                 }`}
               >
                 {/* Drop Insertion Bar Indicator */}
@@ -422,7 +426,7 @@ export const Header: React.FC = () => {
                 <div className="flex items-center gap-1.5 truncate mr-1 flex-1 min-w-0">
                   <div
                     className={`w-2 h-2 rounded-full shrink-0 transition-colors ${
-                      isActive ? 'bg-blue-600 shadow-xs ring-2 ring-blue-100' : 'bg-slate-300 group-hover:bg-slate-400'
+                      isActive ? 'bg-blue-600 shadow-xs ring-2 ring-blue-100 dark:ring-blue-900/40' : 'bg-slate-300 dark:bg-zinc-600 group-hover:bg-slate-400 group-hover:dark:bg-zinc-500'
                     }`}
                   />
                   {isEditing ? (
@@ -436,7 +440,7 @@ export const Header: React.FC = () => {
                         if (e.key === 'Enter') handleSaveRename(tab.id);
                         if (e.key === 'Escape') setEditingTabId(null);
                       }}
-                      className="bg-white text-slate-900 text-xs px-1.5 py-0.5 rounded-lg border border-blue-500 ring-2 ring-blue-100 outline-none w-full font-medium"
+                      className="bg-white dark:bg-zinc-900 text-slate-900 dark:text-zinc-100 text-xs px-1.5 py-0.5 rounded-lg border border-blue-500 ring-2 ring-blue-100 dark:ring-blue-900/50 outline-none w-full font-medium"
                       onClick={(e) => e.stopPropagation()}
                     />
                   ) : (
@@ -458,8 +462,8 @@ export const Header: React.FC = () => {
                       e.stopPropagation();
                       closeTab(tab.id);
                     }}
-                    className={`p-1 rounded-lg hover:bg-red-50 hover:text-red-500 transition-all outline-none ${
-                      isActive ? 'text-slate-400' : 'opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 focus:opacity-100 text-slate-400'
+                    className={`p-1 rounded-lg hover:bg-red-50 hover:dark:bg-red-950/40 hover:text-red-500 hover:dark:text-red-400 transition-all outline-none ${
+                      isActive ? 'text-slate-400 dark:text-zinc-500' : 'opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 focus:opacity-100 text-slate-400 dark:text-zinc-500'
                     }`}
                   >
                     <X className="w-3 h-3" />
@@ -477,7 +481,7 @@ export const Header: React.FC = () => {
             title="New Artboard / Composition (Ctrl+T)"
             aria-label="New Artboard / Composition"
             onClick={() => openNewTab()}
-            className="h-9 w-9 flex items-center justify-center rounded-2xl bg-white/80 hover:bg-white text-slate-600 hover:text-blue-600 border border-slate-200 hover:border-blue-300 shadow-2xs hover:shadow-xs transition-all shrink-0 outline-none focus-visible:ring-2 focus-visible:ring-blue-500 font-semibold text-xs"
+            className="h-9 w-9 flex items-center justify-center rounded-2xl bg-white/80 dark:bg-zinc-800/80 hover:bg-white hover:dark:bg-zinc-700 text-slate-600 dark:text-zinc-400 hover:text-blue-600 hover:dark:text-blue-400 border border-slate-200 dark:border-zinc-700 shadow-2xs hover:shadow-xs transition-all shrink-0 outline-none focus-visible:ring-2 focus-visible:ring-blue-500 font-semibold text-xs"
           >
             <Plus className="w-3.5 h-3.5" />
           </button>
@@ -490,18 +494,18 @@ export const Header: React.FC = () => {
                 title={`View all ${tabs.length} open artboards`}
                 aria-label={`View all ${tabs.length} open artboards`}
                 onClick={() => setTabsDropdownOpen(!tabsDropdownOpen)}
-                className="h-9 px-2 flex items-center justify-center gap-1 rounded-2xl bg-slate-100 hover:bg-slate-200/80 text-slate-600 hover:text-slate-900 border border-slate-200 hover:border-slate-300 transition-all text-xs font-semibold"
+                className="h-9 px-2 flex items-center justify-center gap-1 rounded-2xl bg-slate-100 dark:bg-zinc-800 hover:bg-slate-200/80 hover:dark:bg-zinc-700 text-slate-600 dark:text-zinc-300 border border-slate-200 dark:border-zinc-700 transition-all text-xs font-semibold"
               >
                 <span>{tabs.length}</span>
-                <ChevronDown className="w-3 h-3 text-slate-400" />
+                <ChevronDown className="w-3 h-3 text-slate-400 dark:text-zinc-500" />
               </button>
 
               {tabsDropdownOpen && (
                 <div
                   ref={tabsMenuRef}
-                  className="absolute top-11 left-0 w-56 max-h-80 overflow-y-auto bg-white/95 backdrop-blur-md rounded-2xl shadow-xl border border-slate-200 p-1.5 flex flex-col gap-0.5 z-50 animate-in fade-in zoom-in-95"
+                  className="absolute top-11 left-0 w-56 max-h-80 overflow-y-auto bg-white/95 dark:bg-zinc-900/95 backdrop-blur-md rounded-2xl shadow-xl border border-slate-200 dark:border-zinc-800 p-1.5 flex flex-col gap-0.5 z-50 animate-in fade-in zoom-in-95"
                 >
-                  <div className="px-2.5 py-1 text-[11px] font-bold uppercase tracking-wider text-slate-500">
+                  <div className="px-2.5 py-1 text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-zinc-400">
                     Open Artboards ({tabs.length})
                   </div>
                   {tabs.map((tab) => {
@@ -515,14 +519,14 @@ export const Header: React.FC = () => {
                           setTabsDropdownOpen(false);
                         }}
                         className={`flex items-center justify-between px-2.5 py-1.5 text-xs rounded-xl transition-colors text-left ${
-                          isTabActive ? 'bg-blue-50 text-blue-700 font-semibold' : 'text-slate-700 hover:bg-slate-100 font-medium'
+                          isTabActive ? 'bg-blue-50 dark:bg-blue-950/50 text-blue-700 dark:text-blue-400 font-semibold' : 'text-slate-700 dark:text-zinc-300 hover:bg-slate-100 hover:dark:bg-zinc-800 font-medium'
                         }`}
                       >
                         <div className="flex items-center gap-2 truncate">
-                          <div className={`w-2 h-2 rounded-full shrink-0 ${isTabActive ? 'bg-blue-600' : 'bg-slate-300'}`} />
+                          <div className={`w-2 h-2 rounded-full shrink-0 ${isTabActive ? 'bg-blue-600' : 'bg-slate-300 dark:bg-zinc-600'}`} />
                           <span className="truncate">{tab.title}</span>
                         </div>
-                        {isTabActive && <Check className="w-3.5 h-3.5 text-blue-600 shrink-0" />}
+                        {isTabActive && <Check className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400 shrink-0" />}
                       </button>
                     );
                   })}
@@ -534,7 +538,7 @@ export const Header: React.FC = () => {
       </div>
 
       {/* Center: Tool Group Floating Pill (PERMANENTLY DEAD-CENTERED) */}
-      <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 flex items-center bg-gray-100/90 rounded-full p-1 shadow-inner border border-gray-200/80 z-30 pointer-events-auto">
+      <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 flex items-center bg-gray-100/90 dark:bg-zinc-800/90 rounded-full p-1 shadow-inner border border-gray-200/80 dark:border-zinc-700/80 z-30 pointer-events-auto">
         {tools.map((t) => {
           const isActive = selectedTool === t.id;
           return (
@@ -547,7 +551,7 @@ export const Header: React.FC = () => {
               className={`w-8 h-8 rounded-full flex items-center justify-center transition-all duration-150 ${
                 isActive
                   ? 'bg-blue-500 text-white shadow-sm'
-                  : 'text-gray-600 hover:bg-white hover:text-gray-900'
+                  : 'text-gray-600 dark:text-zinc-400 hover:bg-white hover:dark:bg-zinc-700 hover:text-gray-900 hover:dark:text-zinc-100'
               }`}
             >
               {t.icon}
@@ -565,18 +569,18 @@ export const Header: React.FC = () => {
             className={`w-8 h-8 rounded-full flex items-center justify-center transition-all duration-150 ${
               shapesDropdownOpen
                 ? 'bg-blue-500 text-white shadow-sm'
-                : 'text-gray-600 hover:bg-white hover:text-gray-900'
+                : 'text-gray-600 dark:text-zinc-400 hover:bg-white hover:dark:bg-zinc-700 hover:text-gray-900 hover:dark:text-zinc-100'
             }`}
           >
             <Shapes className="w-3.5 h-3.5" />
           </button>
 
           {shapesDropdownOpen && (
-            <div className="absolute top-10 left-0 bg-white/95 backdrop-blur-md rounded-2xl shadow-xl border border-gray-100 p-1.5 flex flex-col gap-0.5 min-w-[140px] z-50 animate-in fade-in zoom-in-95">
+            <div className="absolute top-10 left-0 bg-white/95 dark:bg-zinc-900/95 backdrop-blur-md rounded-2xl shadow-xl border border-gray-100 dark:border-zinc-800 p-1.5 flex flex-col gap-0.5 min-w-[140px] z-50 animate-in fade-in zoom-in-95">
               <button
                 type="button"
                 onClick={() => handleAddShape('rect')}
-                className="flex items-center gap-2 px-3 py-1.5 text-xs font-semibold text-gray-700 hover:bg-gray-100 rounded-xl transition-colors text-left"
+                className="flex items-center gap-2 px-3 py-1.5 text-xs font-semibold text-gray-700 dark:text-zinc-300 hover:bg-gray-100 hover:dark:bg-zinc-800 rounded-xl transition-colors text-left"
               >
                 <Square className="w-3.5 h-3.5 text-purple-500" />
                 Rectangle
@@ -584,7 +588,7 @@ export const Header: React.FC = () => {
               <button
                 type="button"
                 onClick={() => handleAddShape('circle')}
-                className="flex items-center gap-2 px-3 py-1.5 text-xs font-semibold text-gray-700 hover:bg-gray-100 rounded-xl transition-colors text-left"
+                className="flex items-center gap-2 px-3 py-1.5 text-xs font-semibold text-gray-700 dark:text-zinc-300 hover:bg-gray-100 hover:dark:bg-zinc-800 rounded-xl transition-colors text-left"
               >
                 <Circle className="w-3.5 h-3.5 text-emerald-500" />
                 Circle / Oval
@@ -592,7 +596,7 @@ export const Header: React.FC = () => {
               <button
                 type="button"
                 onClick={() => handleAddShape('star')}
-                className="flex items-center gap-2 px-3 py-1.5 text-xs font-semibold text-gray-700 hover:bg-gray-100 rounded-xl transition-colors text-left"
+                className="flex items-center gap-2 px-3 py-1.5 text-xs font-semibold text-gray-700 dark:text-zinc-300 hover:bg-gray-100 hover:dark:bg-zinc-800 rounded-xl transition-colors text-left"
               >
                 <Star className="w-3.5 h-3.5 text-amber-500" />
                 Star Shape
@@ -609,13 +613,13 @@ export const Header: React.FC = () => {
           className={`w-8 h-8 rounded-full flex items-center justify-center transition-all duration-150 ${
             selectedTool === 'text'
               ? 'bg-blue-500 text-white shadow-sm'
-              : 'text-gray-600 hover:bg-white hover:text-gray-900'
+              : 'text-gray-600 dark:text-zinc-400 hover:bg-white hover:dark:bg-zinc-700 hover:text-gray-900 hover:dark:text-zinc-100'
           }`}
         >
           <Type className="w-3.5 h-3.5" />
         </button>
 
-        <div className="w-[1px] h-4 bg-gray-300 mx-1" />
+        <div className="w-[1px] h-4 bg-gray-300 dark:bg-zinc-700 mx-1" />
 
         <button
           type="button"
@@ -623,7 +627,7 @@ export const Header: React.FC = () => {
           aria-label="Undo (Ctrl+Z)"
           onClick={undo}
           disabled={past.length === 0}
-          className="w-8 h-8 rounded-full flex items-center justify-center text-gray-500 hover:text-gray-900 hover:bg-white transition-all disabled:opacity-30 disabled:pointer-events-none"
+          className="w-8 h-8 rounded-full flex items-center justify-center text-gray-500 dark:text-zinc-400 hover:text-gray-900 hover:dark:text-zinc-100 hover:bg-white hover:dark:bg-zinc-700 transition-all disabled:opacity-30 disabled:pointer-events-none"
         >
           <RotateCcw className="w-3.5 h-3.5" />
         </button>
@@ -633,19 +637,19 @@ export const Header: React.FC = () => {
           aria-label="Redo (Ctrl+Y)"
           onClick={redo}
           disabled={future.length === 0}
-          className="w-8 h-8 rounded-full flex items-center justify-center text-gray-500 hover:text-gray-900 hover:bg-white transition-all disabled:opacity-30 disabled:pointer-events-none"
+          className="w-8 h-8 rounded-full flex items-center justify-center text-gray-500 dark:text-zinc-400 hover:text-gray-900 hover:dark:text-zinc-100 hover:bg-white hover:dark:bg-zinc-700 transition-all disabled:opacity-30 disabled:pointer-events-none"
         >
           <RotateCw className="w-3.5 h-3.5" />
         </button>
 
-        <div className="w-[1px] h-4 bg-gray-300 mx-1" />
+        <div className="w-[1px] h-4 bg-gray-300 dark:bg-zinc-700 mx-1" />
 
         <button
           type="button"
           title="Export Animation (Ctrl+E)"
           aria-label="Export Animation"
           onClick={() => setExportOpen(true)}
-          className="w-8 h-8 rounded-full flex items-center justify-center text-gray-600 hover:bg-blue-50 hover:text-blue-600 transition-all"
+          className="w-8 h-8 rounded-full flex items-center justify-center text-gray-600 dark:text-zinc-400 hover:bg-blue-50 hover:dark:bg-blue-950/40 hover:text-blue-600 hover:dark:text-blue-400 transition-all"
         >
           <Download className="w-3.5 h-3.5" />
         </button>
@@ -654,17 +658,32 @@ export const Header: React.FC = () => {
           title="Project Settings"
           aria-label="Project Settings"
           onClick={() => setSettingsOpen(true)}
-          className="w-8 h-8 rounded-full flex items-center justify-center text-gray-600 hover:bg-white hover:text-gray-900 transition-all"
+          className="w-8 h-8 rounded-full flex items-center justify-center text-gray-600 dark:text-zinc-400 hover:bg-white hover:dark:bg-zinc-700 hover:text-gray-900 hover:dark:text-zinc-100 transition-all"
         >
           <Settings className="w-3.5 h-3.5" />
         </button>
       </div>
 
-      {/* Right: Resolution Info & New Element */}
-      <div className="flex items-center gap-2.5 shrink-0 z-10">
-        <span className="text-xs font-mono bg-gray-100 text-gray-600 px-2.5 py-1 rounded-full border border-gray-200 hidden xl:inline-block">
+      {/* Right: Resolution Info, Theme Switcher & New Element */}
+      <div className="flex items-center gap-2 shrink-0 z-10">
+        <span className="text-xs font-mono bg-gray-100 dark:bg-zinc-800 text-gray-600 dark:text-zinc-400 px-2.5 py-1 rounded-full border border-gray-200 dark:border-zinc-700 hidden xl:inline-block">
           {rootFrame.width} × {rootFrame.height} • {fps} FPS
         </span>
+
+        {/* Circular Reveal Theme Switcher Button with Dynamic Micro-Animation & Glow Hover */}
+        <button
+          type="button"
+          title={theme === 'dark' ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
+          aria-label={theme === 'dark' ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
+          onClick={(e) => toggleThemeWithAnimation(e)}
+          className="group relative w-9 h-9 flex items-center justify-center rounded-2xl bg-white dark:bg-zinc-800 text-slate-700 dark:text-zinc-300 border border-gray-200 dark:border-zinc-700 shadow-2xs hover:shadow-md hover:scale-105 active:scale-95 transition-all duration-200 shrink-0 outline-none focus-visible:ring-2 focus-visible:ring-blue-500 hover:border-amber-400/50 hover:bg-amber-50/40 dark:hover:border-amber-400/40 dark:hover:bg-amber-400/10 hover:shadow-amber-500/10 dark:hover:shadow-amber-400/20"
+        >
+          {theme === 'dark' ? (
+            <Sun className="w-4 h-4 text-amber-400 transition-all duration-300 ease-out group-hover:rotate-90 group-hover:scale-115 group-hover:text-amber-300 drop-shadow-[0_0_6px_rgba(251,191,36,0.5)]" />
+          ) : (
+            <Moon className="w-4 h-4 text-slate-600 transition-all duration-300 ease-out group-hover:-rotate-20 group-hover:scale-115 group-hover:text-indigo-600 drop-shadow-[0_0_6px_rgba(99,102,241,0.4)]" />
+          )}
+        </button>
 
         <button
           type="button"
@@ -682,7 +701,7 @@ export const Header: React.FC = () => {
           role="menu"
           aria-label="Artboard options"
           style={{ top: contextMenu.y + 4, left: Math.min(contextMenu.x, window.innerWidth - 190) }}
-          className="fixed bg-white/95 backdrop-blur-md rounded-2xl shadow-xl border border-slate-200/90 p-1.5 flex flex-col gap-0.5 z-50 min-w-[170px] text-xs text-slate-700 animate-in fade-in zoom-in-95 select-none"
+          className="fixed bg-white/95 dark:bg-zinc-900/95 backdrop-blur-md rounded-2xl shadow-xl border border-slate-200/90 dark:border-zinc-800 p-1.5 flex flex-col gap-0.5 z-50 min-w-[170px] text-xs text-slate-700 dark:text-zinc-300 animate-in fade-in zoom-in-95 select-none"
         >
           <button
             type="button"
@@ -690,9 +709,9 @@ export const Header: React.FC = () => {
               const tab = tabs.find((t) => t.id === contextMenu.tabId);
               if (tab) handleStartRename(tab.id, tab.title);
             }}
-            className="flex items-center gap-2 px-2.5 py-1.5 rounded-xl hover:bg-slate-100 transition-colors text-left font-medium"
+            className="flex items-center gap-2 px-2.5 py-1.5 rounded-xl hover:bg-slate-100 hover:dark:bg-zinc-800 transition-colors text-left font-medium"
           >
-            <Edit2 className="w-3.5 h-3.5 text-slate-500" />
+            <Edit2 className="w-3.5 h-3.5 text-slate-500 dark:text-zinc-400" />
             Rename Artboard
           </button>
           <button
@@ -701,21 +720,21 @@ export const Header: React.FC = () => {
               duplicateTab(contextMenu.tabId);
               setContextMenu(null);
             }}
-            className="flex items-center gap-2 px-2.5 py-1.5 rounded-xl hover:bg-slate-100 transition-colors text-left font-medium"
+            className="flex items-center gap-2 px-2.5 py-1.5 rounded-xl hover:bg-slate-100 hover:dark:bg-zinc-800 transition-colors text-left font-medium"
           >
-            <Copy className="w-3.5 h-3.5 text-slate-500" />
+            <Copy className="w-3.5 h-3.5 text-slate-500 dark:text-zinc-400" />
             Duplicate Artboard
           </button>
-          <div className="h-[1px] bg-slate-100 my-0.5" />
+          <div className="h-[1px] bg-slate-100 dark:bg-zinc-800 my-0.5" />
           <button
             type="button"
             onClick={() => {
               closeTab(contextMenu.tabId);
               setContextMenu(null);
             }}
-            className="flex items-center gap-2 px-2.5 py-1.5 rounded-xl hover:bg-red-50 text-red-600 transition-colors text-left font-medium"
+            className="flex items-center gap-2 px-2.5 py-1.5 rounded-xl hover:bg-red-50 hover:dark:bg-red-950/40 text-red-600 dark:text-red-400 transition-colors text-left font-medium"
           >
-            <X className="w-3.5 h-3.5 text-red-500" />
+            <X className="w-3.5 h-3.5 text-red-500 dark:text-red-400" />
             Close Artboard
           </button>
           <button
@@ -724,9 +743,9 @@ export const Header: React.FC = () => {
               closeOtherTabs(contextMenu.tabId);
               setContextMenu(null);
             }}
-            className="flex items-center gap-2 px-2.5 py-1.5 rounded-xl hover:bg-slate-100 transition-colors text-left font-medium"
+            className="flex items-center gap-2 px-2.5 py-1.5 rounded-xl hover:bg-slate-100 hover:dark:bg-zinc-800 transition-colors text-left font-medium"
           >
-            <ShieldClose className="w-3.5 h-3.5 text-slate-500" />
+            <ShieldClose className="w-3.5 h-3.5 text-slate-500 dark:text-zinc-400" />
             Close Other Artboards
           </button>
           <button
@@ -735,9 +754,9 @@ export const Header: React.FC = () => {
               closeTabsToRight(contextMenu.tabId);
               setContextMenu(null);
             }}
-            className="flex items-center gap-2 px-2.5 py-1.5 rounded-xl hover:bg-slate-100 transition-colors text-left font-medium"
+            className="flex items-center gap-2 px-2.5 py-1.5 rounded-xl hover:bg-slate-100 hover:dark:bg-zinc-800 transition-colors text-left font-medium"
           >
-            <ArrowRightToLine className="w-3.5 h-3.5 text-slate-500" />
+            <ArrowRightToLine className="w-3.5 h-3.5 text-slate-500 dark:text-zinc-400" />
             Close Tabs to the Right
           </button>
         </div>

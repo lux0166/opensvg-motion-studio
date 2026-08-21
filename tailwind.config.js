@@ -1,5 +1,6 @@
-﻿/** @type {import('tailwindcss').Config} */
+/** @type {import('tailwindcss').Config} */
 export default {
+  darkMode: 'class',
   content: [
     "./index.html",
     "./src/**/*.{js,ts,jsx,tsx}",
@@ -8,17 +9,17 @@ export default {
     extend: {
       colors: {
         app: {
-          bg: '#f1f2f5',
-          surface: '#ffffff',
-          border: '#e5e7eb',
-          borderSubtle: '#f3f4f6',
-          text: '#111827',
-          textMuted: '#6b7280',
+          bg: 'var(--app-bg)',
+          surface: 'var(--app-surface)',
+          border: 'var(--app-border)',
+          borderSubtle: 'var(--app-border-subtle)',
+          text: 'var(--app-text)',
+          textMuted: 'var(--app-text-muted)',
           textPlaceholder: '#9ca3af',
-          primary: '#3b82f6',
-          primaryHover: '#2563eb',
-          toolbar: '#f9fafb',
-          card: '#fafafa'
+          primary: 'var(--app-primary)',
+          primaryHover: 'var(--app-primary-hover)',
+          toolbar: 'var(--app-toolbar)',
+          card: 'var(--app-card-bg)'
         }
       },
       boxShadow: {

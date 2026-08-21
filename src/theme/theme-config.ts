@@ -1,36 +1,68 @@
-﻿/**
+/**
  * Canonical Design System Tokens extracted directly from code.html
  * OpenSVG Studio Precision Light/Studio Theme Specification
  */
 export const themeConfig = {
   colors: {
-    app: {
-      bg: '#f1f2f5',
-      surface: '#ffffff',
-      border: '#e5e7eb',
-      borderSubtle: '#f3f4f6',
-      text: '#111827',
-      textSecondary: '#4b5563',
-      textMuted: '#6b7280',
-      textPlaceholder: '#9ca3af',
-      toolbar: '#f9fafb',
-      toolbarBg: 'rgba(255, 255, 255, 0.85)',
-      cardBg: '#fafafa',
-      inputBg: '#f9fafb',
-      
-      // Accents
-      primary: '#3b82f6',
-      primaryHover: '#2563eb',
-      primaryActive: '#1d4ed8',
-      primaryLight: '#eff6ff',
-      primaryBorder: '#bfdbfe',
-      
-      // Status & Decorative
-      indigo: '#6366f1',
-      emerald: '#10b981',
-      amber: '#f59e0b',
-      rose: '#ef4444',
-      purple: '#8b5cf6'
+    light: {
+      app: {
+        bg: '#f1f2f5',
+        surface: '#ffffff',
+        border: '#e5e7eb',
+        borderSubtle: '#f3f4f6',
+        text: '#111827',
+        textSecondary: '#4b5563',
+        textMuted: '#6b7280',
+        textPlaceholder: '#9ca3af',
+        toolbar: '#f9fafb',
+        toolbarBg: 'rgba(255, 255, 255, 0.85)',
+        cardBg: '#fafafa',
+        inputBg: '#f9fafb',
+        
+        // Accents
+        primary: '#3b82f6',
+        primaryHover: '#2563eb',
+        primaryActive: '#1d4ed8',
+        primaryLight: '#eff6ff',
+        primaryBorder: '#bfdbfe',
+        
+        // Status & Decorative
+        indigo: '#6366f1',
+        emerald: '#10b981',
+        amber: '#f59e0b',
+        rose: '#ef4444',
+        purple: '#8b5cf6'
+      }
+    },
+    dark: {
+      app: {
+        bg: '#090a0f',
+        surface: '#12131a',
+        border: '#232634',
+        borderSubtle: '#1a1c24',
+        text: '#f3f4f6',
+        textSecondary: '#cbd5e1',
+        textMuted: '#9ca3af',
+        textPlaceholder: '#6b7280',
+        toolbar: '#12131a',
+        toolbarBg: 'rgba(18, 19, 26, 0.85)',
+        cardBg: '#161822',
+        inputBg: '#1a1c24',
+        
+        // Accents
+        primary: '#3b82f6',
+        primaryHover: '#60a5fa',
+        primaryActive: '#93c5fd',
+        primaryLight: '#1e293b',
+        primaryBorder: '#3b82f6',
+        
+        // Status & Decorative
+        indigo: '#818cf8',
+        emerald: '#34d399',
+        amber: '#fbbf24',
+        rose: '#f87171',
+        purple: '#a78bfa'
+      }
     }
   },
   typography: {

@@ -257,21 +257,21 @@ export const Timeline: React.FC = () => {
   };
 
   return (
-    <footer className="h-64 bg-white border-t border-gray-100 flex flex-col z-20 m-3 mt-0 rounded-2xl shadow-sm overflow-hidden select-none">
+    <footer className="h-64 bg-white dark:bg-zinc-900 border-t border-gray-100 dark:border-zinc-800 flex flex-col z-20 m-3 mt-0 rounded-2xl shadow-sm overflow-hidden select-none">
       {/* Header Controls */}
-      <div className="h-12 border-b border-gray-100 flex items-center justify-between px-4 bg-gray-50/80 shrink-0">
+      <div className="h-12 border-b border-gray-100 dark:border-zinc-800 flex items-center justify-between px-4 bg-gray-50/80 dark:bg-zinc-800/80 shrink-0">
         <div className="flex items-center gap-2">
           <button
             title="Go to Start (0)"
             onClick={() => setCurrentTime(0)}
-            className="w-8 h-8 flex items-center justify-center text-gray-600 hover:bg-white hover:text-blue-600 rounded-lg transition-all"
+            className="w-8 h-8 flex items-center justify-center text-gray-600 dark:text-zinc-400 hover:bg-white hover:dark:bg-zinc-700 hover:text-blue-600 hover:dark:text-blue-400 rounded-lg transition-all"
           >
             <SkipBack className="w-3.5 h-3.5" />
           </button>
           <button
             title="Step Back 0.1s (←)"
             onClick={() => setCurrentTime(Math.max(0, currentTime - 0.1))}
-            className="w-8 h-8 flex items-center justify-center text-gray-600 hover:bg-white hover:text-blue-600 rounded-lg transition-all"
+            className="w-8 h-8 flex items-center justify-center text-gray-600 dark:text-zinc-400 hover:bg-white hover:dark:bg-zinc-700 hover:text-blue-600 hover:dark:text-blue-400 rounded-lg transition-all"
           >
             <ChevronLeft className="w-4 h-4" />
           </button>
@@ -287,11 +287,11 @@ export const Timeline: React.FC = () => {
           <button
             title="Step Forward 0.1s (→)"
             onClick={() => setCurrentTime(Math.min(duration, currentTime + 0.1))}
-            className="w-8 h-8 flex items-center justify-center text-gray-600 hover:bg-white hover:text-blue-600 rounded-lg transition-all"
+            className="w-8 h-8 flex items-center justify-center text-gray-600 dark:text-zinc-400 hover:bg-white hover:dark:bg-zinc-700 hover:text-blue-600 hover:dark:text-blue-400 rounded-lg transition-all"
           >
             <ChevronRight className="w-4 h-4" />
           </button>
-          <div className="w-[1px] h-4 bg-gray-300 mx-1" />
+          <div className="w-[1px] h-4 bg-gray-300 dark:bg-zinc-700 mx-1" />
           <button
             title="Toggle Loop"
             onClick={() => {
@@ -299,35 +299,37 @@ export const Timeline: React.FC = () => {
               showToast(loop ? 'Loop: Disabled' : 'Loop: Enabled');
             }}
             className={`w-8 h-8 flex items-center justify-center rounded-lg transition-all ${
-              loop ? 'bg-blue-50 text-blue-600 font-bold' : 'text-gray-400 hover:bg-gray-100'
+              loop
+                ? 'bg-blue-50 dark:bg-blue-950/50 text-blue-600 dark:text-blue-400 font-bold'
+                : 'text-gray-400 dark:text-zinc-500 hover:bg-gray-100 hover:dark:bg-zinc-700'
             }`}
           >
             <RotateCcw className="w-3.5 h-3.5" />
           </button>
 
           {/* Time Counter Display */}
-          <div className="ml-3 text-xs font-semibold font-mono text-gray-800 flex items-center gap-1.5 bg-white px-3 py-1 rounded-md border border-gray-200/80 shadow-xs">
-            <span className="text-blue-600 w-10 text-right">{currentTime.toFixed(2)}</span>
-            <span className="text-gray-400">/</span>
-            <span className="text-gray-500">{duration.toFixed(2)} s</span>
+          <div className="ml-3 text-xs font-semibold font-mono text-gray-800 dark:text-zinc-200 flex items-center gap-1.5 bg-white dark:bg-zinc-900 px-3 py-1 rounded-md border border-gray-200/80 dark:border-zinc-700 shadow-xs">
+            <span className="text-blue-600 dark:text-blue-400 w-10 text-right">{currentTime.toFixed(2)}</span>
+            <span className="text-gray-400 dark:text-zinc-600">/</span>
+            <span className="text-gray-500 dark:text-zinc-400">{duration.toFixed(2)} s</span>
           </div>
 
           {/* Stagger Keyframes Action Button */}
           <button
             title="Stagger Animation Tracks (+0.05s cascade)"
             onClick={() => staggerSelectedKeyframes(0.05)}
-            className="flex items-center gap-1.5 bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-200 px-2.5 py-1 rounded-lg text-xs font-semibold transition-all active:scale-95 shadow-xs"
+            className="flex items-center gap-1.5 bg-amber-50 dark:bg-amber-950/40 hover:bg-amber-100 hover:dark:bg-amber-900/50 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800 px-2.5 py-1 rounded-lg text-xs font-semibold transition-all active:scale-95 shadow-xs"
           >
-            <Wand2 className="w-3.5 h-3.5 text-amber-600" />
+            <Wand2 className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />
             <span>Stagger Tracks</span>
           </button>
 
           {/* Audio Track Loader Button */}
           <label
             title="Load Audio Track (.mp3, .wav, .ogg)"
-            className="flex items-center gap-1.5 bg-purple-50 hover:bg-purple-100 text-purple-700 border border-purple-200 px-2.5 py-1 rounded-lg text-xs font-semibold cursor-pointer transition-all active:scale-95 shadow-xs"
+            className="flex items-center gap-1.5 bg-purple-50 dark:bg-purple-950/40 hover:bg-purple-100 hover:dark:bg-purple-900/50 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-800 px-2.5 py-1 rounded-lg text-xs font-semibold cursor-pointer transition-all active:scale-95 shadow-xs"
           >
-            <Music className="w-3.5 h-3.5 text-purple-600" />
+            <Music className="w-3.5 h-3.5 text-purple-600 dark:text-purple-400" />
             <span>{audioTrack ? 'Replace Audio' : 'Add Audio'}</span>
             <input type="file" accept="audio/*" onChange={handleAudioUpload} className="hidden" />
           </label>
@@ -335,13 +337,13 @@ export const Timeline: React.FC = () => {
 
         {/* Mode Switcher: Dopesheet vs Graph Editor */}
         <div className="flex items-center gap-3">
-          <div className="flex items-center bg-gray-200/70 p-0.5 rounded-lg border border-gray-300/60 text-xs font-medium">
+          <div className="flex items-center bg-gray-200/70 dark:bg-zinc-800/90 p-0.5 rounded-lg border border-gray-300/60 dark:border-zinc-700 text-xs font-medium">
             <button
               onClick={() => setTimelineMode('dopesheet')}
               className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md transition-all ${
                 timelineMode === 'dopesheet'
-                  ? 'bg-white text-gray-900 font-bold shadow-xs'
-                  : 'text-gray-600 hover:text-gray-900'
+                  ? 'bg-white dark:bg-zinc-700 text-gray-900 dark:text-zinc-100 font-bold shadow-xs'
+                  : 'text-gray-600 dark:text-zinc-400 hover:text-gray-900 hover:dark:text-zinc-100'
               }`}
             >
               <LayersIcon className="w-3 h-3 text-blue-500" /> Dopesheet
@@ -350,8 +352,8 @@ export const Timeline: React.FC = () => {
               onClick={() => setTimelineMode('graph')}
               className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md transition-all ${
                 timelineMode === 'graph'
-                  ? 'bg-white text-gray-900 font-bold shadow-xs'
-                  : 'text-gray-600 hover:text-gray-900'
+                  ? 'bg-white dark:bg-zinc-700 text-gray-900 dark:text-zinc-100 font-bold shadow-xs'
+                  : 'text-gray-600 dark:text-zinc-400 hover:text-gray-900 hover:dark:text-zinc-100'
               }`}
             >
               <Activity className="w-3 h-3 text-indigo-500" /> Graph Editor
@@ -363,7 +365,7 @@ export const Timeline: React.FC = () => {
             onClick={() => {
               addMarker(currentTime, `M @ ${currentTime.toFixed(2)}s`);
             }}
-            className="flex items-center gap-1 bg-white hover:bg-gray-50 text-gray-700 border border-gray-200 px-2.5 py-1 rounded-md font-medium text-xs shadow-xs transition-colors"
+            className="flex items-center gap-1 bg-white dark:bg-zinc-800 hover:bg-gray-50 hover:dark:bg-zinc-700 text-gray-700 dark:text-zinc-300 border border-gray-200 dark:border-zinc-700 px-2.5 py-1 rounded-md font-medium text-xs shadow-xs transition-colors"
           >
             <Bookmark className="w-3 h-3 text-purple-500" /> Add Marker
           </button>
@@ -381,7 +383,7 @@ export const Timeline: React.FC = () => {
                 showToast('Select an element on canvas first!', 'error');
               }
             }}
-            className="flex items-center gap-1 bg-white hover:bg-gray-50 text-gray-700 border border-gray-200 px-2.5 py-1 rounded-md font-medium text-xs shadow-xs transition-colors"
+            className="flex items-center gap-1 bg-white dark:bg-zinc-800 hover:bg-gray-50 hover:dark:bg-zinc-700 text-gray-700 dark:text-zinc-300 border border-gray-200 dark:border-zinc-700 px-2.5 py-1 rounded-md font-medium text-xs shadow-xs transition-colors"
           >
             <Gem className="w-3 h-3 text-blue-500" /> Add Keyframe
           </button>
@@ -391,10 +393,10 @@ export const Timeline: React.FC = () => {
       {/* Tracks / Graph Area */}
       <div className="flex-1 flex overflow-hidden">
         {/* Left Track Labels */}
-        <div className="w-64 border-r border-gray-100 flex flex-col overflow-y-auto bg-white shrink-0">
-          <div className="px-4 py-2 text-xs font-semibold text-gray-400 flex justify-between items-center h-8 border-b border-gray-100 bg-gray-50/50">
+        <div className="w-64 border-r border-gray-100 dark:border-zinc-800 flex flex-col overflow-y-auto bg-white dark:bg-zinc-900 shrink-0">
+          <div className="px-4 py-2 text-xs font-semibold text-gray-400 dark:text-zinc-500 flex justify-between items-center h-8 border-b border-gray-100 dark:border-zinc-800 bg-gray-50/50 dark:bg-zinc-800/50">
             <span>LAYERS & TRACKS</span>
-            <span className="text-[10px] bg-gray-200/60 text-gray-600 px-1.5 py-0.5 rounded">Timeline</span>
+            <span className="text-[10px] bg-gray-200/60 dark:bg-zinc-800 text-gray-600 dark:text-zinc-400 px-1.5 py-0.5 rounded">Timeline</span>
           </div>
 
           {nodeOrder.map((id) => {
@@ -403,18 +405,18 @@ export const Timeline: React.FC = () => {
             const isSelected = selectedId === id;
 
             return (
-              <div key={id} className="flex flex-col border-b border-gray-50 pb-1">
+              <div key={id} className="flex flex-col border-b border-gray-50 dark:border-zinc-800/50 pb-1">
                 <div
                   onClick={() => setSelectedId(id)}
-                  className={`flex items-center px-4 py-2 hover:bg-gray-50 cursor-pointer transition-colors ${
-                    isSelected ? 'bg-blue-50/80 font-medium' : ''
+                  className={`flex items-center px-4 py-2 hover:bg-gray-50 hover:dark:bg-zinc-800/60 cursor-pointer transition-colors ${
+                    isSelected ? 'bg-blue-50/80 dark:bg-blue-950/40 font-medium' : ''
                   }`}
                 >
                   <div
                     className="w-2.5 h-2.5 rounded-sm mr-2 shrink-0"
                     style={{ backgroundColor: node.fill }}
                   />
-                  <span className="text-xs text-gray-700 flex-1 truncate">{node.name}</span>
+                  <span className="text-xs text-gray-700 dark:text-zinc-300 flex-1 truncate">{node.name}</span>
                 </div>
 
                 {node.tracks?.map((track) => {
@@ -428,8 +430,8 @@ export const Timeline: React.FC = () => {
                       }}
                       className={`flex items-center px-4 py-1 pl-8 cursor-pointer text-xs transition-colors ${
                         isTrackActive
-                          ? 'bg-blue-100/60 text-blue-700 font-semibold'
-                          : 'text-gray-500 hover:bg-gray-50'
+                          ? 'bg-blue-100/60 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300 font-semibold'
+                          : 'text-gray-500 dark:text-zinc-400 hover:bg-gray-50 hover:dark:bg-zinc-800/40'
                       }`}
                     >
                       <span className="flex-1 text-[11px] truncate">{track.label}</span>
@@ -446,10 +448,10 @@ export const Timeline: React.FC = () => {
         <div
           ref={gridRef}
           onMouseDown={handleGridMouseDown}
-          className="flex-1 relative overflow-x-hidden overflow-y-auto bg-[#fafafa] flex flex-col cursor-crosshair"
+          className="flex-1 relative overflow-x-hidden overflow-y-auto bg-[#fafafa] dark:bg-zinc-950/50 flex flex-col cursor-crosshair"
         >
           {/* Time Ruler & Markers Header */}
-          <div className="h-8 border-b border-gray-100 relative text-[10px] text-gray-400 bg-white cursor-pointer select-none shrink-0 sticky top-0 z-20">
+          <div className="h-8 border-b border-gray-100 dark:border-zinc-800 relative text-[10px] text-gray-400 dark:text-zinc-500 bg-white dark:bg-zinc-900 cursor-pointer select-none shrink-0 sticky top-0 z-20">
             <div className="absolute left-2 bottom-1.5 font-mono font-medium">0.0s</div>
             <div className="absolute left-[33.33%] bottom-1.5 font-mono font-medium -translate-x-1/2">
               {(duration * 0.33).toFixed(1)}s
@@ -497,10 +499,10 @@ export const Timeline: React.FC = () => {
             <div className="relative w-full flex-1 pt-1 pb-4">
               {/* Audio Waveform Track */}
               {audioTrack && (
-                <div className="relative w-full h-11 bg-purple-50/70 border-b border-purple-200/80 flex items-center px-3 mb-2 shadow-xs">
-                  <div className="flex items-center gap-2 mr-3 shrink-0 bg-white/90 px-2 py-1 rounded-lg border border-purple-200">
-                    <Music className="w-3.5 h-3.5 text-purple-600" />
-                    <span className="text-[10px] font-bold text-purple-800 truncate max-w-[120px]">
+                <div className="relative w-full h-11 bg-purple-50/70 dark:bg-purple-950/30 border-b border-purple-200/80 dark:border-purple-800/80 flex items-center px-3 mb-2 shadow-xs">
+                  <div className="flex items-center gap-2 mr-3 shrink-0 bg-white/90 dark:bg-zinc-900/90 px-2 py-1 rounded-lg border border-purple-200 dark:border-purple-800">
+                    <Music className="w-3.5 h-3.5 text-purple-600 dark:text-purple-400" />
+                    <span className="text-[10px] font-bold text-purple-800 dark:text-purple-300 truncate max-w-[120px]">
                       {audioTrack.name}
                     </span>
                     <button
@@ -509,7 +511,7 @@ export const Timeline: React.FC = () => {
                         e.stopPropagation();
                         generateMarkersFromAudioBeats();
                       }}
-                      className="flex items-center gap-1 text-[10px] font-bold text-pink-600 bg-pink-50 hover:bg-pink-100 px-1.5 py-0.5 rounded transition-colors shadow-2xs"
+                      className="flex items-center gap-1 text-[10px] font-bold text-pink-600 bg-pink-50 dark:bg-pink-950/50 hover:bg-pink-100 hover:dark:bg-pink-900/50 px-1.5 py-0.5 rounded transition-colors shadow-2xs"
                     >
                       <Sparkles className="w-2.5 h-2.5" /> Beats
                     </button>
@@ -519,7 +521,7 @@ export const Timeline: React.FC = () => {
                         e.stopPropagation();
                         updateAudioTrack({ muted: !audioTrack.muted });
                       }}
-                      className="p-0.5 rounded hover:bg-purple-100 text-purple-600 transition-colors"
+                      className="p-0.5 rounded hover:bg-purple-100 hover:dark:bg-purple-900/40 text-purple-600 dark:text-purple-400 transition-colors"
                     >
                       {audioTrack.muted ? (
                         <VolumeX className="w-3 h-3 text-red-500" />
@@ -534,7 +536,7 @@ export const Timeline: React.FC = () => {
                         setAudioTrack(null);
                         showToast('Removed audio track');
                       }}
-                      className="p-0.5 rounded hover:bg-red-50 text-gray-400 hover:text-red-500 transition-colors"
+                      className="p-0.5 rounded hover:bg-red-50 hover:dark:bg-red-950/40 text-gray-400 dark:text-zinc-500 hover:text-red-500 transition-colors"
                     >
                       <Trash2 className="w-3 h-3" />
                     </button>
@@ -551,7 +553,7 @@ export const Timeline: React.FC = () => {
                         <div
                           key={pIdx}
                           className={`flex-1 rounded-full transition-colors ${
-                            isPast ? 'bg-purple-600' : 'bg-purple-300/80'
+                            isPast ? 'bg-purple-600 dark:bg-purple-400' : 'bg-purple-300/80 dark:bg-purple-800/80'
                           }`}
                           style={{ height: `${heightPercent}%` }}
                         />
@@ -572,11 +574,11 @@ export const Timeline: React.FC = () => {
                   <div key={id} className="relative w-full mb-3" style={{ height: `${28 + (node.tracks?.length || 0) * 24}px` }}>
                     {/* Duration Bar */}
                     <div
-                      className="absolute h-5 bg-blue-100/70 border border-blue-200/80 rounded-full flex items-center justify-between px-1.5 shadow-xs"
+                      className="absolute h-5 bg-blue-100/70 dark:bg-blue-950/40 border border-blue-200/80 dark:border-blue-800/60 rounded-full flex items-center justify-between px-1.5 shadow-xs"
                       style={{ top: '4px', left: '2%', right: '4%' }}
                     >
                       <div className="w-1.5 h-2.5 bg-blue-400 rounded-full" />
-                      <span className="text-[9px] font-semibold text-blue-600 truncate px-2 select-none">
+                      <span className="text-[9px] font-semibold text-blue-600 dark:text-blue-400 truncate px-2 select-none">
                         {node.name} duration
                       </span>
                       <div className="w-1.5 h-2.5 bg-blue-400 rounded-full" />
@@ -603,7 +605,7 @@ export const Timeline: React.FC = () => {
                                   ? 'bg-amber-400 border border-amber-600 scale-125 z-10'
                                   : isCurrent
                                   ? 'active bg-blue-600'
-                                  : 'bg-gray-700'
+                                  : 'bg-gray-700 dark:bg-zinc-400'
                               }`}
                               style={{ left: `${kfPos}%`, top: '50%' }}
                             />
@@ -617,17 +619,17 @@ export const Timeline: React.FC = () => {
             </div>
           ) : (
             /* Graph Editor SVG Curve View with Interactive Handles */
-            <div className="relative w-full flex-1 flex flex-col items-center justify-between p-3 bg-white">
+            <div className="relative w-full flex-1 flex flex-col items-center justify-between p-3 bg-white dark:bg-zinc-900">
               {/* Easing & Spring Preset Chips */}
-              <div className="flex flex-wrap items-center gap-1.5 z-10 bg-gray-50 p-1.5 rounded-xl border border-gray-200 text-[11px]">
-                <span className="font-semibold text-gray-500 px-2 flex items-center gap-1">
+              <div className="flex flex-wrap items-center gap-1.5 z-10 bg-gray-50 dark:bg-zinc-800/70 p-1.5 rounded-xl border border-gray-200 dark:border-zinc-700 text-[11px]">
+                <span className="font-semibold text-gray-500 dark:text-zinc-400 px-2 flex items-center gap-1">
                   <Sparkles className="w-3 h-3 text-blue-500" /> Curves:
                 </span>
                 {['linear', 'ease', 'ease-in', 'ease-out', 'ease-in-out', 'spring'].map((p) => (
                   <button
                     key={p}
                     onClick={() => applyCurvePreset(p)}
-                    className="px-2 py-0.5 rounded-lg hover:bg-white hover:text-blue-600 font-medium text-gray-600 transition-colors uppercase text-[10px]"
+                    className="px-2 py-0.5 rounded-lg hover:bg-white hover:dark:bg-zinc-700 hover:text-blue-600 hover:dark:text-blue-400 font-medium text-gray-600 dark:text-zinc-300 transition-colors uppercase text-[10px]"
                   >
                     {p}
                   </button>
@@ -645,8 +647,8 @@ export const Timeline: React.FC = () => {
                   </defs>
 
                   {/* Grid Lines */}
-                  <line x1="40" y1="20" x2="40" y2="110" stroke="#f3f4f6" strokeWidth="1" />
-                  <line x1="40" y1="110" x2="560" y2="110" stroke="#f3f4f6" strokeWidth="1" />
+                  <line x1="40" y1="20" x2="40" y2="110" stroke="currentColor" className="text-gray-200 dark:text-zinc-800" strokeWidth="1" />
+                  <line x1="40" y1="110" x2="560" y2="110" stroke="currentColor" className="text-gray-200 dark:text-zinc-800" strokeWidth="1" />
 
                   {/* Tangent Line P1 */}
                   <line
@@ -711,7 +713,7 @@ export const Timeline: React.FC = () => {
               </div>
 
               {/* Curve Formula Display */}
-              <div className="text-[11px] font-mono text-gray-500 bg-gray-50 px-3 py-1 rounded-lg border border-gray-200">
+              <div className="text-[11px] font-mono text-gray-500 dark:text-zinc-400 bg-gray-50 dark:bg-zinc-800/70 px-3 py-1 rounded-lg border border-gray-200 dark:border-zinc-700">
                 cubic-bezier({currentCurve.x1}, {currentCurve.y1}, {currentCurve.x2}, {currentCurve.y2})
               </div>
             </div>
