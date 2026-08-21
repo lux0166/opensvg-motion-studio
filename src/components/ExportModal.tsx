@@ -1,7 +1,8 @@
-﻿import React from 'react';
+﻿import React, { useState } from 'react';
 import { useStudioStore } from '../store/useStudioStore';
 import { exportToAnimatedSVG, exportToLottieJSON } from '../engine/exporter';
-import { X, FileCode, Code, Globe, ChevronRight } from 'lucide-react';
+import { recordSceneToVideo } from '../engine/videoRecorder';
+import { X, FileCode, Code, Globe, Film, ChevronRight, Loader2 } from 'lucide-react';
 
 export const ExportModal: React.FC = () => {
   const {
@@ -15,12 +16,14 @@ export const ExportModal: React.FC = () => {
     showToast
   } = useStudioStore();
 
+  const [isRecording, setIsRecording] = useState(false);
+  const [recordProgress, setRecordProgress] = useState(0);
+
   if (!isExportOpen) return null;
 
   const currentNodes = nodeOrder.map((id) => nodes[id]).filter(Boolean);
 
-  const downloadFile = (filename: string, content: string, type: string) => {
-    const blob = new Blob([content], { type });
+  const downloadBlob = (filename: string, blob: Blob) => {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
@@ -35,12 +38,14 @@ export const ExportModal: React.FC = () => {
 
   const handleExportSVG = () => {
     const svgStr = exportToAnimatedSVG(rootFrame, currentNodes, duration);
-    downloadFile(`${rootFrame.name.toLowerCase().replace(/\s+/g, '-')}-animation.svg`, svgStr, 'image/svg+xml');
+    const blob = new Blob([svgStr], { type: 'image/svg+xml' });
+    downloadBlob(`${rootFrame.name.toLowerCase().replace(/\s+/g, '-')}-animation.svg`, blob);
   };
 
   const handleExportLottie = () => {
     const lottieData = exportToLottieJSON(rootFrame, currentNodes, duration, fps);
-    downloadFile(`${rootFrame.name.toLowerCase().replace(/\s+/g, '-')}-lottie.json`, JSON.stringify(lottieData, null, 2), 'application/json');
+    const blob = new Blob([JSON.stringify(lottieData, null, 2)], { type: 'application/json' });
+    downloadBlob(`${rootFrame.name.toLowerCase().replace(/\s+/g, '-')}-lottie.json`, blob);
   };
 
   const handleExportProject = () => {
@@ -52,7 +57,28 @@ export const ExportModal: React.FC = () => {
       nodes,
       nodeOrder
     };
-    downloadFile(`${rootFrame.name.toLowerCase().replace(/\s+/g, '-')}-project.kinetic`, JSON.stringify(project, null, 2), 'application/json');
+    const blob = new Blob([JSON.stringify(project, null, 2)], { type: 'application/json' });
+    downloadBlob(`${rootFrame.name.toLowerCase().replace(/\s+/g, '-')}-project.kinetic`, blob);
+  };
+
+  const handleExportVideo = async () => {
+    try {
+      setIsRecording(true);
+      setRecordProgress(0);
+      showToast('Rendering 60 FPS Video...');
+
+      const videoBlob = await recordSceneToVideo(rootFrame, currentNodes, duration, {
+        fps: 60,
+        onProgress: (p) => setRecordProgress(p)
+      });
+
+      downloadBlob(`${rootFrame.name.toLowerCase().replace(/\s+/g, '-')}-60fps.webm`, videoBlob);
+    } catch (err: any) {
+      showToast(`Video export failed: ${err.message || err}`, 'error');
+    } finally {
+      setIsRecording(false);
+      setRecordProgress(0);
+    }
   };
 
   return (
@@ -63,66 +89,106 @@ export const ExportModal: React.FC = () => {
             Export Motion Assets
           </h3>
           <button
-            onClick={() => setExportOpen(false)}
-            className="text-gray-400 hover:text-gray-700 w-8 h-8 rounded-full flex items-center justify-center hover:bg-gray-100"
+            onClick={() => !isRecording && setExportOpen(false)}
+            disabled={isRecording}
+            className="text-gray-400 hover:text-gray-700 w-8 h-8 rounded-full flex items-center justify-center hover:bg-gray-100 disabled:opacity-50"
           >
             <X className="w-4 h-4" />
           </button>
         </div>
 
-        <div className="py-5 flex flex-col gap-3">
-          <p className="text-xs text-gray-500 mb-1">
-            Choose format to export your vector animation:
-          </p>
-
-          <button
-            onClick={handleExportSVG}
-            className="flex items-center justify-between p-3.5 border border-gray-200 rounded-2xl hover:border-blue-500 hover:bg-blue-50/50 transition-all text-left group"
-          >
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-blue-100 text-blue-600 flex items-center justify-center group-hover:scale-105 transition-transform">
-                <FileCode className="w-5 h-5" />
-              </div>
-              <div>
-                <div className="text-xs font-bold text-gray-800">Animated SVG (.svg)</div>
-                <div className="text-[11px] text-gray-400">Standalone SVG with embedded CSS keyframes</div>
-              </div>
+        {/* Video Recording Progress State */}
+        {isRecording ? (
+          <div className="py-8 flex flex-col items-center justify-center gap-4">
+            <Loader2 className="w-8 h-8 text-blue-500 animate-spin" />
+            <div className="text-center">
+              <h4 className="text-xs font-bold text-gray-800">Rendering 60 FPS Video...</h4>
+              <p className="text-[11px] text-gray-400 mt-1">
+                Encoding vector canvas frames ({recordProgress}%)
+              </p>
             </div>
-            <ChevronRight className="w-4 h-4 text-gray-400 group-hover:text-blue-500" />
-          </button>
-
-          <button
-            onClick={handleExportLottie}
-            className="flex items-center justify-between p-3.5 border border-gray-200 rounded-2xl hover:border-indigo-500 hover:bg-indigo-50/50 transition-all text-left group"
-          >
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-indigo-100 text-indigo-600 flex items-center justify-center group-hover:scale-105 transition-transform">
-                <Code className="w-5 h-5" />
-              </div>
-              <div>
-                <div className="text-xs font-bold text-gray-800">Bodymovin / Lottie (.json)</div>
-                <div className="text-[11px] text-gray-400">Official Lottie schema for Web, iOS & Android</div>
-              </div>
+            <div className="w-full bg-gray-100 h-2 rounded-full overflow-hidden">
+              <div
+                className="bg-blue-500 h-full transition-all duration-150 rounded-full"
+                style={{ width: `${recordProgress}%` }}
+              />
             </div>
-            <ChevronRight className="w-4 h-4 text-gray-400 group-hover:text-indigo-500" />
-          </button>
+          </div>
+        ) : (
+          <div className="py-5 flex flex-col gap-3">
+            <p className="text-xs text-gray-500 mb-1">
+              Choose format to export your vector animation:
+            </p>
 
-          <button
-            onClick={handleExportProject}
-            className="flex items-center justify-between p-3.5 border border-gray-200 rounded-2xl hover:border-emerald-500 hover:bg-emerald-50/50 transition-all text-left group"
-          >
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-emerald-100 text-emerald-600 flex items-center justify-center group-hover:scale-105 transition-transform">
-                <Globe className="w-5 h-5" />
+            {/* Video Option */}
+            <button
+              onClick={handleExportVideo}
+              className="flex items-center justify-between p-3.5 border border-gray-200 rounded-2xl hover:border-blue-500 hover:bg-blue-50/50 transition-all text-left group"
+            >
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-rose-100 text-rose-600 flex items-center justify-center group-hover:scale-105 transition-transform">
+                  <Film className="w-5 h-5" />
+                </div>
+                <div>
+                  <div className="text-xs font-bold text-gray-800">60 FPS Video (.webm / .mp4)</div>
+                  <div className="text-[11px] text-gray-400">High-bitrate video stream recording</div>
+                </div>
               </div>
-              <div>
-                <div className="text-xs font-bold text-gray-800">Kinetic Project (.kinetic)</div>
-                <div className="text-[11px] text-gray-400">Full source scene graph and keyframe tracks</div>
+              <ChevronRight className="w-4 h-4 text-gray-400 group-hover:text-rose-500" />
+            </button>
+
+            {/* SVG Option */}
+            <button
+              onClick={handleExportSVG}
+              className="flex items-center justify-between p-3.5 border border-gray-200 rounded-2xl hover:border-blue-500 hover:bg-blue-50/50 transition-all text-left group"
+            >
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-blue-100 text-blue-600 flex items-center justify-center group-hover:scale-105 transition-transform">
+                  <FileCode className="w-5 h-5" />
+                </div>
+                <div>
+                  <div className="text-xs font-bold text-gray-800">Animated SVG (.svg)</div>
+                  <div className="text-[11px] text-gray-400">Standalone SVG with embedded CSS keyframes</div>
+                </div>
               </div>
-            </div>
-            <ChevronRight className="w-4 h-4 text-gray-400 group-hover:text-emerald-500" />
-          </button>
-        </div>
+              <ChevronRight className="w-4 h-4 text-gray-400 group-hover:text-blue-500" />
+            </button>
+
+            {/* Lottie Option */}
+            <button
+              onClick={handleExportLottie}
+              className="flex items-center justify-between p-3.5 border border-gray-200 rounded-2xl hover:border-indigo-500 hover:bg-indigo-50/50 transition-all text-left group"
+            >
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-indigo-100 text-indigo-600 flex items-center justify-center group-hover:scale-105 transition-transform">
+                  <Code className="w-5 h-5" />
+                </div>
+                <div>
+                  <div className="text-xs font-bold text-gray-800">Bodymovin / Lottie (.json)</div>
+                  <div className="text-[11px] text-gray-400">Official Lottie schema for Web, iOS & Android</div>
+                </div>
+              </div>
+              <ChevronRight className="w-4 h-4 text-gray-400 group-hover:text-indigo-500" />
+            </button>
+
+            {/* Project File Option */}
+            <button
+              onClick={handleExportProject}
+              className="flex items-center justify-between p-3.5 border border-gray-200 rounded-2xl hover:border-emerald-500 hover:bg-emerald-50/50 transition-all text-left group"
+            >
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-emerald-100 text-emerald-600 flex items-center justify-center group-hover:scale-105 transition-transform">
+                  <Globe className="w-5 h-5" />
+                </div>
+                <div>
+                  <div className="text-xs font-bold text-gray-800">Kinetic Project (.kinetic)</div>
+                  <div className="text-[11px] text-gray-400">Full source scene graph and keyframe tracks</div>
+                </div>
+              </div>
+              <ChevronRight className="w-4 h-4 text-gray-400 group-hover:text-emerald-500" />
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );
