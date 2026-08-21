@@ -59,3 +59,9 @@
 
 ---
 **Verification Summary**: 17 test suites, 49 tests passing (100%), 0 build errors.
+
+### 12. Task A1: Keyframe Mutation-Time Normalization & O(log N) Evaluator (`perf/evaluator-binary-search`)
+- **Engine**: Implemented `findKeyframeSegment` with \(\mathcal{O}(\log N)\) Binary Search in `src/engine/evaluator.ts`.
+- **Optimization**: Completely eliminated runtime `[...track.keyframes].sort(...)` and array allocations from the 60fps/120fps hot evaluation path.
+- **Store Normalization**: Ensured all keyframes are sorted upon insertion (`addOrUpdateKeyframe`), time update (`updateKeyframeTime`), stagger (`staggerSelectedKeyframes`), and project load (`loadProject`).
+- **Tests**: `src/engine/__tests__/evaluator.test.ts` (9/9 passing, including binary search edge cases and 100-keyframe stress tests).
