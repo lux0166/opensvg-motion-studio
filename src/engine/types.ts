@@ -57,7 +57,8 @@ export type AnimatableProperty =
   | 'shadowBlur'
   | 'shadowOffsetX'
   | 'shadowOffsetY'
-  | 'filterBlur';
+  | 'filterBlur'
+  | 'motionPathProgress';
 
 export interface PropertyTrack<T = number | string> {
   id: string;
@@ -141,6 +142,14 @@ export interface BaseNode {
 
   // Animation tracks
   tracks: PropertyTrack<any>[];
+
+  // Motion Path & Orbit
+  motionPath?: {
+    pathNodeId: string;
+    progress: number; // 0.0 to 1.0
+    autoOrient: boolean;
+    offsetAngle?: number;
+  };
 
   // Interactive State Machine Triggers
   triggers?: NodeTrigger[];

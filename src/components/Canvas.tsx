@@ -73,7 +73,7 @@ export const Canvas: React.FC = () => {
   const evaluatedNodes = nodeOrder
     .map((id) => nodes[id])
     .filter(Boolean)
-    .map((node) => evaluateNode(node, currentTime));
+    .map((node) => evaluateNode(node, currentTime, nodes));
 
   // Render Loop on Canvas 2D
   useEffect(() => {

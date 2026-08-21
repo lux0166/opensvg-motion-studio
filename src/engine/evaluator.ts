@@ -1,5 +1,6 @@
 import { CubicBezierCurve, Keyframe, PropertyTrack, SceneNode, BezierPoint } from './types';
 import { evaluateSpring } from './physics';
+import { evaluateMotionPath } from './motionPath';
 
 /**
  * Cubic Bezier solver using Newton-Raphson approximation
@@ -240,14 +241,35 @@ export function evaluateTrack(track: PropertyTrack<any>, time: number, defaultVa
 
 /**
  * Evaluates animated state of a scene node at timestamp t
+ * (Supports Motion Path & Auto-Orientation when linked to a Path node)
  */
-export function evaluateNode(node: SceneNode, time: number): SceneNode {
+export function evaluateNode(
+  node: SceneNode,
+  time: number,
+  allNodes?: Record<string, SceneNode>
+): SceneNode {
   const evaluated = { ...node };
 
   if (node.tracks && node.tracks.length > 0) {
     for (const track of node.tracks) {
       const val = evaluateTrack(track, time, (node as any)[track.property]);
       (evaluated as any)[track.property] = val;
+    }
+  }
+
+  // Evaluate Motion Path Trajectory & Auto-Orientation
+  if (node.motionPath && node.motionPath.pathNodeId && allNodes) {
+    const targetPath = allNodes[node.motionPath.pathNodeId];
+    if (targetPath && targetPath.pathPoints && targetPath.pathPoints.length > 0) {
+      const progress = (evaluated as any).motionPathProgress ?? node.motionPath.progress;
+      const motion = evaluateMotionPath(targetPath.pathPoints, progress, (targetPath as any).closed);
+
+      evaluated.x = motion.x - node.width / 2;
+      evaluated.y = motion.y - node.height / 2;
+
+      if (node.motionPath.autoOrient) {
+        evaluated.rotation = motion.angle + (node.motionPath.offsetAngle || 0);
+      }
     }
   }
 
