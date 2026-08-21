@@ -12,12 +12,12 @@ import { TimelinePlaybackControls, TimelineActionButtons } from './TimelineContr
 import { Layers, Sliders, Activity, Music, Palette, Workflow, GripVertical, X } from 'lucide-react';
 
 const ICON_MAP: Record<string, React.ReactNode> = {
-  Layers: <Layers className="w-3.5 h-3.5 text-blue-500" />,
-  Sliders: <Sliders className="w-3.5 h-3.5 text-indigo-500" />,
-  Activity: <Activity className="w-3.5 h-3.5 text-indigo-500" />,
-  Music: <Music className="w-3.5 h-3.5 text-purple-500" />,
-  Palette: <Palette className="w-3.5 h-3.5 text-pink-500" />,
-  Workflow: <Workflow className="w-3.5 h-3.5 text-amber-500" />,
+  Layers: <Layers className="w-3.5 h-3.5 text-slate-500 dark:text-zinc-400" />,
+  Sliders: <Sliders className="w-3.5 h-3.5 text-slate-500 dark:text-zinc-400" />,
+  Activity: <Activity className="w-3.5 h-3.5 text-slate-500 dark:text-zinc-400" />,
+  Music: <Music className="w-3.5 h-3.5 text-slate-500 dark:text-zinc-400" />,
+  Palette: <Palette className="w-3.5 h-3.5 text-slate-500 dark:text-zinc-400" />,
+  Workflow: <Workflow className="w-3.5 h-3.5 text-slate-500 dark:text-zinc-400" />,
 };
 
 interface DockContainerProps {
@@ -32,7 +32,7 @@ export const DockContainer: React.FC<DockContainerProps> = ({
   style
 }) => {
   const containerRef = useRef<HTMLDivElement | null>(null);
-  const { toggleGraphEditor } = useStudioStore();
+  const { toggleGraphEditor, setActivePanelInContainer } = useStudioStore();
   const { handleTabPointerDown } = useWorkspaceDrag();
 
   const renderActivePanel = () => {
@@ -77,6 +77,7 @@ export const DockContainer: React.FC<DockContainerProps> = ({
                     type="button"
                     role="tab"
                     aria-selected={isActive}
+                    onClick={() => setActivePanelInContainer(container.id, panelId)}
                     onPointerDown={(e) => handleTabPointerDown(panelId, container.id, e)}
                     className={`group flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium cursor-grab active:cursor-grabbing transition-all outline-none focus-visible:ring-2 focus-visible:ring-blue-500 touch-none ${
                       isActive

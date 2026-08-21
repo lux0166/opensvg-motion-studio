@@ -23,6 +23,10 @@ export const GraphEditorPanel: React.FC = () => {
     }
   };
 
+  const isLinear = currentCurve.x1 === 0 && currentCurve.y1 === 0 && currentCurve.x2 === 1 && currentCurve.y2 === 1;
+  const isHold = currentCurve.x1 === 0 && currentCurve.y1 === 0 && currentCurve.x2 === 0 && currentCurve.y2 === 1;
+  const isCubic = !isLinear && !isHold;
+
   return (
     <div className="w-full h-full min-h-0 bg-white dark:bg-zinc-900 flex flex-col p-2.5 overflow-y-auto shrink-0 select-none">
       {/* Header: Track Indicator */}
@@ -41,7 +45,12 @@ export const GraphEditorPanel: React.FC = () => {
         <button
           type="button"
           onClick={() => handleCurveChange({ x1: 0, y1: 0, x2: 1, y2: 1 })}
-          className="py-1 rounded-md font-semibold text-xs text-center hover:bg-white hover:dark:bg-zinc-700 text-slate-700 dark:text-zinc-300 transition-all flex items-center justify-center gap-1"
+          aria-pressed={isLinear}
+          className={`py-1 rounded-md font-semibold text-xs text-center transition-all flex items-center justify-center gap-1 ${
+            isLinear
+              ? 'bg-white dark:bg-zinc-700 text-blue-600 dark:text-blue-400 shadow-2xs'
+              : 'hover:bg-white hover:dark:bg-zinc-700 text-slate-700 dark:text-zinc-300'
+          }`}
           title="Linear interpolation"
         >
           <span>/</span> Linear
@@ -49,7 +58,12 @@ export const GraphEditorPanel: React.FC = () => {
         <button
           type="button"
           onClick={() => handleCurveChange({ x1: 0.42, y1: 0, x2: 0.58, y2: 1 })}
-          className="py-1 rounded-md font-semibold text-xs text-center bg-white dark:bg-zinc-700 text-blue-600 dark:text-blue-400 shadow-2xs transition-all flex items-center justify-center gap-1"
+          aria-pressed={isCubic}
+          className={`py-1 rounded-md font-semibold text-xs text-center transition-all flex items-center justify-center gap-1 ${
+            isCubic
+              ? 'bg-white dark:bg-zinc-700 text-blue-600 dark:text-blue-400 shadow-2xs'
+              : 'hover:bg-white hover:dark:bg-zinc-700 text-slate-700 dark:text-zinc-300'
+          }`}
           title="Cubic Bézier curve"
         >
           <span>〰️</span> Cubic
@@ -57,7 +71,12 @@ export const GraphEditorPanel: React.FC = () => {
         <button
           type="button"
           onClick={() => handleCurveChange({ x1: 0, y1: 0, x2: 0, y2: 1 })}
-          className="py-1 rounded-md font-semibold text-xs text-center hover:bg-white hover:dark:bg-zinc-700 text-slate-700 dark:text-zinc-300 transition-all flex items-center justify-center gap-1"
+          aria-pressed={isHold}
+          className={`py-1 rounded-md font-semibold text-xs text-center transition-all flex items-center justify-center gap-1 ${
+            isHold
+              ? 'bg-white dark:bg-zinc-700 text-blue-600 dark:text-blue-400 shadow-2xs'
+              : 'hover:bg-white hover:dark:bg-zinc-700 text-slate-700 dark:text-zinc-300'
+          }`}
           title="Hold / Step interpolation"
         >
           <span>⎍</span> Hold
