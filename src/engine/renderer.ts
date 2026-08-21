@@ -1,19 +1,26 @@
-﻿import { SceneNode, FrameNode } from './types';
+import { SceneNode, FrameNode, ToolMode, BezierPoint } from './types';
+
+export interface DragHandleInfo {
+  type: 'move' | 'nw' | 'ne' | 'se' | 'sw' | 'n' | 's' | 'e' | 'w' | 'rotate' | 'anchor' | 'cp1' | 'cp2';
+  pointIndex?: number;
+}
 
 /**
- * High-DPI Vector Canvas Renderer
+ * High-DPI Vector Canvas Renderer with Sub-pixel Precision
  */
 export function renderCanvasScene(
   ctx: CanvasRenderingContext2D,
   rootFrame: FrameNode,
   evaluatedNodes: SceneNode[],
   selectedId: string | null,
+  selectedTool: ToolMode,
+  selectedPointIndex: number | null,
   dpr: number
 ) {
   const width = rootFrame.width;
   const height = rootFrame.height;
 
-  // Clear canvas
+  // Clear canvas with device pixel ratio
   ctx.save();
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   ctx.clearRect(0, 0, width, height);
@@ -92,8 +99,14 @@ export function renderCanvasScene(
       if (node.stroke && node.strokeWidth) ctx.stroke();
     } else if (node.type === 'path' && node.pathPoints && node.pathPoints.length > 0) {
       drawBezierPath(ctx, node.pathPoints, node.x, node.y);
-      ctx.fill();
-      if (node.stroke && node.strokeWidth) ctx.stroke();
+      if (node.fill && node.fill !== 'transparent') ctx.fill();
+      if (node.stroke && node.strokeWidth) {
+        ctx.stroke();
+      } else if (!node.stroke) {
+        ctx.strokeStyle = '#3b82f6';
+        ctx.lineWidth = 2;
+        ctx.stroke();
+      }
     } else if (node.type === 'text') {
       ctx.font = `${node.fontSize || 16}px Inter, sans-serif`;
       ctx.fillText(node.textContent || 'Text', node.x, node.y + (node.fontSize || 16));
@@ -104,9 +117,13 @@ export function renderCanvasScene(
 
   // Draw Selection Bounding Box & Handles
   if (selectedId && selectedId !== rootFrame.id) {
-    const selectedNode = evaluatedNodes.find(n => n.id === selectedId);
+    const selectedNode = evaluatedNodes.find((n) => n.id === selectedId);
     if (selectedNode && selectedNode.visible) {
-      drawSelectionOverlay(ctx, selectedNode);
+      if ((selectedTool === 'pen' || selectedTool === 'direct-select') && selectedNode.type === 'path' && selectedNode.pathPoints) {
+        drawPathEditingOverlay(ctx, selectedNode, selectedPointIndex);
+      } else {
+        drawSelectionOverlay(ctx, selectedNode);
+      }
     }
   }
 
@@ -143,14 +160,19 @@ function drawStar(
   ctx.closePath();
 }
 
-function drawBezierPath(ctx: CanvasRenderingContext2D, points: any[], offsetX: number, offsetY: number) {
+export function drawBezierPath(ctx: CanvasRenderingContext2D, points: BezierPoint[], offsetX: number, offsetY: number) {
   if (points.length === 0) return;
   ctx.beginPath();
   ctx.moveTo(points[0].x + offsetX, points[0].y + offsetY);
 
   for (let i = 1; i < points.length; i++) {
     const p = points[i];
-    if (p.cp1x !== undefined && p.cp2x !== undefined) {
+    if (
+      p.cp1x !== undefined &&
+      p.cp1y !== undefined &&
+      p.cp2x !== undefined &&
+      p.cp2y !== undefined
+    ) {
       ctx.bezierCurveTo(
         p.cp1x + offsetX,
         p.cp1y + offsetY,
@@ -165,6 +187,9 @@ function drawBezierPath(ctx: CanvasRenderingContext2D, points: any[], offsetX: n
   }
 }
 
+/**
+ * 8-Point Bounding Box with Corner, Edge, and Rotation Handles
+ */
 function drawSelectionOverlay(ctx: CanvasRenderingContext2D, node: SceneNode) {
   ctx.save();
   const centerX = node.x + node.width / 2;
@@ -184,34 +209,100 @@ function drawSelectionOverlay(ctx: CanvasRenderingContext2D, node: SceneNode) {
   ctx.lineWidth = 1.5;
   ctx.strokeRect(node.x, node.y, node.width, node.height);
 
-  // 4 Corner handles
-  const handleSize = 7;
-  const corners = [
-    [node.x, node.y],
-    [node.x + node.width, node.y],
-    [node.x, node.y + node.height],
-    [node.x + node.width, node.y + node.height]
+  // 8 handles (Corners + Edges)
+  const handleSize = 6;
+  const handles = [
+    // Corners
+    [node.x, node.y], // NW
+    [node.x + node.width, node.y], // NE
+    [node.x, node.y + node.height], // SW
+    [node.x + node.width, node.y + node.height], // SE
+    // Edges
+    [node.x + node.width / 2, node.y], // N
+    [node.x + node.width / 2, node.y + node.height], // S
+    [node.x, node.y + node.height / 2], // W
+    [node.x + node.width, node.y + node.height / 2], // E
   ];
 
   ctx.fillStyle = '#ffffff';
   ctx.strokeStyle = '#3b82f6';
   ctx.lineWidth = 1.5;
 
-  for (const [hx, hy] of corners) {
+  for (const [hx, hy] of handles) {
     ctx.fillRect(hx - handleSize / 2, hy - handleSize / 2, handleSize, handleSize);
     ctx.strokeRect(hx - handleSize / 2, hy - handleSize / 2, handleSize, handleSize);
   }
 
-  // Rotation top handle
+  // Rotation top handle with lollipop line
   ctx.beginPath();
   ctx.moveTo(centerX, node.y);
-  ctx.lineTo(centerX, node.y - 18);
+  ctx.lineTo(centerX, node.y - 20);
   ctx.stroke();
 
   ctx.beginPath();
-  ctx.arc(centerX, node.y - 18, 4, 0, Math.PI * 2);
+  ctx.arc(centerX, node.y - 20, 4.5, 0, Math.PI * 2);
   ctx.fill();
   ctx.stroke();
+
+  ctx.restore();
+}
+
+/**
+ * Path Vector Overlay (Anchor points & Tangent handles)
+ */
+function drawPathEditingOverlay(ctx: CanvasRenderingContext2D, node: SceneNode, selectedPointIndex: number | null) {
+  if (!node.pathPoints || node.pathPoints.length === 0) return;
+
+  const points = node.pathPoints;
+  const offsetX = node.x;
+  const offsetY = node.y;
+
+  ctx.save();
+
+  // Draw connecting tangent lines
+  ctx.strokeStyle = '#93c5fd';
+  ctx.lineWidth = 1;
+  for (let i = 0; i < points.length; i++) {
+    const pt = points[i];
+    if (pt.cp1x !== undefined && pt.cp1y !== undefined) {
+      ctx.beginPath();
+      ctx.moveTo(pt.x + offsetX, pt.y + offsetY);
+      ctx.lineTo(pt.cp1x + offsetX, pt.cp1y + offsetY);
+      ctx.stroke();
+
+      // Tangent point 1 handle
+      ctx.beginPath();
+      ctx.arc(pt.cp1x + offsetX, pt.cp1y + offsetY, 3.5, 0, Math.PI * 2);
+      ctx.fillStyle = '#3b82f6';
+      ctx.fill();
+    }
+    if (pt.cp2x !== undefined && pt.cp2y !== undefined) {
+      ctx.beginPath();
+      ctx.moveTo(pt.x + offsetX, pt.y + offsetY);
+      ctx.lineTo(pt.cp2x + offsetX, pt.cp2y + offsetY);
+      ctx.stroke();
+
+      // Tangent point 2 handle
+      ctx.beginPath();
+      ctx.arc(pt.cp2x + offsetX, pt.cp2y + offsetY, 3.5, 0, Math.PI * 2);
+      ctx.fillStyle = '#3b82f6';
+      ctx.fill();
+    }
+  }
+
+  // Draw Anchor points (vertices)
+  for (let i = 0; i < points.length; i++) {
+    const pt = points[i];
+    const isSelected = selectedPointIndex === i;
+    const size = isSelected ? 8 : 6;
+
+    ctx.fillStyle = isSelected ? '#3b82f6' : '#ffffff';
+    ctx.strokeStyle = '#1d4ed8';
+    ctx.lineWidth = 1.5;
+
+    ctx.fillRect(pt.x + offsetX - size / 2, pt.y + offsetY - size / 2, size, size);
+    ctx.strokeRect(pt.x + offsetX - size / 2, pt.y + offsetY - size / 2, size, size);
+  }
 
   ctx.restore();
 }

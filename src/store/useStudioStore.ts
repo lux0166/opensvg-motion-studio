@@ -1,6 +1,6 @@
-import { create } from 'zustand';
+﻿import { create } from 'zustand';
 import { immer } from 'zustand/middleware/immer';
-import { FrameNode, SceneNode, ToolMode, TimelineMode } from '../engine/types';
+import { FrameNode, SceneNode, ToolMode, TimelineMode, BezierPoint, CubicBezierCurve } from '../engine/types';
 
 interface StudioState {
   // Playback
@@ -19,6 +19,8 @@ interface StudioState {
   // Tools & Selection
   selectedTool: ToolMode;
   selectedId: string | null;
+  selectedPointIndex: number | null;
+  selectedTrackId: string | null;
   expandedNodeIds: Record<string, boolean>;
 
   // Scene Graph
@@ -42,6 +44,8 @@ interface StudioState {
   setPan: (x: number, y: number) => void;
   setSelectedTool: (tool: ToolMode) => void;
   setSelectedId: (id: string | null) => void;
+  setSelectedPointIndex: (index: number | null) => void;
+  setSelectedTrackId: (trackId: string | null) => void;
   toggleNodeExpand: (id: string) => void;
 
   // Scene manipulation
@@ -51,10 +55,15 @@ interface StudioState {
   deleteNode: (id: string) => void;
   reorderNode: (sourceIndex: number, targetIndex: number) => void;
 
+  // Vector Path manipulation
+  addPathPoint: (nodeId: string, point: BezierPoint) => void;
+  updatePathPoint: (nodeId: string, index: number, updates: Partial<BezierPoint>) => void;
+
   // Keyframes
   addOrUpdateKeyframe: (nodeId: string, property: string, time: number, value: any) => void;
   removeKeyframe: (nodeId: string, property: string, keyframeId: string) => void;
-  updateKeyframeCurve: (nodeId: string, property: string, keyframeId: string, curve: { x1: number; y1: number; x2: number; y2: number }) => void;
+  updateKeyframeTime: (nodeId: string, property: string, keyframeId: string, newTime: number) => void;
+  updateKeyframeCurve: (nodeId: string, property: string, keyframeId: string, curve: CubicBezierCurve) => void;
 
   // Modals & Feedback
   setExportOpen: (open: boolean) => void;
@@ -77,6 +86,8 @@ export const useStudioStore = create<StudioState>()(
 
     selectedTool: 'select',
     selectedId: 'card',
+    selectedPointIndex: null,
+    selectedTrackId: 'tr-rot',
     expandedNodeIds: { 'frame-1': true, card: true, ball: true },
 
     rootFrame: {
@@ -211,7 +222,16 @@ export const useStudioStore = create<StudioState>()(
     setZoom: (zoom) => set({ zoom: Math.max(0.15, Math.min(3.0, zoom)) }),
     setPan: (panX, panY) => set({ panX, panY }),
     setSelectedTool: (tool) => set({ selectedTool: tool }),
-    setSelectedId: (id) => set({ selectedId: id }),
+    setSelectedId: (id) =>
+      set((state) => {
+        state.selectedId = id;
+        state.selectedPointIndex = null;
+        if (id && state.nodes[id] && state.nodes[id].tracks?.length > 0) {
+          state.selectedTrackId = state.nodes[id].tracks[0].id;
+        }
+      }),
+    setSelectedPointIndex: (index) => set({ selectedPointIndex: index }),
+    setSelectedTrackId: (trackId) => set({ selectedTrackId: trackId }),
     toggleNodeExpand: (id) =>
       set((state) => {
         state.expandedNodeIds[id] = !state.expandedNodeIds[id];
@@ -234,6 +254,9 @@ export const useStudioStore = create<StudioState>()(
         state.nodes[node.id] = node;
         state.nodeOrder.push(node.id);
         state.selectedId = node.id;
+        if (node.tracks?.length > 0) {
+          state.selectedTrackId = node.tracks[0].id;
+        }
       }),
 
     deleteNode: (id) =>
@@ -247,6 +270,21 @@ export const useStudioStore = create<StudioState>()(
       set((state) => {
         const [moved] = state.nodeOrder.splice(sourceIndex, 1);
         state.nodeOrder.splice(targetIndex, 0, moved);
+      }),
+
+    addPathPoint: (nodeId, point) =>
+      set((state) => {
+        const node = state.nodes[nodeId];
+        if (!node) return;
+        if (!node.pathPoints) node.pathPoints = [];
+        node.pathPoints.push(point);
+      }),
+
+    updatePathPoint: (nodeId, index, updates) =>
+      set((state) => {
+        const node = state.nodes[nodeId];
+        if (!node || !node.pathPoints || !node.pathPoints[index]) return;
+        Object.assign(node.pathPoints[index], updates);
       }),
 
     addOrUpdateKeyframe: (nodeId, property, time, value) =>
@@ -288,6 +326,20 @@ export const useStudioStore = create<StudioState>()(
         const track = node.tracks.find((t) => t.property === property);
         if (track) {
           track.keyframes = track.keyframes.filter((k) => k.id !== keyframeId);
+        }
+      }),
+
+    updateKeyframeTime: (nodeId, property, keyframeId, newTime) =>
+      set((state) => {
+        const node = state.nodes[nodeId];
+        if (!node) return;
+        const track = node.tracks.find((t) => t.property === property);
+        if (track) {
+          const kf = track.keyframes.find((k) => k.id === keyframeId);
+          if (kf) {
+            kf.time = Math.max(0, Math.min(get().duration, parseFloat(newTime.toFixed(2))));
+            track.keyframes.sort((a, b) => a.time - b.time);
+          }
         }
       }),
 

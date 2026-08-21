@@ -1,5 +1,7 @@
-import React, { useRef, useEffect } from 'react';
+﻿import React, { useRef, useEffect } from 'react';
 import { useStudioStore } from '../store/useStudioStore';
+import { EASING_CURVES } from '../engine/evaluator';
+import { CubicBezierCurve } from '../engine/types';
 import {
   Play,
   Pause,
@@ -9,7 +11,8 @@ import {
   ChevronRight,
   Gem,
   Activity,
-  Layers as LayersIcon
+  Layers as LayersIcon,
+  Sparkles
 } from 'lucide-react';
 
 export const Timeline: React.FC = () => {
@@ -27,7 +30,11 @@ export const Timeline: React.FC = () => {
     nodeOrder,
     selectedId,
     setSelectedId,
+    selectedTrackId,
+    setSelectedTrackId,
     addOrUpdateKeyframe,
+    updateKeyframeTime,
+    updateKeyframeCurve,
     showToast
   } = useStudioStore();
 
@@ -90,7 +97,87 @@ export const Timeline: React.FC = () => {
     window.addEventListener('mouseup', onUp);
   };
 
+  const handleKeyframeDrag = (
+    startEvent: React.MouseEvent,
+    nodeId: string,
+    property: string,
+    keyframeId: string
+  ) => {
+    startEvent.stopPropagation();
+    if (!gridRef.current) return;
+
+    const rect = gridRef.current.getBoundingClientRect();
+
+    const onMove = (moveEv: MouseEvent) => {
+      const offsetX = Math.max(0, Math.min(rect.width, moveEv.clientX - rect.left));
+      const newTime = (offsetX / rect.width) * duration;
+      updateKeyframeTime(nodeId, property, keyframeId, newTime);
+      setCurrentTime(parseFloat(newTime.toFixed(2)));
+    };
+
+    const onUp = () => {
+      window.removeEventListener('mousemove', onMove);
+      window.removeEventListener('mouseup', onUp);
+      showToast('Keyframe position updated');
+    };
+
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
+  };
+
   const progressPercent = Math.min(100, Math.max(0, (currentTime / duration) * 100));
+
+  // Find active track for Graph Editor
+  const activeNode = selectedId ? nodes[selectedId] : null;
+  const activeTrack = activeNode?.tracks?.find((t) => t.id === selectedTrackId) || activeNode?.tracks?.[0];
+  const activeKeyframe = activeTrack?.keyframes?.[0];
+  const currentCurve: CubicBezierCurve = activeKeyframe?.curve || { x1: 0.42, y1: 0, x2: 0.58, y2: 1 };
+
+  const applyCurvePreset = (presetName: string) => {
+    if (!selectedId || !activeTrack || !activeKeyframe) return;
+    const curve = EASING_CURVES[presetName] || EASING_CURVES['ease-in-out'];
+    updateKeyframeCurve(selectedId, activeTrack.property, activeKeyframe.id, curve);
+    showToast(`Applied ${presetName} curve!`);
+  };
+
+  const handleCurveHandleDrag = (handle: 'p1' | 'p2', startEvent: React.MouseEvent) => {
+    startEvent.stopPropagation();
+    const svgRect = (startEvent.currentTarget.closest('svg') as SVGSVGElement)?.getBoundingClientRect();
+    if (!svgRect) return;
+
+    const onMove = (moveEv: MouseEvent) => {
+      const padding = 40;
+      const w = svgRect.width - padding * 2;
+      const h = svgRect.height - padding * 2;
+
+      let nx = (moveEv.clientX - (svgRect.left + padding)) / w;
+      let ny = 1 - (moveEv.clientY - (svgRect.top + padding)) / h;
+
+      nx = Math.max(0, Math.min(1, parseFloat(nx.toFixed(2))));
+      ny = parseFloat(ny.toFixed(2));
+
+      const newCurve = { ...currentCurve };
+      if (handle === 'p1') {
+        newCurve.x1 = nx;
+        newCurve.y1 = ny;
+      } else {
+        newCurve.x2 = nx;
+        newCurve.y2 = ny;
+      }
+
+      if (selectedId && activeTrack && activeKeyframe) {
+        updateKeyframeCurve(selectedId, activeTrack.property, activeKeyframe.id, newCurve);
+      }
+    };
+
+    const onUp = () => {
+      window.removeEventListener('mousemove', onMove);
+      window.removeEventListener('mouseup', onUp);
+    };
+
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
+  };
 
   return (
     <footer className="h-64 bg-white border-t border-gray-100 flex flex-col z-20 m-3 mt-0 rounded-2xl shadow-sm overflow-hidden select-none">
@@ -223,15 +310,26 @@ export const Timeline: React.FC = () => {
                   <span className="text-xs text-gray-700 flex-1 truncate">{node.name}</span>
                 </div>
 
-                {node.tracks?.map((track) => (
-                  <div
-                    key={track.id}
-                    className="flex items-center px-4 py-1 pl-8 hover:bg-gray-50 cursor-pointer text-xs text-gray-500"
-                  >
-                    <span className="flex-1 text-[11px] truncate">{track.label}</span>
-                    <Gem className="w-2.5 h-2.5 text-blue-400" />
-                  </div>
-                ))}
+                {node.tracks?.map((track) => {
+                  const isTrackActive = selectedTrackId === track.id;
+                  return (
+                    <div
+                      key={track.id}
+                      onClick={() => {
+                        setSelectedId(id);
+                        setSelectedTrackId(track.id);
+                      }}
+                      className={`flex items-center px-4 py-1 pl-8 cursor-pointer text-xs transition-colors ${
+                        isTrackActive
+                          ? 'bg-blue-100/60 text-blue-700 font-semibold'
+                          : 'text-gray-500 hover:bg-gray-50'
+                      }`}
+                    >
+                      <span className="flex-1 text-[11px] truncate">{track.label}</span>
+                      <Gem className={`w-2.5 h-2.5 ${isTrackActive ? 'text-blue-600' : 'text-blue-400'}`} />
+                    </div>
+                  );
+                })}
               </div>
             );
           })}
@@ -278,7 +376,7 @@ export const Timeline: React.FC = () => {
                       <div className="w-1.5 h-2.5 bg-blue-400 rounded-full" />
                     </div>
 
-                    {/* Keyframe diamonds */}
+                    {/* Keyframe diamonds with drag support */}
                     {node.tracks?.map((track, tIdx) => (
                       <div
                         key={track.id}
@@ -291,12 +389,9 @@ export const Timeline: React.FC = () => {
                           return (
                             <div
                               key={kf.id}
-                              title={`${track.label}: ${kf.value}${track.unit} at ${kf.time}s`}
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setCurrentTime(kf.time);
-                              }}
-                              className={`keyframe-diamond absolute w-2.5 h-2.5 bg-gray-700 rounded-xs cursor-pointer shadow-sm ${
+                              title={`${track.label}: ${kf.value}${track.unit} at ${kf.time}s (Drag to move)`}
+                              onMouseDown={(e) => handleKeyframeDrag(e, node.id, track.property, kf.id)}
+                              className={`keyframe-diamond absolute w-2.5 h-2.5 bg-gray-700 rounded-xs cursor-ew-resize shadow-sm ${
                                 isCurrent ? 'active' : ''
                               }`}
                               style={{ left: `${kfPos}%`, top: '50%' }}
@@ -310,21 +405,103 @@ export const Timeline: React.FC = () => {
               })}
             </div>
           ) : (
-            /* Graph Editor SVG Curve View */
-            <div className="relative w-full flex-1 min-h-[140px] p-4 flex items-center justify-center">
-              <svg className="w-full h-full absolute inset-0 pointer-events-none">
-                <path
-                  d="M 20 120 C 120 120, 240 20, 360 20 S 480 120, 600 60"
-                  fill="none"
-                  stroke="#3b82f6"
-                  strokeWidth="2.5"
-                />
-                <circle cx="20" cy="120" r="4" fill="#3b82f6" />
-                <circle cx="360" cy="20" r="4" fill="#3b82f6" />
-                <circle cx="600" cy="60" r="4" fill="#3b82f6" />
-              </svg>
-              <div className="text-xs text-gray-400 bg-white/90 px-3 py-1.5 rounded-lg border border-gray-200 shadow-sm z-10">
-                Bézier Velocity Curve Editor (Interactive Tangents Active)
+            /* Graph Editor SVG Curve View with Interactive Handles */
+            <div className="relative w-full flex-1 flex flex-col items-center justify-between p-3 bg-white">
+              {/* Easing Preset Chips */}
+              <div className="flex items-center gap-1.5 z-10 bg-gray-50 p-1 rounded-xl border border-gray-200 text-[11px]">
+                <span className="font-semibold text-gray-500 px-2 flex items-center gap-1">
+                  <Sparkles className="w-3 h-3 text-blue-500" /> Curve Presets:
+                </span>
+                {['linear', 'ease', 'ease-in', 'ease-out', 'ease-in-out', 'bounce'].map((p) => (
+                  <button
+                    key={p}
+                    onClick={() => applyCurvePreset(p)}
+                    className="px-2 py-0.5 rounded-lg hover:bg-white hover:text-blue-600 font-medium text-gray-600 transition-colors uppercase text-[10px]"
+                  >
+                    {p}
+                  </button>
+                ))}
+              </div>
+
+              {/* Interactive Curve SVG */}
+              <div className="relative w-full flex-1 min-h-[100px] flex items-center justify-center">
+                <svg className="w-full h-full">
+                  <defs>
+                    <linearGradient id="curveGrad" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor="#3b82f6" stopOpacity="0.2" />
+                      <stop offset="100%" stopColor="#3b82f6" stopOpacity="0" />
+                    </linearGradient>
+                  </defs>
+
+                  {/* Grid Lines */}
+                  <line x1="40" y1="20" x2="40" y2="110" stroke="#f3f4f6" strokeWidth="1" />
+                  <line x1="40" y1="110" x2="560" y2="110" stroke="#f3f4f6" strokeWidth="1" />
+
+                  {/* Tangent Line P1 */}
+                  <line
+                    x1="40"
+                    y1="110"
+                    x2={40 + currentCurve.x1 * 520}
+                    y2={110 - currentCurve.y1 * 90}
+                    stroke="#93c5fd"
+                    strokeWidth="1.5"
+                    strokeDasharray="3 3"
+                  />
+
+                  {/* Tangent Line P2 */}
+                  <line
+                    x1="560"
+                    y1="20"
+                    x2={40 + currentCurve.x2 * 520}
+                    y2={110 - currentCurve.y2 * 90}
+                    stroke="#93c5fd"
+                    strokeWidth="1.5"
+                    strokeDasharray="3 3"
+                  />
+
+                  {/* Curve Path */}
+                  <path
+                    d={`M 40 110 C ${40 + currentCurve.x1 * 520} ${110 - currentCurve.y1 * 90}, ${
+                      40 + currentCurve.x2 * 520
+                    } ${110 - currentCurve.y2 * 90}, 560 20`}
+                    fill="none"
+                    stroke="#3b82f6"
+                    strokeWidth="2.5"
+                  />
+
+                  {/* Endpoint Start & End */}
+                  <circle cx="40" cy="110" r="4.5" fill="#3b82f6" />
+                  <circle cx="560" cy="20" r="4.5" fill="#3b82f6" />
+
+                  {/* Interactive P1 Handle */}
+                  <circle
+                    cx={40 + currentCurve.x1 * 520}
+                    cy={110 - currentCurve.y1 * 90}
+                    r="6"
+                    fill="#2563eb"
+                    stroke="#ffffff"
+                    strokeWidth="2"
+                    className="cursor-grab active:cursor-grabbing hover:scale-125 transition-transform"
+                    onMouseDown={(e) => handleCurveHandleDrag('p1', e)}
+                  />
+
+                  {/* Interactive P2 Handle */}
+                  <circle
+                    cx={40 + currentCurve.x2 * 520}
+                    cy={110 - currentCurve.y2 * 90}
+                    r="6"
+                    fill="#2563eb"
+                    stroke="#ffffff"
+                    strokeWidth="2"
+                    className="cursor-grab active:cursor-grabbing hover:scale-125 transition-transform"
+                    onMouseDown={(e) => handleCurveHandleDrag('p2', e)}
+                  />
+                </svg>
+              </div>
+
+              {/* Curve Formula Display */}
+              <div className="text-[11px] font-mono text-gray-500 bg-gray-50 px-3 py-1 rounded-lg border border-gray-200">
+                cubic-bezier({currentCurve.x1}, {currentCurve.y1}, {currentCurve.x2}, {currentCurve.y2})
               </div>
             </div>
           )}
