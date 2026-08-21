@@ -1,4 +1,4 @@
-﻿[package]
+[package]
 name = "opensvg-motion-studio"
 version = "0.1.0"
 description = "OpenSVG Motion Studio Desktop Application"
