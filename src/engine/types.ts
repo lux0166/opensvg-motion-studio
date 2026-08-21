@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Vector Motion Design Engine Types (Rive / Figma Motion standard)
  */
 
@@ -54,6 +54,22 @@ export interface PropertyTrack<T = number | string> {
   color?: string; // Color of the curve in Graph Editor
 }
 
+export type FillType = 'solid' | 'linear' | 'radial';
+
+export interface GradientStop {
+  offset: number; // 0 to 1
+  color: string;
+}
+
+export interface LinearGradientConfig {
+  angle: number; // 0 to 360 deg
+  stops: GradientStop[];
+}
+
+export interface RadialGradientConfig {
+  stops: GradientStop[];
+}
+
 export interface BaseNode {
   id: string;
   name: string;
@@ -74,10 +90,19 @@ export interface BaseNode {
   opacity: number; // 0 to 1
   borderRadius: number;
 
-  // Appearance
+  // Appearance & Gradient Fills
+  fillType?: FillType;
   fill: string;
+  linearGradient?: LinearGradientConfig;
+  radialGradient?: RadialGradientConfig;
+
+  // Stroke Styling
   stroke?: string;
   strokeWidth?: number;
+  strokeDash?: number[];
+  strokeCap?: 'butt' | 'round' | 'square';
+  strokeJoin?: 'miter' | 'round' | 'bevel';
+
   shadowColor?: string;
   shadowBlur?: number;
   shadowOffsetX?: number;

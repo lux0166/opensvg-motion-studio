@@ -66,11 +66,16 @@ export function renderCanvasScene(
       ctx.shadowOffsetY = node.shadowOffsetY || 0;
     }
 
-    // Draw Shape
-    ctx.fillStyle = node.fill;
+    // Apply Fill (Solid, Linear Gradient, Radial Gradient)
+    ctx.fillStyle = getShapeFill(ctx, node);
+
+    // Apply Stroke & Dash/Cap/Join
     if (node.stroke && node.strokeWidth) {
       ctx.strokeStyle = node.stroke;
       ctx.lineWidth = node.strokeWidth;
+      ctx.setLineDash(node.strokeDash || []);
+      ctx.lineCap = node.strokeCap || 'round';
+      ctx.lineJoin = node.strokeJoin || 'round';
     }
 
     if (node.type === 'circle') {
@@ -323,4 +328,41 @@ function drawPathEditingOverlay(ctx: CanvasRenderingContext2D, node: SceneNode, 
   }
 
   ctx.restore();
+}
+
+/**
+ * Creates Canvas gradient or returns solid color
+ */
+export function getShapeFill(ctx: CanvasRenderingContext2D, node: SceneNode): string | CanvasGradient {
+  if (node.fillType === 'linear' && node.linearGradient && node.linearGradient.stops.length > 0) {
+    const angleRad = ((node.linearGradient.angle || 0) * Math.PI) / 180;
+    const cx = node.x + node.width / 2;
+    const cy = node.y + node.height / 2;
+    const r = Math.max(node.width, node.height) / 2;
+
+    const x1 = cx - Math.cos(angleRad) * r;
+    const y1 = cy - Math.sin(angleRad) * r;
+    const x2 = cx + Math.cos(angleRad) * r;
+    const y2 = cy + Math.sin(angleRad) * r;
+
+    const grad = ctx.createLinearGradient(x1, y1, x2, y2);
+    for (const stop of node.linearGradient.stops) {
+      grad.addColorStop(Math.max(0, Math.min(1, stop.offset)), stop.color);
+    }
+    return grad;
+  }
+
+  if (node.fillType === 'radial' && node.radialGradient && node.radialGradient.stops.length > 0) {
+    const cx = node.x + node.width / 2;
+    const cy = node.y + node.height / 2;
+    const r = Math.max(node.width, node.height) / 2;
+
+    const grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, r);
+    for (const stop of node.radialGradient.stops) {
+      grad.addColorStop(Math.max(0, Math.min(1, stop.offset)), stop.color);
+    }
+    return grad;
+  }
+
+  return node.fill || '#111827';
 }

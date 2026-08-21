@@ -1,16 +1,32 @@
-﻿import { FrameNode, SceneNode } from './types';
+import { FrameNode, SceneNode } from './types';
 
 /**
  * Multi-Format Exporter for OpenSVG Motion Studio
  */
 
 export function exportToAnimatedSVG(rootFrame: FrameNode, nodes: SceneNode[], duration: number): string {
+  let defs = '';
+  for (const node of nodes) {
+    if (node.fillType === 'linear' && node.linearGradient && node.linearGradient.stops.length > 0) {
+      const gradId = `grad-${node.id}`;
+      defs += `    <linearGradient id="${gradId}" x1="0%" y1="0%" x2="100%" y2="100%">\n`;
+      for (const s of node.linearGradient.stops) {
+        defs += `      <stop offset="${Math.round(s.offset * 100)}%" stop-color="${s.color}" />\n`;
+      }
+      defs += `    </linearGradient>\n`;
+    }
+  }
+
   let svg = `<?xml version="1.0" encoding="utf-8"?>\n`;
   svg += `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${rootFrame.width} ${rootFrame.height}" width="${rootFrame.width}" height="${rootFrame.height}">\n`;
   svg += `  <style>\n`;
   svg += `    @keyframes studioSpin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }\n`;
   svg += `    .animated-spin { transform-origin: center; animation: studioSpin ${duration}s infinite linear; }\n`;
   svg += `  </style>\n`;
+
+  if (defs) {
+    svg += `  <defs>\n${defs}  </defs>\n`;
+  }
 
   // Root background
   svg += `  <rect width="100%" height="100%" fill="${rootFrame.fill}" />\n`;
@@ -19,12 +35,14 @@ export function exportToAnimatedSVG(rootFrame: FrameNode, nodes: SceneNode[], du
     if (!node.visible) continue;
     const rx = node.borderRadius ? ` rx="${node.borderRadius}"` : '';
     const stroke = node.stroke ? ` stroke="${node.stroke}" stroke-width="${node.strokeWidth || 1}"` : '';
+    const dash = node.strokeDash && node.strokeDash.length > 0 ? ` stroke-dasharray="${node.strokeDash.join(',')}"` : '';
+    const fillAttr = node.fillType === 'linear' ? `url(#grad-${node.id})` : node.fill;
 
     if (node.type === 'circle') {
       const r = node.width / 2;
-      svg += `  <circle cx="${node.x + r}" cy="${node.y + r}" r="${r}" fill="${node.fill}"${stroke} />\n`;
+      svg += `  <circle cx="${node.x + r}" cy="${node.y + r}" r="${r}" fill="${fillAttr}"${stroke}${dash} />\n`;
     } else {
-      svg += `  <rect x="${node.x}" y="${node.y}" width="${node.width}" height="${node.height}" fill="${node.fill}"${rx}${stroke} />\n`;
+      svg += `  <rect x="${node.x}" y="${node.y}" width="${node.width}" height="${node.height}" fill="${fillAttr}"${rx}${stroke}${dash} />\n`;
     }
   }
 
