@@ -12,7 +12,9 @@ import {
   AlignCenterVertical,
   AlignEndVertical,
   Type,
-  Sparkles
+  Sparkles,
+  Scissors,
+  Layers
 } from 'lucide-react';
 
 export const PropertiesPanel: React.FC = () => {
@@ -20,7 +22,9 @@ export const PropertiesPanel: React.FC = () => {
     rootFrame,
     nodes,
     selectedId,
+    selectedIds,
     alignSelected,
+    applyBooleanOp,
     updateRootFrame,
     updateNode,
     deleteNode,
@@ -151,6 +155,50 @@ export const PropertiesPanel: React.FC = () => {
       </div>
 
       <div className="p-5 flex flex-col gap-5">
+        {/* Boolean Operations (when 2+ shapes selected) */}
+        {selectedIds.length >= 2 && (
+          <div>
+            <label className="text-[11px] text-gray-400 font-semibold mb-2 block uppercase tracking-wider flex items-center justify-between">
+              <span>Boolean Ops ({selectedIds.length})</span>
+              <span className="text-[10px] text-blue-600 font-bold bg-blue-50 px-1.5 py-0.5 rounded">Compound</span>
+            </label>
+            <div className="grid grid-cols-4 gap-1 bg-gray-50 p-1 rounded-xl border border-gray-200 text-[10px] font-semibold text-gray-700">
+              <button
+                title="Union (Combine Shapes into one)"
+                onClick={() => applyBooleanOp('union')}
+                className="flex flex-col items-center gap-1 py-1.5 rounded-lg hover:bg-white hover:text-blue-600 transition-all shadow-xs"
+              >
+                <Layers className="w-3.5 h-3.5 text-blue-500" />
+                <span>Union</span>
+              </button>
+              <button
+                title="Subtract (Cut front shape from back)"
+                onClick={() => applyBooleanOp('subtract')}
+                className="flex flex-col items-center gap-1 py-1.5 rounded-lg hover:bg-white hover:text-red-600 transition-all shadow-xs"
+              >
+                <Scissors className="w-3.5 h-3.5 text-red-500" />
+                <span>Subtract</span>
+              </button>
+              <button
+                title="Intersect (Keep overlapping area)"
+                onClick={() => applyBooleanOp('intersect')}
+                className="flex flex-col items-center gap-1 py-1.5 rounded-lg hover:bg-white hover:text-indigo-600 transition-all shadow-xs"
+              >
+                <Sparkles className="w-3.5 h-3.5 text-indigo-500" />
+                <span>Intersect</span>
+              </button>
+              <button
+                title="Exclude (XOR Difference)"
+                onClick={() => applyBooleanOp('exclude')}
+                className="flex flex-col items-center gap-1 py-1.5 rounded-lg hover:bg-white hover:text-purple-600 transition-all shadow-xs"
+              >
+                <Type className="w-3.5 h-3.5 text-purple-500" />
+                <span>Exclude</span>
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* Alignment Quick Actions */}
         <div>
           <label className="text-[11px] text-gray-400 font-semibold mb-2 block uppercase tracking-wider">

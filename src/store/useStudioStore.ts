@@ -3,6 +3,7 @@ import { immer } from 'zustand/middleware/immer';
 import { FrameNode, SceneNode, SceneProject, ToolMode, TimelineMode, BezierPoint, CubicBezierCurve, AudioTrackConfig } from '../engine/types';
 import { SnapLine } from '../engine/snapping';
 import { StudioSnapshot, createStudioSnapshot, MAX_HISTORY_STEPS } from '../engine/history';
+import { BooleanOpType, executeBooleanOperation } from '../engine/booleanOps';
 
 function pushDraftSnapshot(state: any) {
   const snap = createStudioSnapshot(state.rootFrame, state.nodes, state.nodeOrder, state.selectedId, state.selectedIds);
@@ -80,9 +81,10 @@ interface StudioState {
   loadProject: (project: SceneProject) => void;
   createNewProject: () => void;
 
-  // Multi-select & Grouping
+  // Multi-select & Grouping & Boolean Operations
   groupSelected: () => void;
   ungroupSelected: () => void;
+  applyBooleanOp: (op: BooleanOpType) => void;
 
   // Alignments & Duplicate
   alignSelected: (type: 'left' | 'center' | 'right' | 'top' | 'middle' | 'bottom') => void;
@@ -481,6 +483,38 @@ export const useStudioStore = create<StudioState>()(
         state.selectedId = children[0] || 'frame-1';
         state.toastMessage = 'Ungrouped elements (Ctrl+Shift+G)';
         state.toastType = 'info';
+      }),
+
+    applyBooleanOp: (op) =>
+      set((state) => {
+        const validNodes = state.selectedIds
+          .filter((id) => id !== 'frame-1' && state.nodes[id])
+          .map((id) => state.nodes[id]);
+
+        if (validNodes.length < 2) {
+          state.toastMessage = 'Select at least 2 shapes for Boolean Operations';
+          state.toastType = 'error';
+          return;
+        }
+
+        pushDraftSnapshot(state);
+
+        const compoundNode = executeBooleanOperation(validNodes, op);
+        if (!compoundNode) return;
+
+        // Delete old nodes
+        for (const n of validNodes) {
+          delete state.nodes[n.id];
+          state.nodeOrder = state.nodeOrder.filter((id) => id !== n.id);
+        }
+
+        // Add compound node
+        state.nodes[compoundNode.id] = compoundNode;
+        state.nodeOrder.push(compoundNode.id);
+        state.selectedId = compoundNode.id;
+        state.selectedIds = [compoundNode.id];
+        state.toastMessage = `Applied Boolean ${op.toUpperCase()}`;
+        state.toastType = 'success';
       }),
 
     duplicateSelected: () =>
