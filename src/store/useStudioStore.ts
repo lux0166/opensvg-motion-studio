@@ -364,6 +364,19 @@ export const useStudioStore = create<StudioState>()(
       set((state) => {
         pushDraftSnapshot(state);
         state.rootFrame = project.rootFrame;
+
+        // Normalize & sort all keyframes at load time (Constitution Rule 56 & 130)
+        for (const nodeId in project.nodes) {
+          const n = project.nodes[nodeId];
+          if (n.tracks) {
+            for (const t of n.tracks) {
+              if (t.keyframes) {
+                t.keyframes.sort((a, b) => a.time - b.time);
+              }
+            }
+          }
+        }
+
         state.nodes = project.nodes;
         state.nodeOrder = project.nodeOrder;
         state.duration = project.duration;
