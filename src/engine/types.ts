@@ -167,3 +167,13 @@ export type ToolMode =
   | 'zoom';
 
 export type TimelineMode = 'dopesheet' | 'graph';
+
+export interface AudioTrackConfig {
+  id: string;
+  name: string;
+  src: string; // Base64 data URL or URL
+  volume: number; // 0 to 1
+  muted: boolean;
+  duration: number; // in seconds
+  waveformData?: number[]; // Normalized peaks (0..1)
+}

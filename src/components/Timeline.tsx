@@ -2,6 +2,7 @@ import React, { useRef, useEffect } from 'react';
 import { useStudioStore } from '../store/useStudioStore';
 import { EASING_CURVES } from '../engine/evaluator';
 import { CubicBezierCurve } from '../engine/types';
+import { parseAudioFile } from '../engine/audioEngine';
 import {
   Play,
   Pause,
@@ -13,7 +14,11 @@ import {
   Activity,
   Layers as LayersIcon,
   Sparkles,
-  Wand2
+  Wand2,
+  Music,
+  Volume2,
+  VolumeX,
+  Trash2
 } from 'lucide-react';
 
 export const Timeline: React.FC = () => {
@@ -37,6 +42,9 @@ export const Timeline: React.FC = () => {
     setSelectedKeyframeIds,
     toggleKeyframeSelection,
     staggerSelectedKeyframes,
+    audioTrack,
+    setAudioTrack,
+    updateAudioTrack,
     addOrUpdateKeyframe,
     updateKeyframeTime,
     updateKeyframeCurve,
@@ -44,6 +52,50 @@ export const Timeline: React.FC = () => {
   } = useStudioStore();
 
   const gridRef = useRef<HTMLDivElement | null>(null);
+  const audioElementRef = useRef<HTMLAudioElement | null>(null);
+
+  // Audio Sync with Playhead
+  useEffect(() => {
+    if (!audioElementRef.current || !audioTrack) return;
+    const audio = audioElementRef.current;
+    audio.volume = audioTrack.muted ? 0 : audioTrack.volume;
+
+    if (isPlaying) {
+      audio.currentTime = currentTime;
+      audio.play().catch(() => {});
+    } else {
+      audio.pause();
+      audio.currentTime = currentTime;
+    }
+  }, [isPlaying, audioTrack?.muted, audioTrack?.volume]);
+
+  useEffect(() => {
+    if (!audioElementRef.current || !audioTrack) return;
+    if (!isPlaying) {
+      audioElementRef.current.currentTime = currentTime;
+    }
+  }, [currentTime]);
+
+  const handleAudioUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    try {
+      const res = await parseAudioFile(file, 150);
+      setAudioTrack({
+        id: `audio-${Date.now()}`,
+        name: file.name,
+        src: res.src,
+        volume: 1,
+        muted: false,
+        duration: res.duration,
+        waveformData: res.waveformData
+      });
+      showToast(`Loaded audio track: ${file.name}`);
+    } catch {
+      showToast('Failed to load audio file', 'error');
+    }
+  };
 
   // Playback requestAnimationFrame Loop
   useEffect(() => {
@@ -264,6 +316,16 @@ export const Timeline: React.FC = () => {
             <Wand2 className="w-3.5 h-3.5 text-amber-600" />
             <span>Stagger Tracks</span>
           </button>
+
+          {/* Audio Track Loader Button */}
+          <label
+            title="Load Audio Track (.mp3, .wav, .ogg)"
+            className="flex items-center gap-1.5 bg-purple-50 hover:bg-purple-100 text-purple-700 border border-purple-200 px-2.5 py-1 rounded-lg text-xs font-semibold cursor-pointer transition-all active:scale-95 shadow-xs"
+          >
+            <Music className="w-3.5 h-3.5 text-purple-600" />
+            <span>{audioTrack ? 'Replace Audio' : 'Add Audio'}</span>
+            <input type="file" accept="audio/*" onChange={handleAudioUpload} className="hidden" />
+          </label>
         </div>
 
         {/* Mode Switcher: Dopesheet vs Graph Editor */}
@@ -388,6 +450,65 @@ export const Timeline: React.FC = () => {
           {/* Dopesheet View vs Graph View */}
           {timelineMode === 'dopesheet' ? (
             <div className="relative w-full flex-1 pt-1 pb-4">
+              {/* Audio Waveform Track */}
+              {audioTrack && (
+                <div className="relative w-full h-11 bg-purple-50/70 border-b border-purple-200/80 flex items-center px-3 mb-2 shadow-xs">
+                  <div className="flex items-center gap-2 mr-3 shrink-0 bg-white/90 px-2 py-1 rounded-lg border border-purple-200">
+                    <Music className="w-3.5 h-3.5 text-purple-600" />
+                    <span className="text-[10px] font-bold text-purple-800 truncate max-w-[120px]">
+                      {audioTrack.name}
+                    </span>
+                    <button
+                      title={audioTrack.muted ? 'Unmute' : 'Mute'}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        updateAudioTrack({ muted: !audioTrack.muted });
+                      }}
+                      className="p-0.5 rounded hover:bg-purple-100 text-purple-600 transition-colors"
+                    >
+                      {audioTrack.muted ? (
+                        <VolumeX className="w-3 h-3 text-red-500" />
+                      ) : (
+                        <Volume2 className="w-3 h-3" />
+                      )}
+                    </button>
+                    <button
+                      title="Remove Audio Track"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setAudioTrack(null);
+                        showToast('Removed audio track');
+                      }}
+                      className="p-0.5 rounded hover:bg-red-50 text-gray-400 hover:text-red-500 transition-colors"
+                    >
+                      <Trash2 className="w-3 h-3" />
+                    </button>
+                  </div>
+
+                  {/* Normalized Waveform Bars */}
+                  <div className="flex-1 h-7 flex items-center gap-0.5 relative overflow-hidden">
+                    {(audioTrack.waveformData || []).map((peak, pIdx) => {
+                      const heightPercent = Math.max(12, peak * 100);
+                      const barPos = (pIdx / (audioTrack.waveformData?.length || 100)) * 100;
+                      const isPast = (barPos / 100) * duration <= currentTime;
+
+                      return (
+                        <div
+                          key={pIdx}
+                          className={`flex-1 rounded-full transition-colors ${
+                            isPast ? 'bg-purple-600' : 'bg-purple-300/80'
+                          }`}
+                          style={{ height: `${heightPercent}%` }}
+                        />
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* Hidden HTML Audio Sync Element */}
+              {audioTrack && <audio ref={audioElementRef} src={audioTrack.src} />}
+
               {nodeOrder.map((id) => {
                 const node = nodes[id];
                 if (!node || !node.visible) return null;

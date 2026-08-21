@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { immer } from 'zustand/middleware/immer';
-import { FrameNode, SceneNode, SceneProject, ToolMode, TimelineMode, BezierPoint, CubicBezierCurve } from '../engine/types';
+import { FrameNode, SceneNode, SceneProject, ToolMode, TimelineMode, BezierPoint, CubicBezierCurve, AudioTrackConfig } from '../engine/types';
 import { SnapLine } from '../engine/snapping';
 import { StudioSnapshot, createStudioSnapshot, MAX_HISTORY_STEPS } from '../engine/history';
 
@@ -107,6 +107,11 @@ interface StudioState {
   removeKeyframe: (nodeId: string, property: string, keyframeId: string) => void;
   updateKeyframeTime: (nodeId: string, property: string, keyframeId: string, newTime: number) => void;
   updateKeyframeCurve: (nodeId: string, property: string, keyframeId: string, curve: CubicBezierCurve) => void;
+
+  // Audio Track & Sync
+  audioTrack: AudioTrackConfig | null;
+  setAudioTrack: (track: AudioTrackConfig | null) => void;
+  updateAudioTrack: (updates: Partial<AudioTrackConfig>) => void;
 
   // Modals & Feedback
   setExportOpen: (open: boolean) => void;
@@ -257,6 +262,7 @@ export const useStudioStore = create<StudioState>()(
     },
 
     nodeOrder: ['card', 'ball'],
+    audioTrack: null,
 
     isExportOpen: false,
     isSettingsOpen: false,
@@ -719,6 +725,14 @@ export const useStudioStore = create<StudioState>()(
           if (kf) {
             kf.curve = curve;
           }
+        }
+      }),
+
+    setAudioTrack: (track) => set({ audioTrack: track }),
+    updateAudioTrack: (updates) =>
+      set((state) => {
+        if (state.audioTrack) {
+          Object.assign(state.audioTrack, updates);
         }
       }),
 
