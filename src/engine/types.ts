@@ -45,7 +45,11 @@ export type AnimatableProperty =
   | 'stroke'
   | 'strokeWidth'
   | 'pathPoints'
-  | 'fontSize';
+  | 'fontSize'
+  | 'shadowBlur'
+  | 'shadowOffsetX'
+  | 'shadowOffsetY'
+  | 'filterBlur';
 
 export interface PropertyTrack<T = number | string> {
   id: string;
@@ -64,11 +68,14 @@ export interface GradientStop {
 }
 
 export interface LinearGradientConfig {
-  angle: number; // 0 to 360 deg
+  angle: number; // 0 to 360 degrees
   stops: GradientStop[];
 }
 
 export interface RadialGradientConfig {
+  cx?: number; // 0 to 1
+  cy?: number; // 0 to 1
+  r?: number; // 0 to 1
   stops: GradientStop[];
 }
 
@@ -81,7 +88,7 @@ export interface BaseNode {
   parentId?: string | null;
   childrenIds?: string[];
 
-  // Base Transform
+  // Spatial Transforms
   x: number;
   y: number;
   width: number;
@@ -105,10 +112,12 @@ export interface BaseNode {
   strokeCap?: 'butt' | 'round' | 'square';
   strokeJoin?: 'miter' | 'round' | 'bevel';
 
+  // Filters & Shadows
   shadowColor?: string;
   shadowBlur?: number;
   shadowOffsetX?: number;
   shadowOffsetY?: number;
+  filterBlur?: number;
 
   // Path data (if type === 'path')
   pathPoints?: BezierPoint[];

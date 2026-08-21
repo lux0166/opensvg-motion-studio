@@ -11,7 +11,8 @@ import {
   AlignStartVertical,
   AlignCenterVertical,
   AlignEndVertical,
-  Type
+  Type,
+  Sparkles
 } from 'lucide-react';
 
 export const PropertiesPanel: React.FC = () => {
@@ -661,6 +662,94 @@ export const PropertiesPanel: React.FC = () => {
             value={selectedNode.borderRadius || 0}
             onChange={(e) => updateNode(selectedId, { borderRadius: parseInt(e.target.value) })}
           />
+        </div>
+
+        {/* Visual Filter Effects: Drop Shadow & Blur */}
+        <div>
+          <label className="text-[11px] text-gray-400 font-semibold mb-2 block uppercase tracking-wider flex items-center gap-1.5">
+            <Sparkles className="w-3 h-3 text-amber-500" /> Effects & Shadows
+          </label>
+          <div className="p-3 bg-gray-50 rounded-2xl border border-gray-200 flex flex-col gap-3">
+            {/* Drop Shadow Toggle & Color */}
+            <div className="flex items-center justify-between">
+              <span className="text-xs text-gray-700 font-semibold">Drop Shadow</span>
+              <input
+                type="color"
+                value={selectedNode.shadowColor || '#000000'}
+                onChange={(e) => updateNode(selectedId, { shadowColor: e.target.value })}
+                className="w-6 h-6 rounded-md border border-gray-300 cursor-pointer p-0 bg-transparent"
+              />
+            </div>
+
+            {/* Shadow Blur Slider */}
+            <div>
+              <div className="flex justify-between items-center mb-1">
+                <span className="text-[10px] text-gray-500 font-medium">Blur</span>
+                <span className="text-xs font-mono font-bold text-gray-700">
+                  {selectedNode.shadowBlur || 0}px
+                </span>
+              </div>
+              <input
+                type="range"
+                min="0"
+                max="64"
+                value={selectedNode.shadowBlur || 0}
+                onChange={(e) => updateNode(selectedId, { shadowBlur: parseInt(e.target.value) || 0 })}
+              />
+            </div>
+
+            {/* Shadow Offset X & Y */}
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <label className="text-[10px] text-gray-400 font-semibold mb-1 block uppercase">
+                  Offset X
+                </label>
+                <input
+                  type="number"
+                  min="-50"
+                  max="50"
+                  value={selectedNode.shadowOffsetX || 0}
+                  onChange={(e) =>
+                    updateNode(selectedId, { shadowOffsetX: parseInt(e.target.value) || 0 })
+                  }
+                  className="w-full bg-white border border-gray-200 rounded-lg px-2 py-1 text-xs font-mono font-semibold text-gray-800 outline-none"
+                />
+              </div>
+
+              <div>
+                <label className="text-[10px] text-gray-400 font-semibold mb-1 block uppercase">
+                  Offset Y
+                </label>
+                <input
+                  type="number"
+                  min="-50"
+                  max="50"
+                  value={selectedNode.shadowOffsetY || 0}
+                  onChange={(e) =>
+                    updateNode(selectedId, { shadowOffsetY: parseInt(e.target.value) || 0 })
+                  }
+                  className="w-full bg-white border border-gray-200 rounded-lg px-2 py-1 text-xs font-mono font-semibold text-gray-800 outline-none"
+                />
+              </div>
+            </div>
+
+            {/* Layer Blur */}
+            <div className="pt-2 border-t border-gray-200/60">
+              <div className="flex justify-between items-center mb-1">
+                <span className="text-[10px] text-gray-500 font-medium">Gaussian Blur</span>
+                <span className="text-xs font-mono font-bold text-gray-700">
+                  {selectedNode.filterBlur || 0}px
+                </span>
+              </div>
+              <input
+                type="range"
+                min="0"
+                max="32"
+                value={selectedNode.filterBlur || 0}
+                onChange={(e) => updateNode(selectedId, { filterBlur: parseInt(e.target.value) || 0 })}
+              />
+            </div>
+          </div>
         </div>
 
         <hr className="border-gray-100" />

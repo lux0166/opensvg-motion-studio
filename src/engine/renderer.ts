@@ -87,6 +87,19 @@ export function renderCanvasScene(
       ctx.lineJoin = node.strokeJoin || 'round';
     }
 
+    // Apply Drop Shadow & Glow Filters
+    if (node.shadowBlur || node.shadowOffsetX || node.shadowOffsetY) {
+      ctx.shadowColor = node.shadowColor || 'rgba(0, 0, 0, 0.25)';
+      ctx.shadowBlur = node.shadowBlur || 0;
+      ctx.shadowOffsetX = node.shadowOffsetX || 0;
+      ctx.shadowOffsetY = node.shadowOffsetY || 0;
+    }
+
+    // Apply Gaussian Layer Blur
+    if (node.filterBlur && node.filterBlur > 0) {
+      ctx.filter = `blur(${node.filterBlur}px)`;
+    }
+
     if (node.type === 'circle') {
       ctx.beginPath();
       ctx.ellipse(

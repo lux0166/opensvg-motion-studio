@@ -15,6 +15,21 @@ export function exportToAnimatedSVG(rootFrame: FrameNode, nodes: SceneNode[], du
       }
       defs += `    </linearGradient>\n`;
     }
+
+    // Shadow & Blur Filters
+    const hasShadow = node.shadowBlur || node.shadowOffsetX || node.shadowOffsetY;
+    const hasBlur = node.filterBlur && node.filterBlur > 0;
+    if (hasShadow || hasBlur) {
+      const filterId = `filter-${node.id}`;
+      defs += `    <filter id="${filterId}" x="-50%" y="-50%" width="200%" height="200%">\n`;
+      if (hasShadow) {
+        defs += `      <feDropShadow dx="${node.shadowOffsetX || 0}" dy="${node.shadowOffsetY || 0}" stdDeviation="${((node.shadowBlur || 0) / 2).toFixed(1)}" flood-color="${node.shadowColor || 'rgba(0,0,0,0.25)'}" />\n`;
+      }
+      if (hasBlur) {
+        defs += `      <feGaussianBlur stdDeviation="${node.filterBlur}" />\n`;
+      }
+      defs += `    </filter>\n`;
+    }
   }
 
   let svg = `<?xml version="1.0" encoding="utf-8"?>\n`;
@@ -37,19 +52,22 @@ export function exportToAnimatedSVG(rootFrame: FrameNode, nodes: SceneNode[], du
     const stroke = node.stroke ? ` stroke="${node.stroke}" stroke-width="${node.strokeWidth || 1}"` : '';
     const dash = node.strokeDash && node.strokeDash.length > 0 ? ` stroke-dasharray="${node.strokeDash.join(',')}"` : '';
     const fillAttr = node.fillType === 'linear' ? `url(#grad-${node.id})` : node.fill;
+    const filterAttr = (node.shadowBlur || node.shadowOffsetX || node.shadowOffsetY || (node.filterBlur && node.filterBlur > 0))
+      ? ` filter="url(#filter-${node.id})"`
+      : '';
 
     if (node.type === 'circle') {
       const r = node.width / 2;
-      svg += `  <circle cx="${node.x + r}" cy="${node.y + r}" r="${r}" fill="${fillAttr}"${stroke}${dash} />\n`;
+      svg += `  <circle cx="${node.x + r}" cy="${node.y + r}" r="${r}" fill="${fillAttr}"${stroke}${dash}${filterAttr} />\n`;
     } else if (node.type === 'text') {
       const anchor = node.textAlign === 'center' ? 'middle' : node.textAlign === 'right' ? 'end' : 'start';
       const textX = node.textAlign === 'center' ? node.x + node.width / 2 : node.textAlign === 'right' ? node.x + node.width : node.x;
       const size = node.fontSize || 28;
       const weight = node.fontWeight || 600;
       const font = node.fontFamily || 'Inter, sans-serif';
-      svg += `  <text x="${textX}" y="${node.y + size}" font-family="${font}" font-size="${size}" font-weight="${weight}" text-anchor="${anchor}" fill="${fillAttr}"${stroke}>${node.textContent || ''}</text>\n`;
+      svg += `  <text x="${textX}" y="${node.y + size}" font-family="${font}" font-size="${size}" font-weight="${weight}" text-anchor="${anchor}" fill="${fillAttr}"${stroke}${filterAttr}>${node.textContent || ''}</text>\n`;
     } else {
-      svg += `  <rect x="${node.x}" y="${node.y}" width="${node.width}" height="${node.height}" fill="${fillAttr}"${rx}${stroke}${dash} />\n`;
+      svg += `  <rect x="${node.x}" y="${node.y}" width="${node.width}" height="${node.height}" fill="${fillAttr}"${rx}${stroke}${dash}${filterAttr} />\n`;
     }
   }
 
