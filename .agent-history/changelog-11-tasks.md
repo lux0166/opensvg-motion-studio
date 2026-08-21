@@ -65,3 +65,14 @@
 - **Optimization**: Completely eliminated runtime `[...track.keyframes].sort(...)` and array allocations from the 60fps/120fps hot evaluation path.
 - **Store Normalization**: Ensured all keyframes are sorted upon insertion (`addOrUpdateKeyframe`), time update (`updateKeyframeTime`), stagger (`staggerSelectedKeyframes`), and project load (`loadProject`).
 - **Tests**: `src/engine/__tests__/evaluator.test.ts` (9/9 passing, including binary search edge cases and 100-keyframe stress tests).
+
+### 13. Task A2: Full-Fidelity Dynamic Animated SVG & Lottie Exporter (`feat/full-fidelity-exporters`)
+- **Engine**: Upgraded `src/engine/exporter.ts` from hardcoded template animation to dynamic keyframe serialization (Constitution Rule 95 & 96 - No Fake Export).
+- **SVG Animation**: Generated dynamic CSS `@keyframes` per animated node calculating exact timestamp percentage steps (`(t / duration) * 100%`) for `translate`, `rotate`, `scale`, `opacity`, `fill`.
+- **Lottie JSON**: Serialized Bodymovin animated properties (`ks.r.a = 1`, `ks.p.a = 1`, `ks.o.a = 1`, `ks.s.a = 1`) with keyframe time frames (`t: kf.time * fps`).
+- **Tests**: `src/engine/__tests__/exporter.test.ts` (3/3 passing).
+
+### 14. Task A3: Document History vs Ephemeral Selection Separation (`refactor/history-document-separation`)
+- **Engine**: Refactored `StudioSnapshot` in `src/engine/history.ts` to only track canonical Document Scene Graph (`rootFrame`, `nodes`, `nodeOrder`), excluding ephemeral UI selection state (Constitution Rule 82).
+- **Store**: Updated `undo()` and `redo()` in `src/store/useStudioStore.ts` with graceful selection preservation fallback.
+- **Tests**: `src/engine/__tests__/history.test.ts` (3/3 passing).
