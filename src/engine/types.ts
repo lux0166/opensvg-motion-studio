@@ -208,3 +208,10 @@ export interface AudioTrackConfig {
   duration: number; // in seconds
   waveformData?: number[]; // Normalized peaks (0..1)
 }
+
+export interface TimelineMarker {
+  id: string;
+  time: number; // seconds
+  label: string;
+  color?: string;
+}

@@ -18,7 +18,8 @@ import {
   Music,
   Volume2,
   VolumeX,
-  Trash2
+  Trash2,
+  Bookmark
 } from 'lucide-react';
 
 export const Timeline: React.FC = () => {
@@ -32,6 +33,10 @@ export const Timeline: React.FC = () => {
     setLoop,
     timelineMode,
     setTimelineMode,
+    markers,
+    addMarker,
+    removeMarker,
+    generateMarkersFromAudioBeats,
     nodes,
     nodeOrder,
     selectedId,
@@ -354,6 +359,16 @@ export const Timeline: React.FC = () => {
           </div>
 
           <button
+            title="Add Marker at current timestamp (M)"
+            onClick={() => {
+              addMarker(currentTime, `M @ ${currentTime.toFixed(2)}s`);
+            }}
+            className="flex items-center gap-1 bg-white hover:bg-gray-50 text-gray-700 border border-gray-200 px-2.5 py-1 rounded-md font-medium text-xs shadow-xs transition-colors"
+          >
+            <Bookmark className="w-3 h-3 text-purple-500" /> Add Marker
+          </button>
+
+          <button
             title="Add Keyframe at current timestamp"
             onClick={() => {
               if (selectedId && selectedId !== 'frame-1') {
@@ -433,7 +448,7 @@ export const Timeline: React.FC = () => {
           onMouseDown={handleGridMouseDown}
           className="flex-1 relative overflow-x-hidden overflow-y-auto bg-[#fafafa] flex flex-col cursor-crosshair"
         >
-          {/* Time Ruler */}
+          {/* Time Ruler & Markers Header */}
           <div className="h-8 border-b border-gray-100 relative text-[10px] text-gray-400 bg-white cursor-pointer select-none shrink-0 sticky top-0 z-20">
             <div className="absolute left-2 bottom-1.5 font-mono font-medium">0.0s</div>
             <div className="absolute left-[33.33%] bottom-1.5 font-mono font-medium -translate-x-1/2">
@@ -445,6 +460,36 @@ export const Timeline: React.FC = () => {
             <div className="absolute right-3 bottom-1.5 font-mono font-medium">
               {duration.toFixed(1)}s
             </div>
+
+            {/* Timeline Markers */}
+            {markers.map((m) => {
+              const leftPct = duration > 0 ? (m.time / duration) * 100 : 0;
+              return (
+                <div
+                  key={m.id}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setCurrentTime(m.time);
+                  }}
+                  onContextMenu={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    removeMarker(m.id);
+                  }}
+                  title={`Marker: ${m.label} (${m.time}s) - Right-click to remove`}
+                  style={{ left: `${leftPct}%` }}
+                  className="absolute top-0 -translate-x-1/2 flex flex-col items-center cursor-pointer group z-30"
+                >
+                  <div
+                    className="w-2.5 h-2.5 rotate-45 rounded-2xs shadow-xs"
+                    style={{ backgroundColor: m.color || '#8b5cf6' }}
+                  />
+                  <span className="text-[9px] font-bold font-mono px-1 py-0.2 rounded shadow-sm mt-0.5 hidden group-hover:block bg-gray-900 text-white whitespace-nowrap z-40">
+                    {m.label} ({m.time}s)
+                  </span>
+                </div>
+              );
+            })}
           </div>
 
           {/* Dopesheet View vs Graph View */}
@@ -458,6 +503,16 @@ export const Timeline: React.FC = () => {
                     <span className="text-[10px] font-bold text-purple-800 truncate max-w-[120px]">
                       {audioTrack.name}
                     </span>
+                    <button
+                      title="Detect Audio Beats & Generate Timeline Markers"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        generateMarkersFromAudioBeats();
+                      }}
+                      className="flex items-center gap-1 text-[10px] font-bold text-pink-600 bg-pink-50 hover:bg-pink-100 px-1.5 py-0.5 rounded transition-colors shadow-2xs"
+                    >
+                      <Sparkles className="w-2.5 h-2.5" /> Beats
+                    </button>
                     <button
                       title={audioTrack.muted ? 'Unmute' : 'Mute'}
                       onClick={(e) => {

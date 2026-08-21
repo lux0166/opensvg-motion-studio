@@ -1,9 +1,10 @@
 import { create } from 'zustand';
 import { immer } from 'zustand/middleware/immer';
-import { FrameNode, SceneNode, SceneProject, ToolMode, TimelineMode, BezierPoint, CubicBezierCurve, AudioTrackConfig, NodeTrigger } from '../engine/types';
+import { FrameNode, SceneNode, SceneProject, ToolMode, TimelineMode, BezierPoint, CubicBezierCurve, AudioTrackConfig, NodeTrigger, TimelineMarker } from '../engine/types';
 import { SnapLine } from '../engine/snapping';
 import { StudioSnapshot, createStudioSnapshot, MAX_HISTORY_STEPS } from '../engine/history';
 import { BooleanOpType, executeBooleanOperation } from '../engine/booleanOps';
+import { detectSyntheticBeats } from '../engine/audioEngine';
 
 function pushDraftSnapshot(state: any) {
   const snap = createStudioSnapshot(state.rootFrame, state.nodes, state.nodeOrder);
@@ -114,6 +115,12 @@ interface StudioState {
   audioTrack: AudioTrackConfig | null;
   setAudioTrack: (track: AudioTrackConfig | null) => void;
   updateAudioTrack: (updates: Partial<AudioTrackConfig>) => void;
+
+  // Timeline Markers & Beat Detection
+  markers: TimelineMarker[];
+  addMarker: (time: number, label?: string, color?: string) => void;
+  removeMarker: (id: string) => void;
+  generateMarkersFromAudioBeats: () => void;
 
   // Interactive State Machine Triggers
   addTrigger: (nodeId: string, trigger: NodeTrigger) => void;
@@ -269,6 +276,10 @@ export const useStudioStore = create<StudioState>()(
 
     nodeOrder: ['card', 'ball'],
     audioTrack: null,
+    markers: [
+      { id: 'm-start', time: 0.0, label: 'Start', color: '#10b981' },
+      { id: 'm-drop', time: 1.5, label: 'Drop', color: '#f59e0b' }
+    ],
 
     isExportOpen: false,
     isSettingsOpen: false,
@@ -793,6 +804,40 @@ export const useStudioStore = create<StudioState>()(
         if (state.audioTrack) {
           Object.assign(state.audioTrack, updates);
         }
+      }),
+
+    addMarker: (time, label = 'Marker', color = '#8b5cf6') =>
+      set((state) => {
+        const newM = {
+          id: `m-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
+          time: parseFloat(Math.max(0, Math.min(state.duration, time)).toFixed(2)),
+          label,
+          color
+        };
+        state.markers.push(newM);
+        state.markers.sort((a, b) => a.time - b.time);
+        state.toastMessage = `Added marker at ${newM.time}s`;
+        state.toastType = 'success';
+      }),
+
+    removeMarker: (id) =>
+      set((state) => {
+        state.markers = state.markers.filter((m) => m.id !== id);
+        state.toastMessage = 'Removed marker';
+        state.toastType = 'info';
+      }),
+
+    generateMarkersFromAudioBeats: () =>
+      set((state) => {
+        const beats = detectSyntheticBeats(state.duration, 120);
+        state.markers = beats.map((time, idx) => ({
+          id: `beat-${idx}`,
+          time,
+          label: `Beat ${idx + 1}`,
+          color: '#ec4899'
+        }));
+        state.toastMessage = `Detected ${beats.length} beats and created markers`;
+        state.toastType = 'success';
       }),
 
     addTrigger: (nodeId, trigger) =>

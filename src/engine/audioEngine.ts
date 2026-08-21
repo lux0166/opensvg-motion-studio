@@ -68,3 +68,66 @@ export async function parseAudioFile(file: File, sampleCount = 100): Promise<{
     reader.readAsArrayBuffer(file);
   });
 }
+
+/**
+ * Audio Beat Detection using instantaneous energy spike thresholding over a sliding window
+ * (Constitution Rule 08 & 45 - Pure, Deterministic Audio Energy Analysis)
+ */
+export function detectAudioBeats(
+  channelData: Float32Array,
+  sampleRate = 44100,
+  thresholdMultiplier = 1.25,
+  minBeatDistance = 0.25 // minimum seconds between beats (max 240 BPM)
+): number[] {
+  const frameSize = 1024;
+  const numFrames = Math.floor(channelData.length / frameSize);
+  const energies: number[] = [];
+
+  // 1. Compute frame RMS energy
+  for (let i = 0; i < numFrames; i++) {
+    const start = i * frameSize;
+    let sum = 0;
+    for (let j = 0; j < frameSize; j++) {
+      const s = channelData[start + j] || 0;
+      sum += s * s;
+    }
+    energies.push(sum / frameSize);
+  }
+
+  // 2. Sliding window average energy comparison
+  const windowSize = 40; // ~1 sec history
+  const beats: number[] = [];
+  let lastBeatTime = -minBeatDistance;
+
+  for (let i = 0; i < energies.length; i++) {
+    const start = Math.max(0, i - windowSize / 2);
+    const end = Math.min(energies.length, i + windowSize / 2);
+    let avgEnergy = 0;
+    for (let w = start; w < end; w++) {
+      avgEnergy += energies[w];
+    }
+    avgEnergy /= (end - start);
+
+    const currentTime = (i * frameSize) / sampleRate;
+    const isPeak = energies[i] > avgEnergy * thresholdMultiplier && energies[i] > 0.001;
+
+    if (isPeak && currentTime - lastBeatTime >= minBeatDistance) {
+      beats.push(parseFloat(currentTime.toFixed(2)));
+      lastBeatTime = currentTime;
+    }
+  }
+
+  return beats;
+}
+
+/**
+ * Generates synthetic beat markers based on BPM tempo
+ */
+export function detectSyntheticBeats(duration: number, bpm = 120): number[] {
+  const interval = 60 / bpm;
+  const beats: number[] = [];
+  for (let t = 0; t <= duration; t += interval) {
+    beats.push(parseFloat(t.toFixed(2)));
+  }
+  return beats;
+}
