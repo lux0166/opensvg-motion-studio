@@ -41,6 +41,13 @@ export function exportToAnimatedSVG(rootFrame: FrameNode, nodes: SceneNode[], du
     if (node.type === 'circle') {
       const r = node.width / 2;
       svg += `  <circle cx="${node.x + r}" cy="${node.y + r}" r="${r}" fill="${fillAttr}"${stroke}${dash} />\n`;
+    } else if (node.type === 'text') {
+      const anchor = node.textAlign === 'center' ? 'middle' : node.textAlign === 'right' ? 'end' : 'start';
+      const textX = node.textAlign === 'center' ? node.x + node.width / 2 : node.textAlign === 'right' ? node.x + node.width : node.x;
+      const size = node.fontSize || 28;
+      const weight = node.fontWeight || 600;
+      const font = node.fontFamily || 'Inter, sans-serif';
+      svg += `  <text x="${textX}" y="${node.y + size}" font-family="${font}" font-size="${size}" font-weight="${weight}" text-anchor="${anchor}" fill="${fillAttr}"${stroke}>${node.textContent || ''}</text>\n`;
     } else {
       svg += `  <rect x="${node.x}" y="${node.y}" width="${node.width}" height="${node.height}" fill="${fillAttr}"${rx}${stroke}${dash} />\n`;
     }

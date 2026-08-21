@@ -124,8 +124,20 @@ export function renderCanvasScene(
         ctx.stroke();
       }
     } else if (node.type === 'text') {
-      ctx.font = `${node.fontSize || 16}px Inter, sans-serif`;
-      ctx.fillText(node.textContent || 'Text', node.x, node.y + (node.fontSize || 16));
+      const weight = node.fontWeight || 600;
+      const size = node.fontSize || 28;
+      const fontFam = node.fontFamily || 'Inter, sans-serif';
+      ctx.font = `${weight} ${size}px ${fontFam}`;
+      ctx.textAlign = node.textAlign || 'left';
+      ctx.textBaseline = 'top';
+
+      const text = node.textContent || 'Typography';
+      const textX = node.textAlign === 'center' ? node.x + node.width / 2 : node.textAlign === 'right' ? node.x + node.width : node.x;
+
+      ctx.fillText(text, textX, node.y);
+      if (node.stroke && node.strokeWidth) {
+        ctx.strokeText(text, textX, node.y);
+      }
     }
 
     ctx.restore();

@@ -111,9 +111,14 @@ export interface BaseNode {
   // Path data (if type === 'path')
   pathPoints?: BezierPoint[];
 
-  // Text content (if type === 'text')
+  // Text & Typography (if type === 'text')
   textContent?: string;
+  fontFamily?: string;
   fontSize?: number;
+  fontWeight?: string | number;
+  letterSpacing?: number;
+  lineHeight?: number;
+  textAlign?: 'left' | 'center' | 'right';
 
   // Animation tracks
   tracks: PropertyTrack<any>[];

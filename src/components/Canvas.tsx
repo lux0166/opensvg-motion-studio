@@ -17,6 +17,7 @@ export const Canvas: React.FC = () => {
     setSelectedIds,
     toggleSelectId,
     selectedTool,
+    setSelectedTool,
     selectedPointIndex,
     setSelectedPointIndex,
     activeSnapLines,
@@ -41,6 +42,7 @@ export const Canvas: React.FC = () => {
   const [panStart, setPanStart] = useState({ x: 0, y: 0 });
   const [isSpacePressed, setIsSpacePressed] = useState(false);
   const [marqueeRect, setMarqueeRect] = useState<MarqueeRect | null>(null);
+  const [editingTextId, setEditingTextId] = useState<string | null>(null);
 
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
@@ -119,7 +121,40 @@ export const Canvas: React.FC = () => {
     const mouseX = Math.round((e.clientX - rect.left) / zoom);
     const mouseY = Math.round((e.clientY - rect.top) / zoom);
 
-    // 2. Vector Pen Tool
+    // 2. Text Tool (T)
+    if (selectedTool === 'text') {
+      const newTextId = `text-${Date.now()}`;
+      addNode({
+        id: newTextId,
+        name: 'Typography',
+        type: 'text',
+        visible: true,
+        locked: false,
+        x: mouseX,
+        y: mouseY,
+        width: 220,
+        height: 48,
+        rotation: 0,
+        scaleX: 1,
+        scaleY: 1,
+        opacity: 1,
+        borderRadius: 0,
+        fill: '#111827',
+        textContent: 'Type something...',
+        fontSize: 28,
+        fontWeight: 600,
+        fontFamily: 'Inter, sans-serif',
+        textAlign: 'left',
+        tracks: []
+      });
+      setSelectedId(newTextId);
+      setSelectedTool('select');
+      setEditingTextId(newTextId);
+      showToast('Created text layer');
+      return;
+    }
+
+    // 3. Vector Pen Tool
     if (selectedTool === 'pen') {
       handlePenToolClick(mouseX, mouseY, e);
       return;
@@ -483,10 +518,33 @@ export const Canvas: React.FC = () => {
     window.addEventListener('mouseup', onUp);
   };
 
+  const handleDoubleClick = (e: React.MouseEvent) => {
+    const rect = canvasRef.current?.getBoundingClientRect();
+    if (!rect) return;
+    const mouseX = Math.round((e.clientX - rect.left) / zoom);
+    const mouseY = Math.round((e.clientY - rect.top) / zoom);
+
+    for (let i = evaluatedNodes.length - 1; i >= 0; i--) {
+      const n = evaluatedNodes[i];
+      if (
+        n.type === 'text' &&
+        mouseX >= n.x &&
+        mouseX <= n.x + n.width &&
+        mouseY >= n.y &&
+        mouseY <= n.y + n.height
+      ) {
+        setEditingTextId(n.id);
+        setSelectedId(n.id);
+        return;
+      }
+    }
+  };
+
   return (
     <section
       ref={containerRef}
       onMouseDown={handleMouseDown}
+      onDoubleClick={handleDoubleClick}
       onMouseMove={handleMouseMove}
       onMouseUp={handleMouseUp}
       onWheel={handleWheel}
@@ -516,6 +574,31 @@ export const Canvas: React.FC = () => {
           ref={canvasRef}
           className="rounded-2xl shadow-xl border border-gray-200/80 bg-white"
         />
+
+        {/* In-Place Live Text Editor */}
+        {editingTextId && nodes[editingTextId] && (
+          <input
+            autoFocus
+            type="text"
+            value={nodes[editingTextId].textContent || ''}
+            onChange={(e) => updateNode(editingTextId, { textContent: e.target.value })}
+            onBlur={() => setEditingTextId(null)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === 'Escape') {
+                setEditingTextId(null);
+              }
+            }}
+            className="absolute z-30 bg-white/95 border-2 border-blue-500 rounded-lg px-2 py-1 shadow-lg text-gray-900 outline-none"
+            style={{
+              left: `${nodes[editingTextId].x}px`,
+              top: `${nodes[editingTextId].y}px`,
+              fontSize: `${nodes[editingTextId].fontSize || 28}px`,
+              fontWeight: nodes[editingTextId].fontWeight || 600,
+              fontFamily: nodes[editingTextId].fontFamily || 'Inter, sans-serif',
+              minWidth: '160px'
+            }}
+          />
+        )}
       </div>
 
       {/* Floating Canvas Controls */}

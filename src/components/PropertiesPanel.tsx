@@ -10,7 +10,8 @@ import {
   AlignRight,
   AlignStartVertical,
   AlignCenterVertical,
-  AlignEndVertical
+  AlignEndVertical,
+  Type
 } from 'lucide-react';
 
 export const PropertiesPanel: React.FC = () => {
@@ -291,6 +292,123 @@ export const PropertiesPanel: React.FC = () => {
             onChange={(e) => updateNode(selectedId, { rotation: parseInt(e.target.value) })}
           />
         </div>
+
+        {/* Typography Controls (When Text Node is Selected) */}
+        {selectedNode.type === 'text' && (
+          <div className="p-3 bg-gray-50 rounded-2xl border border-gray-200 flex flex-col gap-3">
+            <div className="flex items-center gap-1.5 text-xs font-bold text-gray-800">
+              <Type className="w-3.5 h-3.5 text-purple-600" />
+              <span>Typography Settings</span>
+            </div>
+
+            {/* Text Content */}
+            <div>
+              <label className="text-[10px] text-gray-400 font-semibold mb-1 block uppercase">
+                Content
+              </label>
+              <input
+                type="text"
+                value={selectedNode.textContent || ''}
+                onChange={(e) => updateNode(selectedId, { textContent: e.target.value })}
+                className="w-full bg-white border border-gray-200 rounded-xl px-2.5 py-1.5 text-xs font-medium text-gray-800 outline-none focus:border-purple-500"
+              />
+            </div>
+
+            {/* Font Family */}
+            <div>
+              <label className="text-[10px] text-gray-400 font-semibold mb-1 block uppercase">
+                Font Family
+              </label>
+              <select
+                value={selectedNode.fontFamily || 'Inter, sans-serif'}
+                onChange={(e) => updateNode(selectedId, { fontFamily: e.target.value })}
+                className="w-full bg-white border border-gray-200 rounded-xl px-2 py-1.5 text-xs font-medium text-gray-800 outline-none focus:border-purple-500 cursor-pointer"
+              >
+                <option value="Inter, sans-serif">Inter (Modern Clean)</option>
+                <option value="'Space Grotesk', sans-serif">Space Grotesk (Tech & Kinetic)</option>
+                <option value="'Outfit', sans-serif">Outfit (Geometric Sans)</option>
+                <option value="'Fira Code', monospace">Fira Code (Code Monospace)</option>
+                <option value="'Playfair Display', serif">Playfair Display (Editorial Serif)</option>
+                <option value="Roboto, sans-serif">Roboto (Standard)</option>
+              </select>
+            </div>
+
+            {/* Font Size & Weight Grid */}
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <label className="text-[10px] text-gray-400 font-semibold mb-1 block uppercase">
+                  Size ({selectedNode.fontSize || 28}px)
+                </label>
+                <input
+                  type="number"
+                  min="8"
+                  max="144"
+                  value={selectedNode.fontSize || 28}
+                  onChange={(e) =>
+                    updateNode(selectedId, { fontSize: Math.max(8, parseInt(e.target.value) || 28) })
+                  }
+                  className="w-full bg-white border border-gray-200 rounded-xl px-2 py-1 text-xs font-mono font-semibold text-gray-800 outline-none"
+                />
+              </div>
+
+              <div>
+                <label className="text-[10px] text-gray-400 font-semibold mb-1 block uppercase">
+                  Weight
+                </label>
+                <select
+                  value={selectedNode.fontWeight || 600}
+                  onChange={(e) => updateNode(selectedId, { fontWeight: e.target.value })}
+                  className="w-full bg-white border border-gray-200 rounded-xl px-2 py-1 text-xs font-semibold text-gray-800 outline-none cursor-pointer"
+                >
+                  <option value="400">Regular (400)</option>
+                  <option value="500">Medium (500)</option>
+                  <option value="600">SemiBold (600)</option>
+                  <option value="700">Bold (700)</option>
+                  <option value="900">Black (900)</option>
+                </select>
+              </div>
+            </div>
+
+            {/* Text Alignment */}
+            <div>
+              <label className="text-[10px] text-gray-400 font-semibold mb-1 block uppercase">
+                Alignment
+              </label>
+              <div className="flex bg-white p-0.5 rounded-xl border border-gray-200">
+                <button
+                  onClick={() => updateNode(selectedId, { textAlign: 'left' })}
+                  className={`flex-1 py-1 rounded-lg text-[10px] font-semibold transition-colors ${
+                    !selectedNode.textAlign || selectedNode.textAlign === 'left'
+                      ? 'bg-purple-100 text-purple-700'
+                      : 'text-gray-500 hover:bg-gray-50'
+                  }`}
+                >
+                  Left
+                </button>
+                <button
+                  onClick={() => updateNode(selectedId, { textAlign: 'center' })}
+                  className={`flex-1 py-1 rounded-lg text-[10px] font-semibold transition-colors ${
+                    selectedNode.textAlign === 'center'
+                      ? 'bg-purple-100 text-purple-700'
+                      : 'text-gray-500 hover:bg-gray-50'
+                  }`}
+                >
+                  Center
+                </button>
+                <button
+                  onClick={() => updateNode(selectedId, { textAlign: 'right' })}
+                  className={`flex-1 py-1 rounded-lg text-[10px] font-semibold transition-colors ${
+                    selectedNode.textAlign === 'right'
+                      ? 'bg-purple-100 text-purple-700'
+                      : 'text-gray-500 hover:bg-gray-50'
+                  }`}
+                >
+                  Right
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Fill & Gradients */}
         <div>
