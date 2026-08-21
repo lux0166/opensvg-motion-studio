@@ -1,6 +1,6 @@
-﻿import { create } from 'zustand';
+import { create } from 'zustand';
 import { immer } from 'zustand/middleware/immer';
-import { FrameNode, SceneNode, ToolMode, TimelineMode, BezierPoint, CubicBezierCurve } from '../engine/types';
+import { FrameNode, SceneNode, SceneProject, ToolMode, TimelineMode, BezierPoint, CubicBezierCurve } from '../engine/types';
 import { SnapLine } from '../engine/snapping';
 
 interface StudioState {
@@ -52,6 +52,10 @@ interface StudioState {
   setSelectedTrackId: (trackId: string | null) => void;
   setActiveSnapLines: (lines: SnapLine[]) => void;
   toggleNodeExpand: (id: string) => void;
+
+  // Project Management
+  loadProject: (project: SceneProject) => void;
+  createNewProject: () => void;
 
   // Alignments
   alignSelected: (type: 'left' | 'center' | 'right' | 'top' | 'middle' | 'bottom') => void;
@@ -246,6 +250,52 @@ export const useStudioStore = create<StudioState>()(
     toggleNodeExpand: (id) =>
       set((state) => {
         state.expandedNodeIds[id] = !state.expandedNodeIds[id];
+      }),
+
+    loadProject: (project) =>
+      set((state) => {
+        state.rootFrame = project.rootFrame;
+        state.nodes = project.nodes;
+        state.nodeOrder = project.nodeOrder;
+        state.duration = project.duration;
+        state.fps = project.fps;
+        state.currentTime = 0;
+        state.selectedId = project.nodeOrder[0] || 'frame-1';
+        state.selectedTrackId = null;
+        state.toastMessage = `Loaded project: ${project.name}`;
+        state.toastType = 'success';
+      }),
+
+    createNewProject: () =>
+      set((state) => {
+        state.rootFrame = {
+          id: 'frame-1',
+          name: 'New Project',
+          type: 'frame',
+          visible: true,
+          locked: false,
+          clipContent: true,
+          canvasBg: '#f1f2f5',
+          x: 0,
+          y: 0,
+          width: 600,
+          height: 400,
+          rotation: 0,
+          scaleX: 1,
+          scaleY: 1,
+          opacity: 1,
+          borderRadius: 0,
+          fill: '#ffffff',
+          tracks: []
+        };
+        state.nodes = {};
+        state.nodeOrder = [];
+        state.currentTime = 0;
+        state.duration = 3.0;
+        state.selectedId = 'frame-1';
+        state.selectedTrackId = null;
+        state.toastMessage = 'Created new project';
+        state.toastType = 'info';
       }),
 
     alignSelected: (type) =>

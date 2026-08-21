@@ -1,6 +1,7 @@
 ﻿import React, { useState } from 'react';
 import { useStudioStore } from '../store/useStudioStore';
 import { ToolMode } from '../engine/types';
+import { openProjectFromFile, serializeProject } from '../engine/projectManager';
 import {
   Compass,
   MousePointer,
@@ -15,7 +16,11 @@ import {
   Settings,
   Plus,
   Circle,
-  Star
+  Star,
+  FolderOpen,
+  Save,
+  FilePlus,
+  ChevronDown
 } from 'lucide-react';
 
 export const Header: React.FC = () => {
@@ -26,10 +31,17 @@ export const Header: React.FC = () => {
     setSettingsOpen,
     addNode,
     rootFrame,
+    nodes,
+    nodeOrder,
+    duration,
+    fps,
+    loadProject,
+    createNewProject,
     showToast
   } = useStudioStore();
 
   const [shapesDropdownOpen, setShapesDropdownOpen] = useState(false);
+  const [fileMenuOpen, setFileMenuOpen] = useState(false);
 
   const tools: { id: ToolMode; label: string; icon: React.ReactNode }[] = [
     { id: 'select', label: 'Select Tool (V)', icon: <MousePointer className="w-3.5 h-3.5" /> },
@@ -74,18 +86,89 @@ export const Header: React.FC = () => {
     showToast(`Added ${type} shape!`);
   };
 
+  const handleOpenProject = async () => {
+    try {
+      const proj = await openProjectFromFile();
+      loadProject(proj);
+      setFileMenuOpen(false);
+    } catch (err: any) {
+      if (err?.message !== 'No file selected') {
+        showToast(`Failed to open project: ${err?.message || err}`, 'error');
+      }
+    }
+  };
+
+  const handleSaveProject = () => {
+    const jsonStr = serializeProject(rootFrame, nodes, nodeOrder, duration, fps);
+    const blob = new Blob([jsonStr], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${rootFrame.name.toLowerCase().replace(/\s+/g, '-')}-project.kinetic`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    showToast('Saved project (.kinetic)!', 'success');
+    setFileMenuOpen(false);
+  };
+
   return (
     <header className="h-16 flex items-center justify-between px-6 border-b border-app-border shrink-0 z-10 bg-white/80 backdrop-blur-md select-none">
-      {/* Brand & Mode */}
-      <div className="flex items-center gap-3">
+      {/* Brand & File Menu */}
+      <div className="flex items-center gap-3 relative">
         <button
+          onClick={() => setFileMenuOpen(!fileMenuOpen)}
           className="bg-white px-4 py-2 rounded-full shadow-sm font-semibold flex items-center gap-2 hover:bg-gray-50 border border-gray-100 transition-all active:scale-95"
         >
           <Compass className="w-4 h-4 text-blue-600" />
           <span className="bg-gradient-to-r from-gray-900 to-gray-700 bg-clip-text text-transparent font-bold">
             OpenSVG
           </span>
+          <ChevronDown className="w-3.5 h-3.5 text-gray-400" />
         </button>
+
+        {/* File Dropdown Menu */}
+        {fileMenuOpen && (
+          <div className="absolute top-14 left-0 w-52 bg-white rounded-2xl shadow-xl border border-gray-100 p-1.5 flex flex-col gap-1 z-50 animate-in fade-in zoom-in-95">
+            <button
+              onClick={() => {
+                createNewProject();
+                setFileMenuOpen(false);
+              }}
+              className="flex items-center gap-2.5 px-3 py-2 text-xs font-semibold text-gray-700 hover:bg-gray-100 rounded-xl transition-colors text-left"
+            >
+              <FilePlus className="w-4 h-4 text-gray-500" />
+              New Project
+            </button>
+            <button
+              onClick={handleOpenProject}
+              className="flex items-center gap-2.5 px-3 py-2 text-xs font-semibold text-gray-700 hover:bg-gray-100 rounded-xl transition-colors text-left"
+            >
+              <FolderOpen className="w-4 h-4 text-blue-500" />
+              Open File (.kinetic)
+            </button>
+            <button
+              onClick={handleSaveProject}
+              className="flex items-center gap-2.5 px-3 py-2 text-xs font-semibold text-gray-700 hover:bg-gray-100 rounded-xl transition-colors text-left"
+            >
+              <Save className="w-4 h-4 text-emerald-500" />
+              Save Project (Ctrl+S)
+            </button>
+            <div className="h-[1px] bg-gray-100 my-0.5" />
+            <button
+              onClick={() => {
+                setExportOpen(true);
+                setFileMenuOpen(false);
+              }}
+              className="flex items-center gap-2.5 px-3 py-2 text-xs font-semibold text-gray-700 hover:bg-blue-50 hover:text-blue-600 rounded-xl transition-colors text-left"
+            >
+              <Download className="w-4 h-4 text-indigo-500" />
+              Export Assets...
+            </button>
+          </div>
+        )}
+
         <span className="text-xs bg-blue-50 text-blue-600 font-medium px-2.5 py-1 rounded-full border border-blue-100 hidden sm:inline-block">
           Desktop Studio
         </span>
@@ -111,16 +194,14 @@ export const Header: React.FC = () => {
           );
         })}
 
-        <div className="w-[1px] h-5 bg-gray-300 mx-1" />
-
         {/* Shapes Menu */}
         <div className="relative">
           <button
-            title="Add Shapes"
+            title="Shapes Tool"
             onClick={() => setShapesDropdownOpen(!shapesDropdownOpen)}
             className={`w-9 h-9 rounded-full flex items-center justify-center transition-all duration-150 ${
               shapesDropdownOpen
-                ? 'bg-white text-gray-900 shadow-sm'
+                ? 'bg-blue-500 text-white shadow-sm'
                 : 'text-gray-600 hover:bg-white hover:text-gray-900'
             }`}
           >
@@ -128,24 +209,27 @@ export const Header: React.FC = () => {
           </button>
 
           {shapesDropdownOpen && (
-            <div className="absolute top-12 left-0 bg-white rounded-xl shadow-xl border border-gray-100 p-2 w-36 flex flex-col gap-1 z-50 animate-in fade-in zoom-in-95">
+            <div className="absolute top-11 left-0 bg-white rounded-2xl shadow-xl border border-gray-100 p-2 flex flex-col gap-1 min-w-[140px] z-50 animate-in fade-in zoom-in-95">
               <button
                 onClick={() => handleAddShape('rect')}
-                className="flex items-center gap-2.5 px-3 py-2 text-xs font-medium text-gray-700 hover:bg-blue-50 hover:text-blue-600 rounded-lg text-left transition-colors"
+                className="flex items-center gap-2 px-3 py-2 text-xs font-semibold text-gray-700 hover:bg-gray-100 rounded-xl transition-colors text-left"
               >
-                <Square className="w-3.5 h-3.5" /> Rectangle
+                <Square className="w-3.5 h-3.5 text-purple-500" />
+                Rectangle
               </button>
               <button
                 onClick={() => handleAddShape('circle')}
-                className="flex items-center gap-2.5 px-3 py-2 text-xs font-medium text-gray-700 hover:bg-blue-50 hover:text-blue-600 rounded-lg text-left transition-colors"
+                className="flex items-center gap-2 px-3 py-2 text-xs font-semibold text-gray-700 hover:bg-gray-100 rounded-xl transition-colors text-left"
               >
-                <Circle className="w-3.5 h-3.5" /> Circle
+                <Circle className="w-3.5 h-3.5 text-emerald-500" />
+                Circle / Oval
               </button>
               <button
                 onClick={() => handleAddShape('star')}
-                className="flex items-center gap-2.5 px-3 py-2 text-xs font-medium text-gray-700 hover:bg-blue-50 hover:text-blue-600 rounded-lg text-left transition-colors"
+                className="flex items-center gap-2 px-3 py-2 text-xs font-semibold text-gray-700 hover:bg-gray-100 rounded-xl transition-colors text-left"
               >
-                <Star className="w-3.5 h-3.5" /> Star Card
+                <Star className="w-3.5 h-3.5 text-amber-500" />
+                Star Shape
               </button>
             </div>
           )}
@@ -183,7 +267,7 @@ export const Header: React.FC = () => {
         <div className="w-[1px] h-5 bg-gray-300 mx-1" />
 
         <button
-          title="Export Animation"
+          title="Export Animation (Ctrl+E)"
           onClick={() => setExportOpen(true)}
           className="w-9 h-9 rounded-full flex items-center justify-center text-gray-600 hover:bg-blue-50 hover:text-blue-600 transition-all"
         >
