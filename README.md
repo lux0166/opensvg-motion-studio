@@ -1,4 +1,4 @@
-﻿# OpenSVG Motion Studio
+# OpenSVG Motion Studio
 
 > Professional Desktop Vector Animation & Motion Design Studio (inspired by Rive, Figma Motion, and After Effects).
 
@@ -20,18 +20,29 @@ Built with **Tauri v2 + Rust + React 19 + TypeScript + Vite + Tailwind CSS**.
 
 ---
 
+## Architecture & Constitution
+
+Dự án tuân thủ nghiêm ngặt **[OpenSVG Motion Studio — Architecture Constitution (137 Rules & Swarm Governance)](./CONSTITUTION.md)**.
+- `src/engine/`: Pure Domain Layer (Geometry, Evaluator, Physics, Exporter/Importer).
+- `src/store/`: Orchestration State Boundary.
+- `src/components/`: Pure UI Projection.
+
+---
+
 ## Phased Task Roadmap
 
 - [x] **Task 0**: Project Specification & Interactive HTML Prototype.
-- [ ] **Task 1**: Desktop App Foundation (Tauri v2 + Rust backend + React 19 + TypeScript + Dark Studio theme).
-- [ ] **Task 2**: Vector Scene Graph & High-DPI Canvas Renderer (FrameNode, ShapeNode, PathNode, TextNode).
-- [ ] **Task 3**: Infinite Canvas Direct Interaction (Pan/Zoom, Multi-select, Transform Box, Snapping Guides).
-- [ ] **Task 4**: Vector Pen Tool & Bezier Path Editing (Anchor Points & Tangent Control).
-- [ ] **Task 5**: Multi-Track Timeline & Dopesheet Engine (60fps Keyframe Interpolation).
-- [ ] **Task 6**: Graph Curve Velocity Editor (Interactive Bezier Tangent Handles).
-- [ ] **Task 7**: Precision Properties Inspector & Layers Hierarchy Tree.
-- [ ] **Task 8**: Multi-Format Export Engine (Lottie JSON, Animated SVG, 60fps MP4/WebM).
-- [ ] **Task 9**: Native Desktop Packaging, Shortcuts & Windows Release Build.
+- [x] **Task 1**: Desktop App Foundation (Tauri v2 + Rust backend + React 19 + TypeScript + Studio Theme).
+- [x] **Task 2**: Vector Scene Graph & High-DPI Canvas Renderer (FrameNode, ShapeNode, PathNode, TextNode).
+- [x] **Task 3**: Infinite Canvas Direct Interaction (Pan/Zoom, Multi-select, Transform Box, Snapping Guides).
+- [x] **Task 4**: Vector Pen Tool & Bezier Path Editing (Anchor Points & Tangent Control).
+- [x] **Task 5**: Multi-Track Timeline & Dopesheet Engine (60fps Keyframe Interpolation).
+- [x] **Task 6**: Graph Curve Velocity Editor (Interactive Bezier Tangent Handles & Spring Physics).
+- [x] **Task 7**: Precision Properties Inspector & Layers Hierarchy Tree.
+- [x] **Task 8**: Multi-Format Export Engine (Lottie JSON, Animated SVG, 60fps MP4/WebM Video).
+- [x] **Task 9**: Native Desktop Packaging, History Undo/Redo & Shortcuts Matrix.
+- [x] **Task 10**: Advanced Visual Effects (Drop Shadow & Gaussian Layer Blur).
+- [x] **Task 11**: Vector Path Boolean Operations & Interactive State Machine.
 
 ---
 
