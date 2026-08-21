@@ -43,7 +43,9 @@ export type AnimatableProperty =
   | 'borderRadius'
   | 'fill'
   | 'stroke'
-  | 'strokeWidth';
+  | 'strokeWidth'
+  | 'pathPoints'
+  | 'fontSize';
 
 export interface PropertyTrack<T = number | string> {
   id: string;
