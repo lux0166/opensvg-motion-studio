@@ -6,6 +6,13 @@ export interface DragHandleInfo {
   pointIndex?: number;
 }
 
+export interface MarqueeRect {
+  x1: number;
+  y1: number;
+  x2: number;
+  y2: number;
+}
+
 /**
  * High-DPI Vector Canvas Renderer with Sub-pixel Precision
  */
@@ -17,7 +24,9 @@ export function renderCanvasScene(
   selectedTool: ToolMode,
   selectedPointIndex: number | null,
   dpr: number,
-  snapLines: SnapLine[] = []
+  snapLines: SnapLine[] = [],
+  selectedIds: string[] = [],
+  marqueeRect: MarqueeRect | null = null
 ) {
   const width = rootFrame.width;
   const height = rootFrame.height;
@@ -122,8 +131,51 @@ export function renderCanvasScene(
     ctx.restore();
   }
 
-  // Draw Selection Bounding Box & Handles
-  if (selectedId && selectedId !== rootFrame.id) {
+  // Draw Multi-Selection Bounding Boxes
+  if (selectedIds && selectedIds.length > 1) {
+    const activeNodes = evaluatedNodes.filter((n) => selectedIds.includes(n.id) && n.visible);
+    if (activeNodes.length > 0) {
+      // Draw individual borders
+      ctx.save();
+      ctx.strokeStyle = '#93c5fd';
+      ctx.lineWidth = 1;
+      ctx.setLineDash([2, 2]);
+      for (const n of activeNodes) {
+        ctx.strokeRect(n.x, n.y, n.width, n.height);
+      }
+      ctx.restore();
+
+      // Compute combined bounding box
+      let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+      for (const n of activeNodes) {
+        minX = Math.min(minX, n.x);
+        minY = Math.min(minY, n.y);
+        maxX = Math.max(maxX, n.x + n.width);
+        maxY = Math.max(maxY, n.y + n.height);
+      }
+
+      const collectiveNode: SceneNode = {
+        id: 'multi-selection',
+        name: 'Selection',
+        type: 'rect',
+        visible: true,
+        locked: false,
+        x: minX,
+        y: minY,
+        width: maxX - minX,
+        height: maxY - minY,
+        rotation: 0,
+        scaleX: 1,
+        scaleY: 1,
+        opacity: 1,
+        borderRadius: 0,
+        fill: 'transparent',
+        tracks: []
+      };
+      drawSelectionOverlay(ctx, collectiveNode);
+    }
+  } else if (selectedId && selectedId !== rootFrame.id) {
+    // Single Selection Bounding Box & Handles
     const selectedNode = evaluatedNodes.find((n) => n.id === selectedId);
     if (selectedNode && selectedNode.visible) {
       if ((selectedTool === 'pen' || selectedTool === 'direct-select') && selectedNode.type === 'path' && selectedNode.pathPoints) {
@@ -132,6 +184,23 @@ export function renderCanvasScene(
         drawSelectionOverlay(ctx, selectedNode);
       }
     }
+  }
+
+  // Draw Marquee Drag Selection Box
+  if (marqueeRect) {
+    const x = Math.min(marqueeRect.x1, marqueeRect.x2);
+    const y = Math.min(marqueeRect.y1, marqueeRect.y2);
+    const w = Math.abs(marqueeRect.x2 - marqueeRect.x1);
+    const h = Math.abs(marqueeRect.y2 - marqueeRect.y1);
+
+    ctx.save();
+    ctx.fillStyle = 'rgba(59, 130, 246, 0.12)';
+    ctx.strokeStyle = 'rgba(59, 130, 246, 0.8)';
+    ctx.lineWidth = 1;
+    ctx.setLineDash([4, 2]);
+    ctx.fillRect(x, y, w, h);
+    ctx.strokeRect(x, y, w, h);
+    ctx.restore();
   }
 
   // Draw Magnetic Snap Alignment Guides

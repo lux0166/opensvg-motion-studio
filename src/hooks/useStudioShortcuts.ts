@@ -1,4 +1,4 @@
-﻿import { useEffect } from 'react';
+import { useEffect } from 'react';
 import { useStudioStore } from '../store/useStudioStore';
 import { serializeProject } from '../engine/projectManager';
 
@@ -15,6 +15,8 @@ export function useStudioShortcuts() {
     selectedId,
     deleteNode,
     duplicateSelected,
+    groupSelected,
+    ungroupSelected,
     setSelectedTool,
     setExportOpen,
     rootFrame,
@@ -53,6 +55,17 @@ export function useStudioShortcuts() {
       if (isCtrlOrCmd && e.key.toLowerCase() === 'd') {
         e.preventDefault();
         duplicateSelected();
+        return;
+      }
+
+      // 4. Group: Ctrl+G / Ungroup: Ctrl+Shift+G
+      if (isCtrlOrCmd && e.key.toLowerCase() === 'g') {
+        e.preventDefault();
+        if (e.shiftKey) {
+          ungroupSelected();
+        } else {
+          groupSelected();
+        }
         return;
       }
 

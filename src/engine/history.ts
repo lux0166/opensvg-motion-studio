@@ -1,10 +1,11 @@
-﻿import { FrameNode, SceneNode } from './types';
+import { FrameNode, SceneNode } from './types';
 
 export interface StudioSnapshot {
   rootFrame: FrameNode;
   nodes: Record<string, SceneNode>;
   nodeOrder: string[];
   selectedId: string | null;
+  selectedIds?: string[];
   timestamp: number;
 }
 
@@ -17,13 +18,15 @@ export function createStudioSnapshot(
   rootFrame: FrameNode,
   nodes: Record<string, SceneNode>,
   nodeOrder: string[],
-  selectedId: string | null
+  selectedId: string | null,
+  selectedIds: string[] = []
 ): StudioSnapshot {
   return {
     rootFrame: JSON.parse(JSON.stringify(rootFrame)),
     nodes: JSON.parse(JSON.stringify(nodes)),
     nodeOrder: [...nodeOrder],
     selectedId,
+    selectedIds: [...selectedIds],
     timestamp: Date.now()
   };
 }

@@ -5,7 +5,7 @@ import { SnapLine } from '../engine/snapping';
 import { StudioSnapshot, createStudioSnapshot, MAX_HISTORY_STEPS } from '../engine/history';
 
 function pushDraftSnapshot(state: any) {
-  const snap = createStudioSnapshot(state.rootFrame, state.nodes, state.nodeOrder, state.selectedId);
+  const snap = createStudioSnapshot(state.rootFrame, state.nodes, state.nodeOrder, state.selectedId, state.selectedIds);
   state.past.push(snap);
   if (state.past.length > MAX_HISTORY_STEPS) {
     state.past.shift();
@@ -30,6 +30,7 @@ interface StudioState {
   // Tools & Selection
   selectedTool: ToolMode;
   selectedId: string | null;
+  selectedIds: string[];
   selectedPointIndex: number | null;
   selectedTrackId: string | null;
   expandedNodeIds: Record<string, boolean>;
@@ -62,6 +63,8 @@ interface StudioState {
   setPan: (x: number, y: number) => void;
   setSelectedTool: (tool: ToolMode) => void;
   setSelectedId: (id: string | null) => void;
+  setSelectedIds: (ids: string[]) => void;
+  toggleSelectId: (id: string, isShift: boolean) => void;
   setSelectedPointIndex: (index: number | null) => void;
   setSelectedTrackId: (trackId: string | null) => void;
   setActiveSnapLines: (lines: SnapLine[]) => void;
@@ -75,6 +78,10 @@ interface StudioState {
   // Project Management
   loadProject: (project: SceneProject) => void;
   createNewProject: () => void;
+
+  // Multi-select & Grouping
+  groupSelected: () => void;
+  ungroupSelected: () => void;
 
   // Alignments & Duplicate
   alignSelected: (type: 'left' | 'center' | 'right' | 'top' | 'middle' | 'bottom') => void;
@@ -118,6 +125,7 @@ export const useStudioStore = create<StudioState>()(
 
     selectedTool: 'select',
     selectedId: 'card',
+    selectedIds: ['card'],
     selectedPointIndex: null,
     selectedTrackId: 'tr-rot',
     expandedNodeIds: { 'frame-1': true, card: true, ball: true },
@@ -259,7 +267,7 @@ export const useStudioStore = create<StudioState>()(
     undo: () =>
       set((state) => {
         if (state.past.length === 0) return;
-        const current = createStudioSnapshot(state.rootFrame, state.nodes, state.nodeOrder, state.selectedId);
+        const current = createStudioSnapshot(state.rootFrame, state.nodes, state.nodeOrder, state.selectedId, state.selectedIds);
         state.future.push(current);
 
         const previous = state.past.pop()!;
@@ -267,6 +275,7 @@ export const useStudioStore = create<StudioState>()(
         state.nodes = previous.nodes;
         state.nodeOrder = previous.nodeOrder;
         state.selectedId = previous.selectedId;
+        state.selectedIds = previous.selectedIds || (previous.selectedId ? [previous.selectedId] : []);
         state.toastMessage = 'Undo';
         state.toastType = 'info';
       }),
@@ -274,7 +283,7 @@ export const useStudioStore = create<StudioState>()(
     redo: () =>
       set((state) => {
         if (state.future.length === 0) return;
-        const current = createStudioSnapshot(state.rootFrame, state.nodes, state.nodeOrder, state.selectedId);
+        const current = createStudioSnapshot(state.rootFrame, state.nodes, state.nodeOrder, state.selectedId, state.selectedIds);
         state.past.push(current);
 
         const next = state.future.pop()!;
@@ -282,6 +291,7 @@ export const useStudioStore = create<StudioState>()(
         state.nodes = next.nodes;
         state.nodeOrder = next.nodeOrder;
         state.selectedId = next.selectedId;
+        state.selectedIds = next.selectedIds || (next.selectedId ? [next.selectedId] : []);
         state.toastMessage = 'Redo';
         state.toastType = 'info';
       }),
@@ -298,9 +308,31 @@ export const useStudioStore = create<StudioState>()(
     setSelectedId: (id) =>
       set((state) => {
         state.selectedId = id;
+        state.selectedIds = id ? [id] : [];
         state.selectedPointIndex = null;
         if (id && state.nodes[id] && state.nodes[id].tracks?.length > 0) {
           state.selectedTrackId = state.nodes[id].tracks[0].id;
+        }
+      }),
+    setSelectedIds: (ids) =>
+      set((state) => {
+        state.selectedIds = ids;
+        state.selectedId = ids.length > 0 ? ids[0] : null;
+        state.selectedPointIndex = null;
+      }),
+    toggleSelectId: (id, isShift) =>
+      set((state) => {
+        if (isShift) {
+          if (state.selectedIds.includes(id)) {
+            state.selectedIds = state.selectedIds.filter((item) => item !== id);
+            state.selectedId = state.selectedIds.length > 0 ? state.selectedIds[0] : null;
+          } else {
+            state.selectedIds.push(id);
+            state.selectedId = id;
+          }
+        } else {
+          state.selectedId = id;
+          state.selectedIds = [id];
         }
       }),
     setSelectedPointIndex: (index) => set({ selectedPointIndex: index }),
@@ -321,6 +353,7 @@ export const useStudioStore = create<StudioState>()(
         state.fps = project.fps;
         state.currentTime = 0;
         state.selectedId = project.nodeOrder[0] || 'frame-1';
+        state.selectedIds = project.nodeOrder[0] ? [project.nodeOrder[0]] : [];
         state.selectedTrackId = null;
         state.toastMessage = `Loaded project: ${project.name}`;
         state.toastType = 'success';
@@ -354,60 +387,147 @@ export const useStudioStore = create<StudioState>()(
         state.currentTime = 0;
         state.duration = 3.0;
         state.selectedId = 'frame-1';
+        state.selectedIds = ['frame-1'];
         state.selectedTrackId = null;
         state.toastMessage = 'Created new project';
         state.toastType = 'info';
       }),
 
-    duplicateSelected: () =>
+    groupSelected: () =>
       set((state) => {
-        const id = state.selectedId;
-        if (!id || id === 'frame-1' || !state.nodes[id]) return;
+        const validIds = state.selectedIds.filter((id) => id !== 'frame-1' && state.nodes[id]);
+        if (validIds.length < 2) return;
         pushDraftSnapshot(state);
 
-        const srcNode = state.nodes[id];
-        const newId = `node-${Date.now()}`;
-        const cloned: SceneNode = JSON.parse(JSON.stringify(srcNode));
-        cloned.id = newId;
-        cloned.name = `${srcNode.name} Copy`;
-        cloned.x += 20;
-        cloned.y += 20;
+        let minX = Infinity;
+        let minY = Infinity;
+        let maxX = -Infinity;
+        let maxY = -Infinity;
 
-        state.nodes[newId] = cloned;
-        state.nodeOrder.push(newId);
-        state.selectedId = newId;
-        state.toastMessage = `Duplicated ${srcNode.name}`;
+        for (const id of validIds) {
+          const n = state.nodes[id];
+          minX = Math.min(minX, n.x);
+          minY = Math.min(minY, n.y);
+          maxX = Math.max(maxX, n.x + n.width);
+          maxY = Math.max(maxY, n.y + n.height);
+        }
+
+        const groupId = `group-${Date.now()}`;
+        const groupNode: SceneNode = {
+          id: groupId,
+          name: 'Group',
+          type: 'group',
+          visible: true,
+          locked: false,
+          x: minX,
+          y: minY,
+          width: Math.max(20, maxX - minX),
+          height: Math.max(20, maxY - minY),
+          rotation: 0,
+          scaleX: 1,
+          scaleY: 1,
+          opacity: 1,
+          borderRadius: 0,
+          fill: 'transparent',
+          childrenIds: [...validIds],
+          tracks: []
+        };
+
+        for (const id of validIds) {
+          state.nodes[id].parentId = groupId;
+        }
+
+        state.nodes[groupId] = groupNode;
+        state.nodeOrder = state.nodeOrder.filter((id) => !validIds.includes(id));
+        state.nodeOrder.push(groupId);
+        state.selectedId = groupId;
+        state.selectedIds = [groupId];
+        state.toastMessage = 'Grouped elements (Ctrl+G)';
+        state.toastType = 'info';
+      }),
+
+    ungroupSelected: () =>
+      set((state) => {
+        const id = state.selectedId;
+        if (!id || !state.nodes[id] || state.nodes[id].type !== 'group') return;
+        pushDraftSnapshot(state);
+
+        const group = state.nodes[id];
+        const children = group.childrenIds || [];
+
+        for (const childId of children) {
+          if (state.nodes[childId]) {
+            state.nodes[childId].parentId = null;
+            if (!state.nodeOrder.includes(childId)) {
+              state.nodeOrder.push(childId);
+            }
+          }
+        }
+
+        delete state.nodes[id];
+        state.nodeOrder = state.nodeOrder.filter((nId) => nId !== id);
+        state.selectedIds = [...children];
+        state.selectedId = children[0] || 'frame-1';
+        state.toastMessage = 'Ungrouped elements (Ctrl+Shift+G)';
+        state.toastType = 'info';
+      }),
+
+    duplicateSelected: () =>
+      set((state) => {
+        const idsToDuplicate = state.selectedIds.filter((id) => id !== 'frame-1' && state.nodes[id]);
+        if (idsToDuplicate.length === 0) return;
+        pushDraftSnapshot(state);
+
+        const newSelectedIds: string[] = [];
+        for (const id of idsToDuplicate) {
+          const srcNode = state.nodes[id];
+          const newId = `node-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`;
+          const cloned: SceneNode = JSON.parse(JSON.stringify(srcNode));
+          cloned.id = newId;
+          cloned.name = `${srcNode.name} Copy`;
+          cloned.x += 20;
+          cloned.y += 20;
+
+          state.nodes[newId] = cloned;
+          state.nodeOrder.push(newId);
+          newSelectedIds.push(newId);
+        }
+
+        state.selectedIds = newSelectedIds;
+        state.selectedId = newSelectedIds[0] || null;
+        state.toastMessage = `Duplicated ${idsToDuplicate.length} element(s)`;
         state.toastType = 'info';
       }),
 
     alignSelected: (type) =>
       set((state) => {
-        const id = state.selectedId;
-        if (!id || id === 'frame-1' || !state.nodes[id]) return;
+        const idsToAlign = state.selectedIds.filter((id) => id !== 'frame-1' && state.nodes[id]);
+        if (idsToAlign.length === 0) return;
         pushDraftSnapshot(state);
 
-        const node = state.nodes[id];
         const rf = state.rootFrame;
-
-        switch (type) {
-          case 'left':
-            node.x = 0;
-            break;
-          case 'center':
-            node.x = Math.round((rf.width - node.width) / 2);
-            break;
-          case 'right':
-            node.x = rf.width - node.width;
-            break;
-          case 'top':
-            node.y = 0;
-            break;
-          case 'middle':
-            node.y = Math.round((rf.height - node.height) / 2);
-            break;
-          case 'bottom':
-            node.y = rf.height - node.height;
-            break;
+        for (const id of idsToAlign) {
+          const node = state.nodes[id];
+          switch (type) {
+            case 'left':
+              node.x = 0;
+              break;
+            case 'center':
+              node.x = Math.round((rf.width - node.width) / 2);
+              break;
+            case 'right':
+              node.x = rf.width - node.width;
+              break;
+            case 'top':
+              node.y = 0;
+              break;
+            case 'middle':
+              node.y = Math.round((rf.height - node.height) / 2);
+              break;
+            case 'bottom':
+              node.y = rf.height - node.height;
+              break;
+          }
         }
       }),
 
@@ -431,6 +551,7 @@ export const useStudioStore = create<StudioState>()(
         state.nodes[node.id] = node;
         state.nodeOrder.push(node.id);
         state.selectedId = node.id;
+        state.selectedIds = [node.id];
         if (node.tracks?.length > 0) {
           state.selectedTrackId = node.tracks[0].id;
         }
@@ -442,7 +563,8 @@ export const useStudioStore = create<StudioState>()(
         pushDraftSnapshot(state);
         delete state.nodes[id];
         state.nodeOrder = state.nodeOrder.filter((nId) => nId !== id);
-        if (state.selectedId === id) state.selectedId = 'frame-1';
+        state.selectedIds = state.selectedIds.filter((sId) => sId !== id);
+        if (state.selectedId === id) state.selectedId = state.selectedIds[0] || 'frame-1';
       }),
 
     reorderNode: (sourceIndex, targetIndex) =>
