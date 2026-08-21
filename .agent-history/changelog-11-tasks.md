@@ -93,3 +93,10 @@
 - **Engine**: Built `detectAudioBeats` in `src/engine/audioEngine.ts` using sliding-window RMS energy spike thresholding.
 - **Timeline**: Rendered interactive marker flags on the Timeline Ruler, added "Add Marker (M)" toolbar button, and "Beats" auto-generation in the audio track header.
 - **Tests**: `src/engine/__tests__/markers.test.ts` (3/3 passing).
+
+### 18. Task: Rive-Style Multi-Document Browser Tab System (`feat/browser-tabs-system`)
+- **Data Model**: Added `DocumentTab` in `src/engine/types.ts` encapsulating Scene Graph (`rootFrame`, `nodes`, `nodeOrder`), History Stacks (`past`, `future`), Viewport State (`zoom`, `panX`, `panY`, `currentTime`, `selectedId`), and Extras (`audioTrack`, `markers`).
+- **Store Core**: Implemented `openNewTab`, `closeTab`, `switchTab`, `renameTab`, `duplicateTab`, `reorderTabs` in `src/store/useStudioStore.ts` with automatic state freezing & hydrating on tab transitions.
+- **UI Component**: Created `src/components/TabBar.tsx` featuring macOS window dots, OpenSVG branding, scrollable tabs with active state elevation, inline double-click rename, duplicate, close, and `+` new tab button.
+- **Keyboard Shortcuts**: Added `Ctrl+T` (New Tab), `Ctrl+W` (Close Tab), `Ctrl+Tab` / `Ctrl+Shift+Tab` (Switch Tabs), `Ctrl+1..9` (Direct Tab Jump) in `src/hooks/useStudioShortcuts.ts`.
+- **Tests**: `src/engine/__tests__/tabs.test.ts` (9/9 passing, total 72/72 tests passing).
