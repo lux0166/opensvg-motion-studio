@@ -18,8 +18,11 @@ import {
   MousePointerClick,
   Zap,
   Plus,
-  Navigation
+  Navigation,
+  Pipette,
+  Palette
 } from 'lucide-react';
+import { generateColorHarmonies } from '../engine/colorHarmony';
 
 export const PropertiesPanel: React.FC = () => {
   const {
@@ -529,19 +532,117 @@ export const PropertiesPanel: React.FC = () => {
 
           {/* Solid Color */}
           {(!selectedNode.fillType || selectedNode.fillType === 'solid') && (
-            <div className="flex items-center justify-between p-2.5 bg-gray-50 rounded-xl border border-gray-200">
-              <div className="flex items-center gap-2.5">
-                <input
-                  type="color"
-                  value={selectedNode.fill}
-                  onChange={(e) => updateNode(selectedId, { fill: e.target.value })}
-                  className="w-7 h-7 rounded-lg border border-gray-300 cursor-pointer p-0 bg-transparent"
-                />
-                <span className="text-xs font-mono font-semibold text-gray-700 uppercase">
-                  {selectedNode.fill}
-                </span>
+            <div className="space-y-2">
+              <div className="flex items-center justify-between p-2.5 bg-gray-50 rounded-xl border border-gray-200">
+                <div className="flex items-center gap-2.5">
+                  <input
+                    type="color"
+                    value={selectedNode.fill.startsWith('#') ? selectedNode.fill : '#3b82f6'}
+                    onChange={(e) => updateNode(selectedId, { fill: e.target.value })}
+                    className="w-7 h-7 rounded-lg border border-gray-300 cursor-pointer p-0 bg-transparent"
+                  />
+                  <span className="text-xs font-mono font-semibold text-gray-700 uppercase">
+                    {selectedNode.fill}
+                  </span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <button
+                    title="Sample screen color (Eyedropper)"
+                    onClick={async () => {
+                      if ('EyeDropper' in window) {
+                        try {
+                          const eyeDropper = new (window as any).EyeDropper();
+                          const res = await eyeDropper.open();
+                          if (res && res.sRGBHex) {
+                            updateNode(selectedId, { fill: res.sRGBHex });
+                            showToast(`Sampled: ${res.sRGBHex}`, 'success');
+                          }
+                        } catch {
+                          // cancelled
+                        }
+                      } else {
+                        showToast('Eyedropper tool active', 'info');
+                      }
+                    }}
+                    className="p-1.5 text-gray-500 hover:text-blue-600 bg-white hover:bg-blue-50 border border-gray-200 rounded-lg transition-colors shadow-2xs"
+                  >
+                    <Pipette className="w-3.5 h-3.5" />
+                  </button>
+                  <span className="text-[10px] text-gray-400 font-medium">Pick</span>
+                </div>
               </div>
-              <span className="text-[11px] text-gray-400 font-medium">Hex Color</span>
+
+              {/* Color Harmonies Palette Generator */}
+              {selectedNode.fill.startsWith('#') && (
+                <div className="p-2.5 bg-gray-50/70 rounded-xl border border-gray-200/80 space-y-2">
+                  <div className="flex items-center gap-1 text-[10px] font-bold text-gray-500 uppercase tracking-wider">
+                    <Palette className="w-3 h-3 text-purple-500" /> Color Harmonies
+                  </div>
+                  {(() => {
+                    const harmonies = generateColorHarmonies(selectedNode.fill);
+                    return (
+                      <div className="space-y-1.5">
+                        <div className="flex items-center justify-between text-[10px] text-gray-500">
+                          <span>Complementary</span>
+                          <div className="flex gap-1">
+                            {harmonies.complementary.map((c, i) => (
+                              <button
+                                key={i}
+                                title={`Apply ${c}`}
+                                onClick={() => updateNode(selectedId, { fill: c })}
+                                style={{ backgroundColor: c }}
+                                className="w-4 h-4 rounded-md border border-black/10 shadow-2xs hover:scale-115 transition-transform"
+                              />
+                            ))}
+                          </div>
+                        </div>
+                        <div className="flex items-center justify-between text-[10px] text-gray-500">
+                          <span>Analogous</span>
+                          <div className="flex gap-1">
+                            {harmonies.analogous.map((c, i) => (
+                              <button
+                                key={i}
+                                title={`Apply ${c}`}
+                                onClick={() => updateNode(selectedId, { fill: c })}
+                                style={{ backgroundColor: c }}
+                                className="w-4 h-4 rounded-md border border-black/10 shadow-2xs hover:scale-115 transition-transform"
+                              />
+                            ))}
+                          </div>
+                        </div>
+                        <div className="flex items-center justify-between text-[10px] text-gray-500">
+                          <span>Triadic</span>
+                          <div className="flex gap-1">
+                            {harmonies.triadic.map((c, i) => (
+                              <button
+                                key={i}
+                                title={`Apply ${c}`}
+                                onClick={() => updateNode(selectedId, { fill: c })}
+                                style={{ backgroundColor: c }}
+                                className="w-4 h-4 rounded-md border border-black/10 shadow-2xs hover:scale-115 transition-transform"
+                              />
+                            ))}
+                          </div>
+                        </div>
+                        <div className="flex items-center justify-between text-[10px] text-gray-500">
+                          <span>Monochromatic</span>
+                          <div className="flex gap-1">
+                            {harmonies.monochromatic.map((c, i) => (
+                              <button
+                                key={i}
+                                title={`Apply ${c}`}
+                                onClick={() => updateNode(selectedId, { fill: c })}
+                                style={{ backgroundColor: c }}
+                                className="w-4 h-4 rounded-md border border-black/10 shadow-2xs hover:scale-115 transition-transform"
+                              />
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })()}
+                </div>
+              )}
             </div>
           )}
 
