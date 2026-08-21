@@ -1,4 +1,4 @@
-﻿import { create } from 'zustand';
+import { create } from 'zustand';
 import { immer } from 'zustand/middleware/immer';
 import { FrameNode, SceneNode, SceneProject, ToolMode, TimelineMode, BezierPoint, CubicBezierCurve } from '../engine/types';
 import { SnapLine } from '../engine/snapping';
@@ -31,6 +31,7 @@ interface StudioState {
   selectedTool: ToolMode;
   selectedId: string | null;
   selectedIds: string[];
+  selectedKeyframeIds: string[];
   selectedPointIndex: number | null;
   selectedTrackId: string | null;
   expandedNodeIds: Record<string, boolean>;
@@ -99,6 +100,9 @@ interface StudioState {
   updatePathPoint: (nodeId: string, index: number, updates: Partial<BezierPoint>) => void;
 
   // Keyframes
+  setSelectedKeyframeIds: (ids: string[]) => void;
+  toggleKeyframeSelection: (kfId: string, isShift: boolean) => void;
+  staggerSelectedKeyframes: (offsetStep?: number) => void;
   addOrUpdateKeyframe: (nodeId: string, property: string, time: number, value: any) => void;
   removeKeyframe: (nodeId: string, property: string, keyframeId: string) => void;
   updateKeyframeTime: (nodeId: string, property: string, keyframeId: string, newTime: number) => void;
@@ -126,6 +130,7 @@ export const useStudioStore = create<StudioState>()(
     selectedTool: 'select',
     selectedId: 'card',
     selectedIds: ['card'],
+    selectedKeyframeIds: [],
     selectedPointIndex: null,
     selectedTrackId: 'tr-rot',
     expandedNodeIds: { 'frame-1': true, card: true, ball: true },
@@ -588,6 +593,61 @@ export const useStudioStore = create<StudioState>()(
         const node = state.nodes[nodeId];
         if (!node || !node.pathPoints || !node.pathPoints[index]) return;
         Object.assign(node.pathPoints[index], updates);
+      }),
+
+    setSelectedKeyframeIds: (ids) => set({ selectedKeyframeIds: ids }),
+    toggleKeyframeSelection: (kfId, isShift) =>
+      set((state) => {
+        if (isShift) {
+          if (state.selectedKeyframeIds.includes(kfId)) {
+            state.selectedKeyframeIds = state.selectedKeyframeIds.filter((id) => id !== kfId);
+          } else {
+            state.selectedKeyframeIds.push(kfId);
+          }
+        } else {
+          state.selectedKeyframeIds = [kfId];
+        }
+      }),
+
+    staggerSelectedKeyframes: (offsetStep = 0.05) =>
+      set((state) => {
+        pushDraftSnapshot(state);
+
+        // If specific keyframes are selected, stagger them by selection order
+        if (state.selectedKeyframeIds.length > 1) {
+          let count = 0;
+          for (const kfId of state.selectedKeyframeIds) {
+            for (const n of Object.values(state.nodes)) {
+              for (const t of n.tracks || []) {
+                const kf = t.keyframes.find((k) => k.id === kfId);
+                if (kf) {
+                  kf.time = parseFloat(
+                    Math.max(0, Math.min(state.duration, kf.time + count * offsetStep)).toFixed(2)
+                  );
+                  t.keyframes.sort((a, b) => a.time - b.time);
+                  count++;
+                }
+              }
+            }
+          }
+          state.toastMessage = `Staggered ${count} keyframes by +${offsetStep}s`;
+          state.toastType = 'info';
+          return;
+        }
+
+        // Otherwise stagger tracks of the selected node
+        const node = state.selectedId ? state.nodes[state.selectedId] : null;
+        if (node && node.tracks && node.tracks.length > 1) {
+          node.tracks.forEach((track, index) => {
+            const shift = index * offsetStep;
+            track.keyframes.forEach((kf) => {
+              kf.time = parseFloat(Math.max(0, Math.min(state.duration, kf.time + shift)).toFixed(2));
+            });
+            track.keyframes.sort((a, b) => a.time - b.time);
+          });
+          state.toastMessage = `Staggered ${node.tracks.length} tracks by +${offsetStep}s`;
+          state.toastType = 'info';
+        }
       }),
 
     addOrUpdateKeyframe: (nodeId, property, time, value) =>

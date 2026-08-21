@@ -1,4 +1,4 @@
-﻿import React, { useRef, useEffect } from 'react';
+import React, { useRef, useEffect } from 'react';
 import { useStudioStore } from '../store/useStudioStore';
 import { EASING_CURVES } from '../engine/evaluator';
 import { CubicBezierCurve } from '../engine/types';
@@ -12,7 +12,8 @@ import {
   Gem,
   Activity,
   Layers as LayersIcon,
-  Sparkles
+  Sparkles,
+  Wand2
 } from 'lucide-react';
 
 export const Timeline: React.FC = () => {
@@ -32,6 +33,10 @@ export const Timeline: React.FC = () => {
     setSelectedId,
     selectedTrackId,
     setSelectedTrackId,
+    selectedKeyframeIds,
+    setSelectedKeyframeIds,
+    toggleKeyframeSelection,
+    staggerSelectedKeyframes,
     addOrUpdateKeyframe,
     updateKeyframeTime,
     updateKeyframeCurve,
@@ -104,15 +109,30 @@ export const Timeline: React.FC = () => {
     keyframeId: string
   ) => {
     startEvent.stopPropagation();
+    if (startEvent.shiftKey) {
+      toggleKeyframeSelection(keyframeId, true);
+      return;
+    }
+
+    if (!selectedKeyframeIds.includes(keyframeId)) {
+      setSelectedKeyframeIds([keyframeId]);
+    }
+
     if (!gridRef.current) return;
 
     const rect = gridRef.current.getBoundingClientRect();
+    const startClientX = startEvent.clientX;
+    const initialTrack = nodes[nodeId]?.tracks?.find((t) => t.property === property);
+    const initialKf = initialTrack?.keyframes?.find((k) => k.id === keyframeId);
+    const initialTime = initialKf?.time || 0;
 
     const onMove = (moveEv: MouseEvent) => {
-      const offsetX = Math.max(0, Math.min(rect.width, moveEv.clientX - rect.left));
-      const newTime = (offsetX / rect.width) * duration;
+      const dx = moveEv.clientX - startClientX;
+      const dt = (dx / rect.width) * duration;
+      const newTime = Math.max(0, Math.min(duration, parseFloat((initialTime + dt).toFixed(2))));
+
       updateKeyframeTime(nodeId, property, keyframeId, newTime);
-      setCurrentTime(parseFloat(newTime.toFixed(2)));
+      setCurrentTime(newTime);
     };
 
     const onUp = () => {
@@ -234,6 +254,16 @@ export const Timeline: React.FC = () => {
             <span className="text-gray-400">/</span>
             <span className="text-gray-500">{duration.toFixed(2)} s</span>
           </div>
+
+          {/* Stagger Keyframes Action Button */}
+          <button
+            title="Stagger Animation Tracks (+0.05s cascade)"
+            onClick={() => staggerSelectedKeyframes(0.05)}
+            className="flex items-center gap-1.5 bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-200 px-2.5 py-1 rounded-lg text-xs font-semibold transition-all active:scale-95 shadow-xs"
+          >
+            <Wand2 className="w-3.5 h-3.5 text-amber-600" />
+            <span>Stagger Tracks</span>
+          </button>
         </div>
 
         {/* Mode Switcher: Dopesheet vs Graph Editor */}
@@ -386,13 +416,18 @@ export const Timeline: React.FC = () => {
                         {track.keyframes.map((kf) => {
                           const kfPos = (kf.time / duration) * 100;
                           const isCurrent = Math.abs(currentTime - kf.time) < 0.04;
+                          const isSelected = selectedKeyframeIds.includes(kf.id);
                           return (
                             <div
                               key={kf.id}
-                              title={`${track.label}: ${kf.value}${track.unit} at ${kf.time}s (Drag to move)`}
+                              title={`${track.label}: ${kf.value}${track.unit} at ${kf.time}s (Shift+Click to multi-select, Drag to move)`}
                               onMouseDown={(e) => handleKeyframeDrag(e, node.id, track.property, kf.id)}
-                              className={`keyframe-diamond absolute w-2.5 h-2.5 bg-gray-700 rounded-xs cursor-ew-resize shadow-sm ${
-                                isCurrent ? 'active' : ''
+                              className={`keyframe-diamond absolute w-2.5 h-2.5 rounded-xs cursor-ew-resize shadow-sm transition-transform ${
+                                isSelected
+                                  ? 'bg-amber-400 border border-amber-600 scale-125 z-10'
+                                  : isCurrent
+                                  ? 'active bg-blue-600'
+                                  : 'bg-gray-700'
                               }`}
                               style={{ left: `${kfPos}%`, top: '50%' }}
                             />
