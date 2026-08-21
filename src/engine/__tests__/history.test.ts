@@ -1,4 +1,4 @@
-﻿import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import { useStudioStore } from '../../store/useStudioStore';
 import { createStudioSnapshot } from '../history';
 
@@ -55,7 +55,7 @@ describe('Studio History & Undo/Redo Engine', () => {
       }
     };
 
-    const snap = createStudioSnapshot(rf, nodes, ['card'], 'card');
+    const snap = createStudioSnapshot(rf, nodes, ['card']);
     nodes.card.x = 999;
 
     expect(snap.nodes.card.x).toBe(10);

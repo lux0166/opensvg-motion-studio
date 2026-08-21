@@ -6,7 +6,7 @@ import { StudioSnapshot, createStudioSnapshot, MAX_HISTORY_STEPS } from '../engi
 import { BooleanOpType, executeBooleanOperation } from '../engine/booleanOps';
 
 function pushDraftSnapshot(state: any) {
-  const snap = createStudioSnapshot(state.rootFrame, state.nodes, state.nodeOrder, state.selectedId, state.selectedIds);
+  const snap = createStudioSnapshot(state.rootFrame, state.nodes, state.nodeOrder);
   state.past.push(snap);
   if (state.past.length > MAX_HISTORY_STEPS) {
     state.past.shift();
@@ -284,15 +284,19 @@ export const useStudioStore = create<StudioState>()(
     undo: () =>
       set((state) => {
         if (state.past.length === 0) return;
-        const current = createStudioSnapshot(state.rootFrame, state.nodes, state.nodeOrder, state.selectedId, state.selectedIds);
+        const current = createStudioSnapshot(state.rootFrame, state.nodes, state.nodeOrder);
         state.future.push(current);
 
         const previous = state.past.pop()!;
         state.rootFrame = previous.rootFrame;
         state.nodes = previous.nodes;
         state.nodeOrder = previous.nodeOrder;
-        state.selectedId = previous.selectedId;
-        state.selectedIds = previous.selectedIds || (previous.selectedId ? [previous.selectedId] : []);
+
+        // Keep selection valid (fallback if current selected node was deleted in previous state)
+        if (state.selectedId && !state.nodes[state.selectedId] && state.selectedId !== 'frame-1') {
+          state.selectedId = state.nodeOrder[0] || 'frame-1';
+          state.selectedIds = state.nodeOrder[0] ? [state.nodeOrder[0]] : [];
+        }
         state.toastMessage = 'Undo';
         state.toastType = 'info';
       }),
@@ -300,15 +304,19 @@ export const useStudioStore = create<StudioState>()(
     redo: () =>
       set((state) => {
         if (state.future.length === 0) return;
-        const current = createStudioSnapshot(state.rootFrame, state.nodes, state.nodeOrder, state.selectedId, state.selectedIds);
+        const current = createStudioSnapshot(state.rootFrame, state.nodes, state.nodeOrder);
         state.past.push(current);
 
         const next = state.future.pop()!;
         state.rootFrame = next.rootFrame;
         state.nodes = next.nodes;
         state.nodeOrder = next.nodeOrder;
-        state.selectedId = next.selectedId;
-        state.selectedIds = next.selectedIds || (next.selectedId ? [next.selectedId] : []);
+
+        // Keep selection valid
+        if (state.selectedId && !state.nodes[state.selectedId] && state.selectedId !== 'frame-1') {
+          state.selectedId = state.nodeOrder[0] || 'frame-1';
+          state.selectedIds = state.nodeOrder[0] ? [state.nodeOrder[0]] : [];
+        }
         state.toastMessage = 'Redo';
         state.toastType = 'info';
       }),
