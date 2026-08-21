@@ -76,3 +76,20 @@
 - **Engine**: Refactored `StudioSnapshot` in `src/engine/history.ts` to only track canonical Document Scene Graph (`rootFrame`, `nodes`, `nodeOrder`), excluding ephemeral UI selection state (Constitution Rule 82).
 - **Store**: Updated `undo()` and `redo()` in `src/store/useStudioStore.ts` with graceful selection preservation fallback.
 - **Tests**: `src/engine/__tests__/history.test.ts` (3/3 passing).
+
+### 15. Task B1: Vector Motion Path & Auto-Orientation (`feat/motion-path`)
+- **Engine**: Implemented `evaluateMotionPath` and `evaluateCubicSegment` in `src/engine/motionPath.ts` calculating arc-length positions and tangent derivative vectors \(B'(u)\) with angle \(\theta = \text{atan2}(dy, dx)\).
+- **Evaluator**: Updated `evaluateNode` to link with target vector path layers and auto-rotate when `autoOrient: true`.
+- **UI**: Added "Motion Path & Trajectory" section in `src/components/PropertiesPanel.tsx`.
+- **Tests**: `src/engine/__tests__/motionPath.test.ts` (4/4 passing).
+
+### 16. Task B2: Color Palette Generator & Eyedropper Tool (`feat/palette-eyedropper`)
+- **Engine**: Created `src/engine/colorHarmony.ts` implementing pure mathematical color transformations (Complementary, Analogous, Triadic, Tetradic, Monochromatic).
+- **Eyedropper**: Integrated screen color sampling with native `EyeDropper` API.
+- **UI**: Added "Color Harmonies" palette section in `src/components/PropertiesPanel.tsx`.
+- **Tests**: `src/engine/__tests__/colorHarmony.test.ts` (3/3 passing).
+
+### 17. Task B3: Timeline Markers & Audio Beat Detection (`feat/timeline-markers-beat`)
+- **Engine**: Built `detectAudioBeats` in `src/engine/audioEngine.ts` using sliding-window RMS energy spike thresholding.
+- **Timeline**: Rendered interactive marker flags on the Timeline Ruler, added "Add Marker (M)" toolbar button, and "Beats" auto-generation in the audio track header.
+- **Tests**: `src/engine/__tests__/markers.test.ts` (3/3 passing).
