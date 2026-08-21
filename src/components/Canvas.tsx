@@ -3,7 +3,8 @@ import { useStudioStore } from '../store/useStudioStore';
 import { evaluateNode } from '../engine/evaluator';
 import { renderCanvasScene, MarqueeRect } from '../engine/renderer';
 import { computeSnapping } from '../engine/snapping';
-import { Minus, Plus, Maximize2, Square } from 'lucide-react';
+import { importSvgString } from '../engine/svgImporter';
+import { Minus, Plus, Maximize2, Square, UploadCloud } from 'lucide-react';
 
 export const Canvas: React.FC = () => {
   const {
@@ -43,6 +44,7 @@ export const Canvas: React.FC = () => {
   const [isSpacePressed, setIsSpacePressed] = useState(false);
   const [marqueeRect, setMarqueeRect] = useState<MarqueeRect | null>(null);
   const [editingTextId, setEditingTextId] = useState<string | null>(null);
+  const [isDraggingFile, setIsDraggingFile] = useState(false);
 
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
@@ -540,6 +542,37 @@ export const Canvas: React.FC = () => {
     }
   };
 
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDraggingFile(false);
+
+    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+      const file = e.dataTransfer.files[0];
+      if (file.name.endsWith('.svg') || file.type === 'image/svg+xml') {
+        const reader = new FileReader();
+        reader.onload = (ev) => {
+          const svgContent = ev.target?.result as string;
+          if (svgContent) {
+            try {
+              const { nodes: imported } = importSvgString(svgContent);
+              if (imported.length > 0) {
+                for (const node of imported) {
+                  addNode(node);
+                }
+                setSelectedIds(imported.map((n) => n.id));
+                setSelectedId(imported[0].id);
+                showToast(`Imported ${imported.length} vector elements from ${file.name}`);
+              }
+            } catch (err) {
+              showToast('Failed to parse SVG file', 'error');
+            }
+          }
+        };
+        reader.readAsText(file);
+      }
+    }
+  };
+
   return (
     <section
       ref={containerRef}
@@ -548,10 +581,26 @@ export const Canvas: React.FC = () => {
       onMouseMove={handleMouseMove}
       onMouseUp={handleMouseUp}
       onWheel={handleWheel}
+      onDragOver={(e) => {
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'copy';
+        setIsDraggingFile(true);
+      }}
+      onDragLeave={() => setIsDraggingFile(false)}
+      onDrop={handleDrop}
       className={`flex-1 relative flex items-center justify-center overflow-hidden bg-[#f1f2f5] select-none ${
         isPanning || isSpacePressed ? 'cursor-grab active:cursor-grabbing' : 'cursor-default'
       }`}
     >
+      {/* Drag & Drop Visual Dropzone Overlay */}
+      {isDraggingFile && (
+        <div className="absolute inset-6 z-50 bg-blue-500/10 backdrop-blur-xs border-2 border-dashed border-blue-500 rounded-3xl flex flex-col items-center justify-center text-blue-600 gap-3 pointer-events-none shadow-2xl">
+          <UploadCloud className="w-12 h-12 animate-bounce text-blue-500" />
+          <div className="text-sm font-bold text-blue-700">Drop SVG file here to import layers</div>
+          <div className="text-xs text-blue-500">Vector paths, rects, circles and texts will be imported</div>
+        </div>
+      )}
+
       <div
         className="relative transition-transform duration-75 origin-center"
         style={{

@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useStudioStore } from '../store/useStudioStore';
 import { ToolMode } from '../engine/types';
 import { openProjectFromFile, serializeProject } from '../engine/projectManager';
+import { importSvgString } from '../engine/svgImporter';
 import {
   Compass,
   MousePointer,
@@ -20,6 +21,7 @@ import {
   FolderOpen,
   Save,
   FilePlus,
+  UploadCloud,
   ChevronDown
 } from 'lucide-react';
 
@@ -117,6 +119,37 @@ export const Header: React.FC = () => {
     setFileMenuOpen(false);
   };
 
+  const handleImportSvg = () => {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = '.svg,image/svg+xml';
+    input.onchange = (e) => {
+      const file = (e.target as HTMLInputElement).files?.[0];
+      if (file) {
+        const reader = new FileReader();
+        reader.onload = (ev) => {
+          const svgContent = ev.target?.result as string;
+          if (svgContent) {
+            try {
+              const { nodes: imported } = importSvgString(svgContent);
+              if (imported.length > 0) {
+                for (const node of imported) {
+                  addNode(node);
+                }
+                showToast(`Imported ${imported.length} vector elements!`);
+              }
+            } catch {
+              showToast('Failed to parse SVG file', 'error');
+            }
+          }
+        };
+        reader.readAsText(file);
+      }
+    };
+    input.click();
+    setFileMenuOpen(false);
+  };
+
   return (
     <header className="h-16 flex items-center justify-between px-6 border-b border-app-border shrink-0 z-10 bg-white/80 backdrop-blur-md select-none">
       {/* Brand & File Menu */}
@@ -151,6 +184,13 @@ export const Header: React.FC = () => {
             >
               <FolderOpen className="w-4 h-4 text-blue-500" />
               Open File (.kinetic)
+            </button>
+            <button
+              onClick={handleImportSvg}
+              className="flex items-center gap-2.5 px-3 py-2 text-xs font-semibold text-gray-700 hover:bg-gray-100 rounded-xl transition-colors text-left"
+            >
+              <UploadCloud className="w-4 h-4 text-purple-500" />
+              Import SVG Asset...
             </button>
             <button
               onClick={handleSaveProject}
