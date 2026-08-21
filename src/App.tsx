@@ -1,6 +1,7 @@
 import React, { useEffect } from 'react';
 import { useStudioStore } from './store/useStudioStore';
 import { useStudioShortcuts } from './hooks/useStudioShortcuts';
+import { TabBar } from './components/TabBar';
 import { Header } from './components/Header';
 import { Canvas } from './components/Canvas';
 import { LayersPanel } from './components/LayersPanel';
@@ -30,6 +31,7 @@ export const App: React.FC = () => {
 
       {/* Main Studio Frame Window */}
       <div className="bg-app-bg rounded-3xl shadow-soft border border-app-border flex-1 flex flex-col overflow-hidden relative">
+        <TabBar />
         <Header />
 
         <main className="flex-1 flex overflow-hidden relative">

@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { immer } from 'zustand/middleware/immer';
-import { FrameNode, SceneNode, SceneProject, ToolMode, TimelineMode, BezierPoint, CubicBezierCurve, AudioTrackConfig, NodeTrigger, TimelineMarker } from '../engine/types';
+import { FrameNode, SceneNode, SceneProject, ToolMode, TimelineMode, BezierPoint, CubicBezierCurve, AudioTrackConfig, NodeTrigger, TimelineMarker, DocumentTab } from '../engine/types';
 import { SnapLine } from '../engine/snapping';
 import { StudioSnapshot, createStudioSnapshot, MAX_HISTORY_STEPS } from '../engine/history';
 import { BooleanOpType, executeBooleanOperation } from '../engine/booleanOps';
@@ -13,6 +13,178 @@ function pushDraftSnapshot(state: any) {
     state.past.shift();
   }
   state.future = [];
+}
+
+export function createDefaultTab(id = `tab-${Date.now()}`, title = 'moon_scan'): DocumentTab {
+  const rootFrame: FrameNode = {
+    id: 'frame-1',
+    name: title,
+    type: 'frame',
+    visible: true,
+    locked: false,
+    clipContent: true,
+    canvasBg: '#18191d',
+    x: 0,
+    y: 0,
+    width: 600,
+    height: 400,
+    rotation: 0,
+    scaleX: 1,
+    scaleY: 1,
+    opacity: 1,
+    borderRadius: 0,
+    fill: '#ffffff',
+    tracks: []
+  };
+
+  const cardNode: SceneNode = {
+    id: 'card',
+    name: 'Card Container',
+    type: 'rect',
+    visible: true,
+    locked: false,
+    x: 150,
+    y: 75,
+    width: 300,
+    height: 250,
+    rotation: 0,
+    scaleX: 1,
+    scaleY: 1,
+    opacity: 1,
+    borderRadius: 24,
+    fill: '#8b5cf6',
+    tracks: [
+      {
+        id: 'tr-rot',
+        property: 'rotation',
+        label: 'Rotation',
+        unit: '°',
+        color: '#8b5cf6',
+        keyframes: [
+          { id: 'k1', time: 0.0, value: 0, curve: { x1: 0.42, y1: 0, x2: 0.58, y2: 1 } },
+          { id: 'k2', time: 1.5, value: 180, curve: { x1: 0.42, y1: 0, x2: 0.58, y2: 1 } },
+          { id: 'k3', time: 3.0, value: 360, curve: { x1: 0.42, y1: 0, x2: 0.58, y2: 1 } }
+        ]
+      }
+    ]
+  };
+
+  const ballNode: SceneNode = {
+    id: 'ball',
+    name: 'Neon Ball',
+    type: 'circle',
+    visible: true,
+    locked: false,
+    x: 250,
+    y: 150,
+    width: 100,
+    height: 100,
+    rotation: 0,
+    scaleX: 1,
+    scaleY: 1,
+    opacity: 1,
+    borderRadius: 9999,
+    fill: '#10b981',
+    tracks: [
+      {
+        id: 'tr-scale',
+        property: 'scaleX',
+        label: 'Pulse Scale',
+        unit: 'x',
+        color: '#10b981',
+        keyframes: [
+          { id: 'bsk1', time: 0.0, value: 1.0, curve: { x1: 0.34, y1: 1.56, x2: 0.64, y2: 1 } },
+          { id: 'bsk2', time: 1.5, value: 1.4, curve: { x1: 0.34, y1: 1.56, x2: 0.64, y2: 1 } },
+          { id: 'bsk3', time: 3.0, value: 1.0, curve: { x1: 0.34, y1: 1.56, x2: 0.64, y2: 1 } }
+        ]
+      }
+    ]
+  };
+
+  return {
+    id,
+    title,
+    isDirty: false,
+    createdAt: Date.now(),
+    project: {
+      id: `proj-${id}`,
+      name: title,
+      version: '1.0.0',
+      duration: 3.0,
+      fps: 60,
+      rootFrame,
+      nodes: { card: cardNode, ball: ballNode },
+      nodeOrder: ['card', 'ball']
+    },
+    history: {
+      past: [],
+      future: []
+    },
+    viewport: {
+      zoom: 0.56,
+      panX: 0,
+      panY: 0,
+      currentTime: 1.05,
+      selectedId: 'card',
+      selectedIds: ['card']
+    },
+    audioTrack: null,
+    markers: [
+      { id: 'm-start', time: 0.0, label: 'Start', color: '#10b981' },
+      { id: 'm-drop', time: 1.5, label: 'Drop', color: '#f59e0b' }
+    ]
+  };
+}
+
+function syncCurrentTabState(state: any) {
+  const currentTab = state.tabs.find((t: any) => t.id === state.activeTabId);
+  if (currentTab) {
+    currentTab.title = state.rootFrame.name || currentTab.title;
+    currentTab.project = {
+      id: currentTab.project?.id || `proj-${currentTab.id}`,
+      name: state.rootFrame.name || currentTab.title,
+      version: '1.0.0',
+      duration: state.duration,
+      fps: state.fps,
+      rootFrame: state.rootFrame,
+      nodes: state.nodes,
+      nodeOrder: state.nodeOrder
+    };
+    currentTab.history = {
+      past: [...state.past],
+      future: [...state.future]
+    };
+    currentTab.viewport = {
+      zoom: state.zoom,
+      panX: state.panX,
+      panY: state.panY,
+      currentTime: state.currentTime,
+      selectedId: state.selectedId,
+      selectedIds: [...state.selectedIds]
+    };
+    currentTab.audioTrack = state.audioTrack;
+    currentTab.markers = [...state.markers];
+  }
+}
+
+function loadTabState(state: any, targetTab: DocumentTab) {
+  state.activeTabId = targetTab.id;
+  state.rootFrame = targetTab.project.rootFrame;
+  state.nodes = targetTab.project.nodes;
+  state.nodeOrder = targetTab.project.nodeOrder;
+  state.duration = targetTab.project.duration;
+  state.fps = targetTab.project.fps;
+  state.past = targetTab.history.past ? [...targetTab.history.past] : [];
+  state.future = targetTab.history.future ? [...targetTab.history.future] : [];
+  state.zoom = targetTab.viewport.zoom ?? 0.56;
+  state.panX = targetTab.viewport.panX ?? 0;
+  state.panY = targetTab.viewport.panY ?? 0;
+  state.currentTime = targetTab.viewport.currentTime ?? 0;
+  state.selectedId = targetTab.viewport.selectedId ?? null;
+  state.selectedIds = targetTab.viewport.selectedIds ? [...targetTab.viewport.selectedIds] : [];
+  state.audioTrack = targetTab.audioTrack;
+  state.markers = targetTab.markers ? [...targetTab.markers] : [];
+  state.isPlaying = false;
 }
 
 interface StudioState {
@@ -122,6 +294,16 @@ interface StudioState {
   removeMarker: (id: string) => void;
   generateMarkersFromAudioBeats: () => void;
 
+  // Browser Tabs Management
+  tabs: DocumentTab[];
+  activeTabId: string;
+  openNewTab: (title?: string, project?: SceneProject) => void;
+  closeTab: (tabId: string) => void;
+  switchTab: (tabId: string) => void;
+  renameTab: (tabId: string, newTitle: string) => void;
+  duplicateTab: (tabId: string) => void;
+  reorderTabs: (sourceIndex: number, destinationIndex: number) => void;
+
   // Interactive State Machine Triggers
   addTrigger: (nodeId: string, trigger: NodeTrigger) => void;
   removeTrigger: (nodeId: string, triggerId: string) => void;
@@ -132,8 +314,13 @@ interface StudioState {
   showToast: (msg: string, type?: 'success' | 'info' | 'error') => void;
 }
 
+const initialTab = createDefaultTab('tab-default', 'moon_scan');
+
 export const useStudioStore = create<StudioState>()(
   immer((set, get) => ({
+    tabs: [initialTab],
+    activeTabId: initialTab.id,
+
     isPlaying: false,
     currentTime: 1.05,
     duration: 3.0,
@@ -838,6 +1025,125 @@ export const useStudioStore = create<StudioState>()(
         }));
         state.toastMessage = `Detected ${beats.length} beats and created markers`;
         state.toastType = 'success';
+      }),
+
+    // Browser Tabs Management Actions
+    openNewTab: (title, project) =>
+      set((state) => {
+        syncCurrentTabState(state);
+        const newId = `tab-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`;
+        const newTitle = title || `Composition ${state.tabs.length + 1}`;
+        let newTab: DocumentTab;
+
+        if (project) {
+          newTab = {
+            id: newId,
+            title: newTitle,
+            isDirty: false,
+            createdAt: Date.now(),
+            project,
+            history: { past: [], future: [] },
+            viewport: {
+              zoom: 0.56,
+              panX: 0,
+              panY: 0,
+              currentTime: 0.0,
+              selectedId: project.nodeOrder[0] || null,
+              selectedIds: project.nodeOrder[0] ? [project.nodeOrder[0]] : []
+            },
+            audioTrack: null,
+            markers: []
+          };
+        } else {
+          newTab = createDefaultTab(newId, newTitle);
+          newTab.project.nodes = {};
+          newTab.project.nodeOrder = [];
+          newTab.viewport.selectedId = 'frame-1';
+          newTab.viewport.selectedIds = ['frame-1'];
+          newTab.markers = [];
+        }
+
+        state.tabs.push(newTab);
+        loadTabState(state, newTab);
+        state.toastMessage = `Opened tab: ${newTab.title}`;
+        state.toastType = 'info';
+      }),
+
+    closeTab: (tabId) =>
+      set((state) => {
+        if (state.tabs.length <= 1) {
+          const freshTab = createDefaultTab(`tab-${Date.now()}`, 'Composition 1');
+          freshTab.project.nodes = {};
+          freshTab.project.nodeOrder = [];
+          freshTab.viewport.selectedId = 'frame-1';
+          freshTab.viewport.selectedIds = ['frame-1'];
+          freshTab.markers = [];
+          state.tabs = [freshTab];
+          loadTabState(state, freshTab);
+          state.toastMessage = 'Reset to new composition';
+          state.toastType = 'info';
+          return;
+        }
+
+        const closeIdx = state.tabs.findIndex((t) => t.id === tabId);
+        if (closeIdx === -1) return;
+
+        const isClosingActive = state.activeTabId === tabId;
+        state.tabs.splice(closeIdx, 1);
+
+        if (isClosingActive) {
+          const nextIdx = Math.min(closeIdx, state.tabs.length - 1);
+          const nextTab = state.tabs[nextIdx];
+          loadTabState(state, nextTab);
+        }
+      }),
+
+    switchTab: (tabId) =>
+      set((state) => {
+        if (state.activeTabId === tabId) return;
+        const targetTab = state.tabs.find((t) => t.id === tabId);
+        if (!targetTab) return;
+
+        syncCurrentTabState(state);
+        loadTabState(state, targetTab);
+      }),
+
+    renameTab: (tabId, newTitle) =>
+      set((state) => {
+        const tab = state.tabs.find((t) => t.id === tabId);
+        if (tab) {
+          tab.title = newTitle.trim() || 'Untitled';
+          if (state.activeTabId === tabId) {
+            state.rootFrame.name = tab.title;
+          }
+        }
+      }),
+
+    duplicateTab: (tabId) =>
+      set((state) => {
+        const sourceTab = state.tabs.find((t) => t.id === tabId);
+        if (!sourceTab) return;
+        syncCurrentTabState(state);
+
+        const newId = `tab-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`;
+        const newTab: DocumentTab = JSON.parse(JSON.stringify(sourceTab));
+        newTab.id = newId;
+        newTab.title = `${sourceTab.title} (Copy)`;
+        newTab.createdAt = Date.now();
+        newTab.history = { past: [], future: [] };
+
+        state.tabs.push(newTab);
+        loadTabState(state, newTab);
+        state.toastMessage = `Duplicated tab: ${newTab.title}`;
+        state.toastType = 'success';
+      }),
+
+    reorderTabs: (sourceIndex, destinationIndex) =>
+      set((state) => {
+        const [moved] = state.tabs.splice(sourceIndex, 1);
+        if (moved) {
+          state.tabs.splice(destinationIndex, 0, moved);
+        }
       }),
 
     addTrigger: (nodeId, trigger) =>

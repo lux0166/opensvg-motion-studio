@@ -215,3 +215,25 @@ export interface TimelineMarker {
   label: string;
   color?: string;
 }
+
+export interface DocumentTab {
+  id: string;
+  title: string;
+  isDirty?: boolean;
+  createdAt: number;
+  project: SceneProject;
+  history: {
+    past: any[];
+    future: any[];
+  };
+  viewport: {
+    zoom: number;
+    panX: number;
+    panY: number;
+    currentTime: number;
+    selectedId: string | null;
+    selectedIds: string[];
+  };
+  audioTrack: AudioTrackConfig | null;
+  markers: TimelineMarker[];
+}

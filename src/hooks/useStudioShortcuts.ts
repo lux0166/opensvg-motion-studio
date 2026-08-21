@@ -24,6 +24,11 @@ export function useStudioShortcuts() {
     nodeOrder,
     duration,
     fps,
+    tabs,
+    activeTabId,
+    openNewTab,
+    closeTab,
+    switchTab,
     showToast
   } = useStudioStore();
 
@@ -36,6 +41,40 @@ export function useStudioShortcuts() {
         activeEl?.isContentEditable;
 
       const isCtrlOrCmd = e.ctrlKey || e.metaKey;
+
+      // 0. Browser Tab Shortcuts: Ctrl+T (New), Ctrl+W (Close), Ctrl+Tab (Switch), Ctrl+1..9 (Jump)
+      if (isCtrlOrCmd && e.key.toLowerCase() === 't' && !e.shiftKey) {
+        e.preventDefault();
+        openNewTab();
+        return;
+      }
+
+      if (isCtrlOrCmd && e.key.toLowerCase() === 'w') {
+        e.preventDefault();
+        closeTab(activeTabId);
+        return;
+      }
+
+      if (isCtrlOrCmd && e.key === 'Tab') {
+        e.preventDefault();
+        const currentIdx = tabs.findIndex((t) => t.id === activeTabId);
+        if (currentIdx !== -1 && tabs.length > 1) {
+          const nextIdx = e.shiftKey
+            ? (currentIdx - 1 + tabs.length) % tabs.length
+            : (currentIdx + 1) % tabs.length;
+          switchTab(tabs[nextIdx].id);
+        }
+        return;
+      }
+
+      if (isCtrlOrCmd && /^[1-9]$/.test(e.key)) {
+        const targetIdx = parseInt(e.key, 10) - 1;
+        if (targetIdx < tabs.length) {
+          e.preventDefault();
+          switchTab(tabs[targetIdx].id);
+          return;
+        }
+      }
 
       // 1. Undo: Ctrl+Z / Cmd+Z
       if (isCtrlOrCmd && e.key.toLowerCase() === 'z' && !e.shiftKey) {
