@@ -1,5 +1,6 @@
 import React, { useEffect } from 'react';
 import { useStudioStore } from './store/useStudioStore';
+import { useStudioShortcuts } from './hooks/useStudioShortcuts';
 import { Header } from './components/Header';
 import { Canvas } from './components/Canvas';
 import { LayersPanel } from './components/LayersPanel';
@@ -9,6 +10,9 @@ import { ExportModal } from './components/ExportModal';
 
 export const App: React.FC = () => {
   const { toastMessage, showToast } = useStudioStore();
+
+  // Activate studio keyboard shortcuts (Ctrl+Z, Ctrl+Y, Space, V, P, T, Delete, Ctrl+S)
+  useStudioShortcuts();
 
   useEffect(() => {
     showToast('OpenSVG Motion Studio Initialized');

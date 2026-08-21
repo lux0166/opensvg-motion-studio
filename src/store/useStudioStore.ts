@@ -1,7 +1,17 @@
-import { create } from 'zustand';
+﻿import { create } from 'zustand';
 import { immer } from 'zustand/middleware/immer';
 import { FrameNode, SceneNode, SceneProject, ToolMode, TimelineMode, BezierPoint, CubicBezierCurve } from '../engine/types';
 import { SnapLine } from '../engine/snapping';
+import { StudioSnapshot, createStudioSnapshot, MAX_HISTORY_STEPS } from '../engine/history';
+
+function pushDraftSnapshot(state: any) {
+  const snap = createStudioSnapshot(state.rootFrame, state.nodes, state.nodeOrder, state.selectedId);
+  state.past.push(snap);
+  if (state.past.length > MAX_HISTORY_STEPS) {
+    state.past.shift();
+  }
+  state.future = [];
+}
 
 interface StudioState {
   // Playback
@@ -26,6 +36,10 @@ interface StudioState {
 
   // Snapping
   activeSnapLines: SnapLine[];
+
+  // History Time-travel
+  past: StudioSnapshot[];
+  future: StudioSnapshot[];
 
   // Scene Graph
   rootFrame: FrameNode;
@@ -53,16 +67,22 @@ interface StudioState {
   setActiveSnapLines: (lines: SnapLine[]) => void;
   toggleNodeExpand: (id: string) => void;
 
+  // History Actions
+  pushSnapshot: () => void;
+  undo: () => void;
+  redo: () => void;
+
   // Project Management
   loadProject: (project: SceneProject) => void;
   createNewProject: () => void;
 
-  // Alignments
+  // Alignments & Duplicate
   alignSelected: (type: 'left' | 'center' | 'right' | 'top' | 'middle' | 'bottom') => void;
+  duplicateSelected: () => void;
 
   // Scene manipulation
   updateRootFrame: (updates: Partial<FrameNode>) => void;
-  updateNode: (id: string, updates: Partial<SceneNode>) => void;
+  updateNode: (id: string, updates: Partial<SceneNode>, recordHistory?: boolean) => void;
   addNode: (node: SceneNode) => void;
   deleteNode: (id: string) => void;
   reorderNode: (sourceIndex: number, targetIndex: number) => void;
@@ -103,6 +123,9 @@ export const useStudioStore = create<StudioState>()(
     expandedNodeIds: { 'frame-1': true, card: true, ball: true },
 
     activeSnapLines: [],
+
+    past: [],
+    future: [],
 
     rootFrame: {
       id: 'frame-1',
@@ -227,6 +250,42 @@ export const useStudioStore = create<StudioState>()(
     toastMessage: null,
     toastType: 'info',
 
+    // History implementation
+    pushSnapshot: () =>
+      set((state) => {
+        pushDraftSnapshot(state);
+      }),
+
+    undo: () =>
+      set((state) => {
+        if (state.past.length === 0) return;
+        const current = createStudioSnapshot(state.rootFrame, state.nodes, state.nodeOrder, state.selectedId);
+        state.future.push(current);
+
+        const previous = state.past.pop()!;
+        state.rootFrame = previous.rootFrame;
+        state.nodes = previous.nodes;
+        state.nodeOrder = previous.nodeOrder;
+        state.selectedId = previous.selectedId;
+        state.toastMessage = 'Undo';
+        state.toastType = 'info';
+      }),
+
+    redo: () =>
+      set((state) => {
+        if (state.future.length === 0) return;
+        const current = createStudioSnapshot(state.rootFrame, state.nodes, state.nodeOrder, state.selectedId);
+        state.past.push(current);
+
+        const next = state.future.pop()!;
+        state.rootFrame = next.rootFrame;
+        state.nodes = next.nodes;
+        state.nodeOrder = next.nodeOrder;
+        state.selectedId = next.selectedId;
+        state.toastMessage = 'Redo';
+        state.toastType = 'info';
+      }),
+
     // Action implementations
     setPlaying: (playing) => set({ isPlaying: playing }),
     setCurrentTime: (time) => set({ currentTime: Math.max(0, Math.min(get().duration, time)) }),
@@ -254,6 +313,7 @@ export const useStudioStore = create<StudioState>()(
 
     loadProject: (project) =>
       set((state) => {
+        pushDraftSnapshot(state);
         state.rootFrame = project.rootFrame;
         state.nodes = project.nodes;
         state.nodeOrder = project.nodeOrder;
@@ -268,6 +328,7 @@ export const useStudioStore = create<StudioState>()(
 
     createNewProject: () =>
       set((state) => {
+        pushDraftSnapshot(state);
         state.rootFrame = {
           id: 'frame-1',
           name: 'New Project',
@@ -298,10 +359,33 @@ export const useStudioStore = create<StudioState>()(
         state.toastType = 'info';
       }),
 
+    duplicateSelected: () =>
+      set((state) => {
+        const id = state.selectedId;
+        if (!id || id === 'frame-1' || !state.nodes[id]) return;
+        pushDraftSnapshot(state);
+
+        const srcNode = state.nodes[id];
+        const newId = `node-${Date.now()}`;
+        const cloned: SceneNode = JSON.parse(JSON.stringify(srcNode));
+        cloned.id = newId;
+        cloned.name = `${srcNode.name} Copy`;
+        cloned.x += 20;
+        cloned.y += 20;
+
+        state.nodes[newId] = cloned;
+        state.nodeOrder.push(newId);
+        state.selectedId = newId;
+        state.toastMessage = `Duplicated ${srcNode.name}`;
+        state.toastType = 'info';
+      }),
+
     alignSelected: (type) =>
       set((state) => {
         const id = state.selectedId;
         if (!id || id === 'frame-1' || !state.nodes[id]) return;
+        pushDraftSnapshot(state);
+
         const node = state.nodes[id];
         const rf = state.rootFrame;
 
@@ -329,18 +413,21 @@ export const useStudioStore = create<StudioState>()(
 
     updateRootFrame: (updates) =>
       set((state) => {
+        pushDraftSnapshot(state);
         Object.assign(state.rootFrame, updates);
       }),
 
-    updateNode: (id, updates) =>
+    updateNode: (id, updates, recordHistory = false) =>
       set((state) => {
         if (state.nodes[id]) {
+          if (recordHistory) pushDraftSnapshot(state);
           Object.assign(state.nodes[id], updates);
         }
       }),
 
     addNode: (node) =>
       set((state) => {
+        pushDraftSnapshot(state);
         state.nodes[node.id] = node;
         state.nodeOrder.push(node.id);
         state.selectedId = node.id;
@@ -351,6 +438,8 @@ export const useStudioStore = create<StudioState>()(
 
     deleteNode: (id) =>
       set((state) => {
+        if (id === 'frame-1') return;
+        pushDraftSnapshot(state);
         delete state.nodes[id];
         state.nodeOrder = state.nodeOrder.filter((nId) => nId !== id);
         if (state.selectedId === id) state.selectedId = 'frame-1';
@@ -358,12 +447,14 @@ export const useStudioStore = create<StudioState>()(
 
     reorderNode: (sourceIndex, targetIndex) =>
       set((state) => {
+        pushDraftSnapshot(state);
         const [moved] = state.nodeOrder.splice(sourceIndex, 1);
         state.nodeOrder.splice(targetIndex, 0, moved);
       }),
 
     addPathPoint: (nodeId, point) =>
       set((state) => {
+        pushDraftSnapshot(state);
         const node = state.nodes[nodeId];
         if (!node) return;
         if (!node.pathPoints) node.pathPoints = [];
@@ -379,6 +470,7 @@ export const useStudioStore = create<StudioState>()(
 
     addOrUpdateKeyframe: (nodeId, property, time, value) =>
       set((state) => {
+        pushDraftSnapshot(state);
         const node = state.nodes[nodeId];
         if (!node) return;
 
@@ -411,6 +503,7 @@ export const useStudioStore = create<StudioState>()(
 
     removeKeyframe: (nodeId, property, keyframeId) =>
       set((state) => {
+        pushDraftSnapshot(state);
         const node = state.nodes[nodeId];
         if (!node) return;
         const track = node.tracks.find((t) => t.property === property);
@@ -435,6 +528,7 @@ export const useStudioStore = create<StudioState>()(
 
     updateKeyframeCurve: (nodeId, property, keyframeId, curve) =>
       set((state) => {
+        pushDraftSnapshot(state);
         const node = state.nodes[nodeId];
         if (!node) return;
         const track = node.tracks.find((t) => t.property === property);

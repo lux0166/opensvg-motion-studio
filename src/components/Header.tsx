@@ -1,4 +1,4 @@
-﻿import React, { useState } from 'react';
+import React, { useState } from 'react';
 import { useStudioStore } from '../store/useStudioStore';
 import { ToolMode } from '../engine/types';
 import { openProjectFromFile, serializeProject } from '../engine/projectManager';
@@ -37,6 +37,10 @@ export const Header: React.FC = () => {
     fps,
     loadProject,
     createNewProject,
+    undo,
+    redo,
+    past,
+    future,
     showToast
   } = useStudioStore();
 
@@ -251,15 +255,17 @@ export const Header: React.FC = () => {
 
         <button
           title="Undo (Ctrl+Z)"
-          onClick={() => showToast('Undo')}
-          className="w-9 h-9 rounded-full flex items-center justify-center text-gray-500 hover:text-gray-900 hover:bg-white transition-all"
+          onClick={undo}
+          disabled={past.length === 0}
+          className="w-9 h-9 rounded-full flex items-center justify-center text-gray-500 hover:text-gray-900 hover:bg-white transition-all disabled:opacity-30 disabled:pointer-events-none"
         >
           <RotateCcw className="w-3.5 h-3.5" />
         </button>
         <button
-          title="Redo (Ctrl+Y)"
-          onClick={() => showToast('Redo')}
-          className="w-9 h-9 rounded-full flex items-center justify-center text-gray-500 hover:text-gray-900 hover:bg-white transition-all"
+          title="Redo (Ctrl+Y / Ctrl+Shift+Z)"
+          onClick={redo}
+          disabled={future.length === 0}
+          className="w-9 h-9 rounded-full flex items-center justify-center text-gray-500 hover:text-gray-900 hover:bg-white transition-all disabled:opacity-30 disabled:pointer-events-none"
         >
           <RotateCw className="w-3.5 h-3.5" />
         </button>
