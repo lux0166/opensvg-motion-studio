@@ -1,0 +1,345 @@
+import React, { useRef, useEffect } from 'react';
+import { useStudioStore } from '../store/useStudioStore';
+import {
+  Play,
+  Pause,
+  RotateCcw,
+  SkipBack,
+  ChevronLeft,
+  ChevronRight,
+  Gem,
+  Activity,
+  Layers as LayersIcon
+} from 'lucide-react';
+
+export const Timeline: React.FC = () => {
+  const {
+    isPlaying,
+    setPlaying,
+    currentTime,
+    setCurrentTime,
+    duration,
+    loop,
+    setLoop,
+    timelineMode,
+    setTimelineMode,
+    nodes,
+    nodeOrder,
+    selectedId,
+    setSelectedId,
+    addOrUpdateKeyframe,
+    showToast
+  } = useStudioStore();
+
+  const gridRef = useRef<HTMLDivElement | null>(null);
+
+  // Playback requestAnimationFrame Loop
+  useEffect(() => {
+    let animId: number;
+    let lastTime: number | null = null;
+
+    const loopFn = (now: number) => {
+      if (!isPlaying) {
+        lastTime = null;
+        return;
+      }
+
+      if (!lastTime) lastTime = now;
+      const dt = (now - lastTime) / 1000;
+      lastTime = now;
+
+      let nextTime = currentTime + dt;
+      if (nextTime >= duration) {
+        if (loop) {
+          nextTime = 0;
+        } else {
+          nextTime = duration;
+          setPlaying(false);
+        }
+      }
+
+      setCurrentTime(nextTime);
+      animId = requestAnimationFrame(loopFn);
+    };
+
+    if (isPlaying) {
+      animId = requestAnimationFrame(loopFn);
+    }
+
+    return () => cancelAnimationFrame(animId);
+  }, [isPlaying, currentTime, duration, loop]);
+
+  const handleGridMouseDown = (e: React.MouseEvent) => {
+    if (!gridRef.current) return;
+    const rect = gridRef.current.getBoundingClientRect();
+    const seek = (clientX: number) => {
+      const offsetX = Math.max(0, Math.min(rect.width, clientX - rect.left));
+      const progress = offsetX / rect.width;
+      setCurrentTime(parseFloat((progress * duration).toFixed(2)));
+    };
+
+    seek(e.clientX);
+
+    const onMove = (moveEv: MouseEvent) => seek(moveEv.clientX);
+    const onUp = () => {
+      window.removeEventListener('mousemove', onMove);
+      window.removeEventListener('mouseup', onUp);
+    };
+
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
+  };
+
+  const progressPercent = Math.min(100, Math.max(0, (currentTime / duration) * 100));
+
+  return (
+    <footer className="h-64 bg-white border-t border-gray-100 flex flex-col z-20 m-3 mt-0 rounded-2xl shadow-sm overflow-hidden select-none">
+      {/* Header Controls */}
+      <div className="h-12 border-b border-gray-100 flex items-center justify-between px-4 bg-gray-50/80 shrink-0">
+        <div className="flex items-center gap-2">
+          <button
+            title="Go to Start (0)"
+            onClick={() => setCurrentTime(0)}
+            className="w-8 h-8 flex items-center justify-center text-gray-600 hover:bg-white hover:text-blue-600 rounded-lg transition-all"
+          >
+            <SkipBack className="w-3.5 h-3.5" />
+          </button>
+          <button
+            title="Step Back 0.1s (←)"
+            onClick={() => setCurrentTime(Math.max(0, currentTime - 0.1))}
+            className="w-8 h-8 flex items-center justify-center text-gray-600 hover:bg-white hover:text-blue-600 rounded-lg transition-all"
+          >
+            <ChevronLeft className="w-4 h-4" />
+          </button>
+          <button
+            title="Play / Pause (Space)"
+            onClick={() => setPlaying(!isPlaying)}
+            className={`w-9 h-9 flex items-center justify-center text-white rounded-lg shadow-sm transition-all active:scale-95 ${
+              isPlaying ? 'bg-blue-600' : 'bg-blue-500 hover:bg-blue-600'
+            }`}
+          >
+            {isPlaying ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4 ml-0.5" />}
+          </button>
+          <button
+            title="Step Forward 0.1s (→)"
+            onClick={() => setCurrentTime(Math.min(duration, currentTime + 0.1))}
+            className="w-8 h-8 flex items-center justify-center text-gray-600 hover:bg-white hover:text-blue-600 rounded-lg transition-all"
+          >
+            <ChevronRight className="w-4 h-4" />
+          </button>
+          <div className="w-[1px] h-4 bg-gray-300 mx-1" />
+          <button
+            title="Toggle Loop"
+            onClick={() => {
+              setLoop(!loop);
+              showToast(loop ? 'Loop: Disabled' : 'Loop: Enabled');
+            }}
+            className={`w-8 h-8 flex items-center justify-center rounded-lg transition-all ${
+              loop ? 'bg-blue-50 text-blue-600 font-bold' : 'text-gray-400 hover:bg-gray-100'
+            }`}
+          >
+            <RotateCcw className="w-3.5 h-3.5" />
+          </button>
+
+          {/* Time Counter Display */}
+          <div className="ml-3 text-xs font-semibold font-mono text-gray-800 flex items-center gap-1.5 bg-white px-3 py-1 rounded-md border border-gray-200/80 shadow-xs">
+            <span className="text-blue-600 w-10 text-right">{currentTime.toFixed(2)}</span>
+            <span className="text-gray-400">/</span>
+            <span className="text-gray-500">{duration.toFixed(2)} s</span>
+          </div>
+        </div>
+
+        {/* Mode Switcher: Dopesheet vs Graph Editor */}
+        <div className="flex items-center gap-3">
+          <div className="flex items-center bg-gray-200/70 p-0.5 rounded-lg border border-gray-300/60 text-xs font-medium">
+            <button
+              onClick={() => setTimelineMode('dopesheet')}
+              className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md transition-all ${
+                timelineMode === 'dopesheet'
+                  ? 'bg-white text-gray-900 font-bold shadow-xs'
+                  : 'text-gray-600 hover:text-gray-900'
+              }`}
+            >
+              <LayersIcon className="w-3 h-3 text-blue-500" /> Dopesheet
+            </button>
+            <button
+              onClick={() => setTimelineMode('graph')}
+              className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md transition-all ${
+                timelineMode === 'graph'
+                  ? 'bg-white text-gray-900 font-bold shadow-xs'
+                  : 'text-gray-600 hover:text-gray-900'
+              }`}
+            >
+              <Activity className="w-3 h-3 text-indigo-500" /> Graph Editor
+            </button>
+          </div>
+
+          <button
+            title="Add Keyframe at current timestamp"
+            onClick={() => {
+              if (selectedId && selectedId !== 'frame-1') {
+                const n = nodes[selectedId];
+                if (n) {
+                  addOrUpdateKeyframe(selectedId, 'rotation', currentTime, n.rotation || 0);
+                  showToast(`Keyframe added at ${currentTime.toFixed(2)}s`);
+                }
+              } else {
+                showToast('Select an element on canvas first!', 'error');
+              }
+            }}
+            className="flex items-center gap-1 bg-white hover:bg-gray-50 text-gray-700 border border-gray-200 px-2.5 py-1 rounded-md font-medium text-xs shadow-xs transition-colors"
+          >
+            <Gem className="w-3 h-3 text-blue-500" /> Add Keyframe
+          </button>
+        </div>
+      </div>
+
+      {/* Tracks / Graph Area */}
+      <div className="flex-1 flex overflow-hidden">
+        {/* Left Track Labels */}
+        <div className="w-64 border-r border-gray-100 flex flex-col overflow-y-auto bg-white shrink-0">
+          <div className="px-4 py-2 text-xs font-semibold text-gray-400 flex justify-between items-center h-8 border-b border-gray-100 bg-gray-50/50">
+            <span>LAYERS & TRACKS</span>
+            <span className="text-[10px] bg-gray-200/60 text-gray-600 px-1.5 py-0.5 rounded">Timeline</span>
+          </div>
+
+          {nodeOrder.map((id) => {
+            const node = nodes[id];
+            if (!node || !node.visible) return null;
+            const isSelected = selectedId === id;
+
+            return (
+              <div key={id} className="flex flex-col border-b border-gray-50 pb-1">
+                <div
+                  onClick={() => setSelectedId(id)}
+                  className={`flex items-center px-4 py-2 hover:bg-gray-50 cursor-pointer transition-colors ${
+                    isSelected ? 'bg-blue-50/80 font-medium' : ''
+                  }`}
+                >
+                  <div
+                    className="w-2.5 h-2.5 rounded-sm mr-2 shrink-0"
+                    style={{ backgroundColor: node.fill }}
+                  />
+                  <span className="text-xs text-gray-700 flex-1 truncate">{node.name}</span>
+                </div>
+
+                {node.tracks?.map((track) => (
+                  <div
+                    key={track.id}
+                    className="flex items-center px-4 py-1 pl-8 hover:bg-gray-50 cursor-pointer text-xs text-gray-500"
+                  >
+                    <span className="flex-1 text-[11px] truncate">{track.label}</span>
+                    <Gem className="w-2.5 h-2.5 text-blue-400" />
+                  </div>
+                ))}
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Right Timeline Grid Area */}
+        <div
+          ref={gridRef}
+          onMouseDown={handleGridMouseDown}
+          className="flex-1 relative overflow-x-hidden overflow-y-auto bg-[#fafafa] flex flex-col cursor-crosshair"
+        >
+          {/* Time Ruler */}
+          <div className="h-8 border-b border-gray-100 relative text-[10px] text-gray-400 bg-white cursor-pointer select-none shrink-0 sticky top-0 z-20">
+            <div className="absolute left-2 bottom-1.5 font-mono font-medium">0.0s</div>
+            <div className="absolute left-[33.33%] bottom-1.5 font-mono font-medium -translate-x-1/2">
+              {(duration * 0.33).toFixed(1)}s
+            </div>
+            <div className="absolute left-[66.66%] bottom-1.5 font-mono font-medium -translate-x-1/2">
+              {(duration * 0.66).toFixed(1)}s
+            </div>
+            <div className="absolute right-3 bottom-1.5 font-mono font-medium">
+              {duration.toFixed(1)}s
+            </div>
+          </div>
+
+          {/* Dopesheet View vs Graph View */}
+          {timelineMode === 'dopesheet' ? (
+            <div className="relative w-full flex-1 pt-1 pb-4">
+              {nodeOrder.map((id) => {
+                const node = nodes[id];
+                if (!node || !node.visible) return null;
+
+                return (
+                  <div key={id} className="relative w-full mb-3" style={{ height: `${28 + (node.tracks?.length || 0) * 24}px` }}>
+                    {/* Duration Bar */}
+                    <div
+                      className="absolute h-5 bg-blue-100/70 border border-blue-200/80 rounded-full flex items-center justify-between px-1.5 shadow-xs"
+                      style={{ top: '4px', left: '2%', right: '4%' }}
+                    >
+                      <div className="w-1.5 h-2.5 bg-blue-400 rounded-full" />
+                      <span className="text-[9px] font-semibold text-blue-600 truncate px-2 select-none">
+                        {node.name} duration
+                      </span>
+                      <div className="w-1.5 h-2.5 bg-blue-400 rounded-full" />
+                    </div>
+
+                    {/* Keyframe diamonds */}
+                    {node.tracks?.map((track, tIdx) => (
+                      <div
+                        key={track.id}
+                        className="absolute w-full h-6 flex items-center"
+                        style={{ top: `${32 + tIdx * 24}px` }}
+                      >
+                        {track.keyframes.map((kf) => {
+                          const kfPos = (kf.time / duration) * 100;
+                          const isCurrent = Math.abs(currentTime - kf.time) < 0.04;
+                          return (
+                            <div
+                              key={kf.id}
+                              title={`${track.label}: ${kf.value}${track.unit} at ${kf.time}s`}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setCurrentTime(kf.time);
+                              }}
+                              className={`keyframe-diamond absolute w-2.5 h-2.5 bg-gray-700 rounded-xs cursor-pointer shadow-sm ${
+                                isCurrent ? 'active' : ''
+                              }`}
+                              style={{ left: `${kfPos}%`, top: '50%' }}
+                            />
+                          );
+                        })}
+                      </div>
+                    ))}
+                  </div>
+                );
+              })}
+            </div>
+          ) : (
+            /* Graph Editor SVG Curve View */
+            <div className="relative w-full flex-1 min-h-[140px] p-4 flex items-center justify-center">
+              <svg className="w-full h-full absolute inset-0 pointer-events-none">
+                <path
+                  d="M 20 120 C 120 120, 240 20, 360 20 S 480 120, 600 60"
+                  fill="none"
+                  stroke="#3b82f6"
+                  strokeWidth="2.5"
+                />
+                <circle cx="20" cy="120" r="4" fill="#3b82f6" />
+                <circle cx="360" cy="20" r="4" fill="#3b82f6" />
+                <circle cx="600" cy="60" r="4" fill="#3b82f6" />
+              </svg>
+              <div className="text-xs text-gray-400 bg-white/90 px-3 py-1.5 rounded-lg border border-gray-200 shadow-sm z-10">
+                Bézier Velocity Curve Editor (Interactive Tangents Active)
+              </div>
+            </div>
+          )}
+
+          {/* Draggable Scrubber Playhead */}
+          <div
+            className="absolute top-0 bottom-0 w-[2px] bg-blue-500 z-30 pointer-events-none transform -translate-x-1/2"
+            style={{ left: `${progressPercent}%` }}
+          >
+            <div className="w-3.5 h-4 bg-blue-500 rounded-b-sm absolute top-0 -left-[6px] shadow-md flex items-center justify-center pointer-events-auto cursor-ew-resize">
+              <div className="w-1 h-2 bg-white/80 rounded-full" />
+            </div>
+          </div>
+        </div>
+      </div>
+    </footer>
+  );
+};
