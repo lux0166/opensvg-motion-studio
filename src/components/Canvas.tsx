@@ -4,6 +4,7 @@ import { evaluateNode } from '../engine/evaluator';
 import { renderCanvasScene, MarqueeRect } from '../engine/renderer';
 import { computeSnapping } from '../engine/snapping';
 import { importSvgString } from '../engine/svgImporter';
+import { handleNodeTriggerEvent } from '../engine/stateMachine';
 import { Minus, Plus, Maximize2, Square, UploadCloud } from 'lucide-react';
 
 export const Canvas: React.FC = () => {
@@ -11,7 +12,10 @@ export const Canvas: React.FC = () => {
     rootFrame,
     nodes,
     nodeOrder,
+    isPlaying,
+    setPlaying,
     currentTime,
+    setCurrentTime,
     selectedId,
     selectedIds,
     setSelectedId,
@@ -210,6 +214,17 @@ export const Canvas: React.FC = () => {
     }
 
     if (clickedId) {
+      // Execute Interactive Triggers
+      if (nodes[clickedId]) {
+        handleNodeTriggerEvent(nodes[clickedId], 'onClick', {
+          setCurrentTime,
+          setPlaying,
+          updateNode,
+          showToast,
+          isPlaying
+        });
+      }
+
       if (e.shiftKey) {
         toggleSelectId(clickedId, true);
       } else {

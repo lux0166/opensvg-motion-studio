@@ -14,7 +14,10 @@ import {
   Type,
   Sparkles,
   Scissors,
-  Layers
+  Layers,
+  MousePointerClick,
+  Zap,
+  Plus
 } from 'lucide-react';
 
 export const PropertiesPanel: React.FC = () => {
@@ -25,6 +28,8 @@ export const PropertiesPanel: React.FC = () => {
     selectedIds,
     alignSelected,
     applyBooleanOp,
+    addTrigger,
+    removeTrigger,
     updateRootFrame,
     updateNode,
     deleteNode,
@@ -797,6 +802,62 @@ export const PropertiesPanel: React.FC = () => {
                 onChange={(e) => updateNode(selectedId, { filterBlur: parseInt(e.target.value) || 0 })}
               />
             </div>
+          </div>
+        </div>
+
+        {/* Interactivity & State Machine Triggers */}
+        <div>
+          <div className="flex justify-between items-center mb-2">
+            <label className="text-[11px] text-gray-400 font-semibold uppercase tracking-wider flex items-center gap-1.5">
+              <Zap className="w-3 h-3 text-amber-500" /> Triggers & Events
+            </label>
+            <button
+              title="Add Click Trigger (Jump to 0.0s)"
+              onClick={() => {
+                const newTrigger = {
+                  id: `trig-${Date.now()}`,
+                  event: 'onClick' as const,
+                  action: 'jumpToTime' as const,
+                  targetTime: 0.0
+                };
+                addTrigger(selectedId, newTrigger);
+              }}
+              className="flex items-center gap-1 text-[10px] font-bold text-blue-600 hover:text-blue-700 bg-blue-50 hover:bg-blue-100 px-2 py-0.5 rounded-md transition-colors shadow-xs"
+            >
+              <Plus className="w-3 h-3" /> Add Trigger
+            </button>
+          </div>
+
+          <div className="flex flex-col gap-2">
+            {(!selectedNode.triggers || selectedNode.triggers.length === 0) ? (
+              <div className="p-3 bg-gray-50 rounded-xl border border-gray-200/80 text-[11px] text-gray-400 flex items-center gap-2">
+                <MousePointerClick className="w-3.5 h-3.5 text-gray-400" />
+                <span>No triggers added. Add interactive hover or click actions.</span>
+              </div>
+            ) : (
+              selectedNode.triggers.map((trig) => (
+                <div
+                  key={trig.id}
+                  className="p-2.5 bg-gray-50 rounded-xl border border-gray-200 flex items-center justify-between gap-2 text-xs"
+                >
+                  <div className="flex flex-col">
+                    <span className="font-bold text-gray-800 text-[11px] uppercase">
+                      {trig.event}
+                    </span>
+                    <span className="text-[10px] text-gray-500 font-mono">
+                      → {trig.action}{trig.action === 'jumpToTime' ? ` (${trig.targetTime}s)` : ''}
+                    </span>
+                  </div>
+                  <button
+                    title="Remove Trigger"
+                    onClick={() => removeTrigger(selectedId, trig.id)}
+                    className="text-gray-400 hover:text-red-500 p-1 rounded hover:bg-red-50 transition-colors"
+                  >
+                    <Trash2 className="w-3 h-3" />
+                  </button>
+                </div>
+              ))
+            )}
           </div>
         </div>
 

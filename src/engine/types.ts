@@ -141,6 +141,20 @@ export interface BaseNode {
 
   // Animation tracks
   tracks: PropertyTrack<any>[];
+
+  // Interactive State Machine Triggers
+  triggers?: NodeTrigger[];
+}
+
+export type TriggerEvent = 'onClick' | 'onHoverEnter' | 'onHoverLeave';
+export type TriggerActionType = 'jumpToTime' | 'togglePlay' | 'setProperties' | 'play';
+
+export interface NodeTrigger {
+  id: string;
+  event: TriggerEvent;
+  action: TriggerActionType;
+  targetTime?: number; // for jumpToTime
+  propertyUpdates?: Partial<BaseNode>; // for setProperties
 }
 
 export interface FrameNode extends BaseNode {

@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { immer } from 'zustand/middleware/immer';
-import { FrameNode, SceneNode, SceneProject, ToolMode, TimelineMode, BezierPoint, CubicBezierCurve, AudioTrackConfig } from '../engine/types';
+import { FrameNode, SceneNode, SceneProject, ToolMode, TimelineMode, BezierPoint, CubicBezierCurve, AudioTrackConfig, NodeTrigger } from '../engine/types';
 import { SnapLine } from '../engine/snapping';
 import { StudioSnapshot, createStudioSnapshot, MAX_HISTORY_STEPS } from '../engine/history';
 import { BooleanOpType, executeBooleanOperation } from '../engine/booleanOps';
@@ -114,6 +114,10 @@ interface StudioState {
   audioTrack: AudioTrackConfig | null;
   setAudioTrack: (track: AudioTrackConfig | null) => void;
   updateAudioTrack: (updates: Partial<AudioTrackConfig>) => void;
+
+  // Interactive State Machine Triggers
+  addTrigger: (nodeId: string, trigger: NodeTrigger) => void;
+  removeTrigger: (nodeId: string, triggerId: string) => void;
 
   // Modals & Feedback
   setExportOpen: (open: boolean) => void;
@@ -768,6 +772,27 @@ export const useStudioStore = create<StudioState>()(
         if (state.audioTrack) {
           Object.assign(state.audioTrack, updates);
         }
+      }),
+
+    addTrigger: (nodeId, trigger) =>
+      set((state) => {
+        pushDraftSnapshot(state);
+        const node = state.nodes[nodeId];
+        if (!node) return;
+        if (!node.triggers) node.triggers = [];
+        node.triggers.push(trigger);
+        state.toastMessage = `Added ${trigger.event} trigger`;
+        state.toastType = 'success';
+      }),
+
+    removeTrigger: (nodeId, triggerId) =>
+      set((state) => {
+        pushDraftSnapshot(state);
+        const node = state.nodes[nodeId];
+        if (!node || !node.triggers) return;
+        node.triggers = node.triggers.filter((t) => t.id !== triggerId);
+        state.toastMessage = 'Removed trigger';
+        state.toastType = 'info';
       }),
 
     setExportOpen: (open) => set({ isExportOpen: open }),
