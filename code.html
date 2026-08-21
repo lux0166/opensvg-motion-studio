@@ -1,0 +1,1639 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta content="width=device-width, initial-scale=1.0" name="viewport">
+  <title>OpenSVG Animation Studio - Interactive Editor</title>
+  <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+    body {
+      font-family: 'Inter', sans-serif;
+      background-color: #f1f2f5;
+      user-select: none;
+    }
+    .font-mono {
+      font-family: 'JetBrains Mono', monospace;
+    }
+    
+    /* Custom Scrollbar */
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: transparent;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #d1d5db;
+      border-radius: 3px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: #9ca3af;
+    }
+
+    /* Range Slider */
+    input[type=range] {
+      -webkit-appearance: none;
+      width: 100%;
+      background: transparent;
+    }
+    input[type=range]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      height: 14px;
+      width: 14px;
+      border-radius: 50%;
+      background: #3b82f6;
+      cursor: pointer;
+      margin-top: -5px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+    }
+    input[type=range]::-webkit-slider-runnable-track {
+      width: 100%;
+      height: 4px;
+      cursor: pointer;
+      background: #e5e7eb;
+      border-radius: 2px;
+    }
+
+    /* Canvas selection handles */
+    .selection-ring {
+      outline: 2px solid #3b82f6;
+      outline-offset: 2px;
+    }
+    .handle {
+      position: absolute;
+      width: 8px;
+      height: 8px;
+      background: white;
+      border: 2px solid #3b82f6;
+      border-radius: 2px;
+    }
+    .handle-tl { top: -5px; left: -5px; cursor: nwse-resize; }
+    .handle-tr { top: -5px; right: -5px; cursor: nesw-resize; }
+    .handle-bl { bottom: -5px; left: -5px; cursor: nesw-resize; }
+    .handle-br { bottom: -5px; right: -5px; cursor: nwse-resize; }
+
+    /* Timeline Keyframe Diamond */
+    .keyframe-diamond {
+      transform: translate(-50%, -50%) rotate(45deg);
+      transition: transform 0.15s, background-color 0.15s;
+    }
+    .keyframe-diamond:hover {
+      transform: translate(-50%, -50%) rotate(45deg) scale(1.3);
+    }
+    .keyframe-diamond.active {
+      background-color: #3b82f6 !important;
+      box-shadow: 0 0 6px rgba(59, 130, 246, 0.8);
+    }
+
+    /* Modal Animation */
+    .modal-enter {
+      animation: modalFadeIn 0.2s ease-out forwards;
+    }
+    @keyframes modalFadeIn {
+      from { opacity: 0; transform: scale(0.95); }
+      to { opacity: 1; transform: scale(1); }
+    }
+  </style>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            app: {
+              bg: '#f1f2f5',
+              surface: '#ffffff',
+              border: '#e5e7eb',
+              text: '#111827',
+              textMuted: '#6b7280',
+              primary: '#3b82f6',
+              primaryHover: '#2563eb',
+              toolbar: '#f9fafb'
+            }
+          },
+          boxShadow: {
+            'soft': '0 8px 30px -4px rgba(0, 0, 0, 0.08)',
+            'inner-soft': 'inset 0 2px 4px 0 rgba(0, 0, 0, 0.03)'
+          }
+        }
+      }
+    }
+  </script>
+</head>
+<body class="h-screen w-full flex flex-col overflow-hidden text-sm text-app-text antialiased select-none">
+  <!-- Toast Notification -->
+  <div id="toast" class="fixed top-6 right-6 z-50 bg-gray-900 text-white px-4 py-2.5 rounded-xl shadow-lg flex items-center gap-3 transition-all duration-300 transform translate-y-[-100px] opacity-0 pointer-events-none">
+    <i id="toast-icon" class="fa-solid fa-circle-check text-green-400"></i>
+    <span id="toast-msg" class="text-xs font-medium">Notification message</span>
+  </div>
+
+  <!-- BEGIN: Main Layout -->
+  <div class="flex-1 flex flex-col p-2 md:p-4 lg:p-6 overflow-hidden">
+    <div class="bg-app-bg rounded-3xl shadow-soft border border-app-border flex-1 flex flex-col overflow-hidden relative">
+      
+      <!-- BEGIN: Top Toolbar -->
+      <header class="h-16 flex items-center justify-between px-6 border-b border-app-border shrink-0 z-10 bg-white/80 backdrop-blur-md">
+        <!-- Logo & Project -->
+        <div class="flex items-center gap-3">
+          <button id="btn-home" class="bg-white px-4 py-2 rounded-full shadow-sm font-semibold flex items-center gap-2 hover:bg-gray-50 border border-gray-100 transition-all active:scale-95">
+            <i class="fa-solid fa-compass text-blue-600"></i>
+            <span class="bg-gradient-to-r from-gray-900 to-gray-700 bg-clip-text text-transparent font-bold">OpenSVG</span>
+          </button>
+          <span class="text-xs bg-blue-50 text-blue-600 font-medium px-2.5 py-1 rounded-full border border-blue-100 hidden sm:inline-block">Studio Pro</span>
+        </div>
+
+        <!-- Tool Group Center -->
+        <div class="flex items-center bg-gray-100/90 rounded-full p-1 shadow-inner border border-gray-200/80">
+          <button id="tool-select" data-tool="select" title="Select Tool (V)" class="tool-btn w-9 h-9 rounded-full flex items-center justify-center bg-blue-500 text-white shadow-sm transition-all duration-150">
+            <i class="fa-solid fa-arrow-pointer text-xs"></i>
+          </button>
+          <button id="tool-transform" data-tool="transform" title="Transform Tool (T)" class="tool-btn w-9 h-9 rounded-full flex items-center justify-center text-gray-600 hover:bg-white hover:text-gray-900 transition-all duration-150">
+            <i class="fa-solid fa-crop-simple text-xs"></i>
+          </button>
+          <button id="tool-frame" data-tool="frame" title="Frame Tool (F)" class="tool-btn w-9 h-9 rounded-full flex items-center justify-center text-gray-600 hover:bg-white hover:text-gray-900 transition-all duration-150">
+            <i class="fa-solid fa-vector-square text-xs"></i>
+          </button>
+          <button id="tool-pen" data-tool="pen" title="Pen Tool (P)" class="tool-btn w-9 h-9 rounded-full flex items-center justify-center text-gray-600 hover:bg-white hover:text-gray-900 transition-all duration-150">
+            <i class="fa-solid fa-pen-nib text-xs"></i>
+          </button>
+          <div class="w-[1px] h-5 bg-gray-300 mx-1"></div>
+          
+          <!-- Shapes Dropdown Menu -->
+          <div class="relative">
+            <button id="tool-shapes" data-tool="shapes" title="Add Shape (S)" class="tool-btn w-9 h-9 rounded-full flex items-center justify-center text-gray-600 hover:bg-white hover:text-gray-900 transition-all duration-150">
+              <i class="fa-solid fa-shapes text-xs"></i>
+            </button>
+            <div id="shapes-dropdown" class="hidden absolute top-12 left-0 bg-white rounded-xl shadow-xl border border-gray-100 p-2 w-36 flex flex-col gap-1 z-50">
+              <button id="add-rect-btn" class="flex items-center gap-2.5 px-3 py-2 text-xs font-medium text-gray-700 hover:bg-blue-50 hover:text-blue-600 rounded-lg text-left transition-colors">
+                <i class="fa-regular fa-square"></i> Rectangle
+              </button>
+              <button id="add-circle-btn" class="flex items-center gap-2.5 px-3 py-2 text-xs font-medium text-gray-700 hover:bg-blue-50 hover:text-blue-600 rounded-lg text-left transition-colors">
+                <i class="fa-regular fa-circle"></i> Circle
+              </button>
+              <button id="add-star-btn" class="flex items-center gap-2.5 px-3 py-2 text-xs font-medium text-gray-700 hover:bg-blue-50 hover:text-blue-600 rounded-lg text-left transition-colors">
+                <i class="fa-regular fa-star"></i> Star Card
+              </button>
+            </div>
+          </div>
+
+          <button id="tool-text" data-tool="text" title="Text Tool" class="tool-btn w-9 h-9 rounded-full flex items-center justify-center text-gray-600 hover:bg-white hover:text-gray-900 transition-all duration-150">
+            <i class="fa-solid fa-t text-xs"></i>
+          </button>
+          <div class="w-[1px] h-5 bg-gray-300 mx-1"></div>
+          
+          <button id="btn-undo" title="Undo (Ctrl+Z)" class="w-9 h-9 rounded-full flex items-center justify-center text-gray-400 hover:text-gray-700 hover:bg-white transition-all disabled:opacity-40 disabled:cursor-not-allowed">
+            <i class="fa-solid fa-rotate-left text-xs"></i>
+          </button>
+          <button id="btn-redo" title="Redo (Ctrl+Y)" class="w-9 h-9 rounded-full flex items-center justify-center text-gray-400 hover:text-gray-700 hover:bg-white transition-all disabled:opacity-40 disabled:cursor-not-allowed">
+            <i class="fa-solid fa-rotate-right text-xs"></i>
+          </button>
+          <div class="w-[1px] h-5 bg-gray-300 mx-1"></div>
+          
+          <button id="btn-export" title="Export SVG Animation" class="w-9 h-9 rounded-full flex items-center justify-center text-gray-600 hover:bg-blue-50 hover:text-blue-600 transition-all">
+            <i class="fa-solid fa-download text-xs"></i>
+          </button>
+          <button id="btn-settings" title="Settings" class="w-9 h-9 rounded-full flex items-center justify-center text-gray-600 hover:bg-white hover:text-gray-900 transition-all">
+            <i class="fa-solid fa-gear text-xs"></i>
+          </button>
+        </div>
+
+        <!-- Right Quick Actions -->
+        <div class="flex items-center gap-2">
+          <button id="btn-add-element" class="bg-blue-500 hover:bg-blue-600 text-white px-3.5 py-1.5 rounded-full text-xs font-semibold shadow-sm flex items-center gap-1.5 transition-all active:scale-95">
+            <i class="fa-solid fa-plus"></i> New Element
+          </button>
+        </div>
+      </header>
+      <!-- END: Top Toolbar -->
+
+      <!-- BEGIN: Main Workspace Area -->
+      <main class="flex-1 flex overflow-hidden relative">
+        
+        <!-- BEGIN: Left Sidebar (Layers) -->
+        <aside class="w-64 bg-white m-3 rounded-2xl shadow-sm border border-gray-100 flex flex-col z-10 select-none">
+          <div class="px-4 py-3 border-b border-gray-100 flex justify-between items-center font-semibold text-gray-800">
+            <span class="flex items-center gap-2">
+              <i class="fa-solid fa-layer-group text-blue-500 text-xs"></i> Layers
+            </span>
+            <div class="flex items-center gap-2">
+              <span id="layer-count-badge" class="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full font-medium">2 items</span>
+            </div>
+          </div>
+          
+          <div id="layers-list" class="flex-1 overflow-y-auto p-2 flex flex-col gap-1">
+            <!-- Layers dynamically populated by JS -->
+          </div>
+        </aside>
+        <!-- END: Left Sidebar -->
+
+        <!-- BEGIN: Canvas Area -->
+        <section id="canvas-viewport" class="flex-1 relative flex items-center justify-center overflow-hidden bg-gray-100/60">
+          
+          <!-- Canvas Label -->
+          <div id="canvas-label-badge" class="absolute top-8 left-1/2 -translate-x-1/2 flex items-center gap-2 z-10 transition-all">
+            <span id="canvas-frame-name" class="bg-blue-500 text-white text-xs px-3 py-1 rounded-md font-semibold shadow-sm flex items-center gap-1.5 cursor-pointer">
+              <i class="fa-regular fa-square text-[10px]"></i> Frame 1
+            </span>
+            <span id="canvas-clip-badge" class="bg-blue-400 text-white text-[10px] px-2 py-1 rounded-md font-medium shadow-sm">Clip</span>
+          </div>
+
+          <!-- Canvas Zoom Container -->
+          <div id="canvas-transform-wrapper" class="transition-transform duration-100 ease-out origin-center flex items-center justify-center">
+            <!-- Canvas Frame Element -->
+            <div id="canvas-frame" class="w-[600px] h-[400px] bg-white border-2 border-blue-400/80 shadow-md relative overflow-hidden rounded-sm transition-colors duration-150">
+              
+              <!-- SVG Motion Path Overlay -->
+              <svg id="motion-path-svg" class="absolute inset-0 w-full h-full pointer-events-none z-0">
+                <path id="motion-path-card" d="M 150 100 Q 200 120 180 140 T 150 100" fill="none" stroke="#6366f1" stroke-width="2" stroke-dasharray="4 4" opacity="0.4"></path>
+                <path id="motion-path-ball" d="M 180 250 C 260 180, 380 220, 450 270 S 280 310, 180 250" fill="none" stroke="#3b82f6" stroke-width="2" stroke-dasharray="4 4" opacity="0.5"></path>
+              </svg>
+
+              <!-- Dynamic Canvas Objects Container -->
+              <div id="canvas-objects" class="absolute inset-0">
+                <!-- Elements injected and manipulated by JavaScript -->
+              </div>
+
+              <!-- Selection Box Overlay -->
+              <div id="selection-box" class="absolute hidden pointer-events-none border-2 border-blue-500 z-30">
+                <div class="handle handle-tl"></div>
+                <div class="handle handle-tr"></div>
+                <div class="handle handle-bl"></div>
+                <div class="handle handle-br"></div>
+              </div>
+
+            </div>
+          </div>
+
+          <!-- Zoom Controls Bottom Left -->
+          <div class="absolute bottom-5 left-5 bg-white/95 backdrop-blur-sm rounded-full shadow-md border border-gray-100 flex items-center px-2 py-1 z-20">
+            <button id="btn-zoom-out" title="Zoom Out (-)" class="w-8 h-8 flex items-center justify-center text-gray-500 hover:text-blue-600 hover:bg-gray-50 rounded-full transition-colors">
+              <i class="fa-solid fa-minus text-xs"></i>
+            </button>
+            <button id="btn-zoom-reset" title="Click to Reset 100%" class="text-xs font-mono font-medium text-gray-700 px-2 min-w-[3.5rem] text-center hover:text-blue-600">
+              <span id="zoom-text">56%</span>
+            </button>
+            <button id="btn-zoom-in" title="Zoom In (+)" class="w-8 h-8 flex items-center justify-center text-gray-500 hover:text-blue-600 hover:bg-gray-50 rounded-full transition-colors">
+              <i class="fa-solid fa-plus text-xs"></i>
+            </button>
+            <div class="w-[1px] h-4 bg-gray-200 mx-1"></div>
+            <button id="btn-zoom-fit" title="Fit to Screen" class="w-8 h-8 flex items-center justify-center text-gray-500 hover:text-blue-600 hover:bg-gray-50 rounded-full transition-colors">
+              <i class="fa-solid fa-compress text-xs"></i>
+            </button>
+          </div>
+
+        </section>
+        <!-- END: Canvas Area -->
+
+        <!-- BEGIN: Right Sidebar (Properties Inspector) -->
+        <aside id="properties-panel" class="w-72 bg-white m-3 rounded-2xl shadow-sm border border-gray-100 flex flex-col z-10 overflow-y-auto">
+          <!-- Dynamic Content rendered by JavaScript -->
+        </aside>
+        <!-- END: Right Sidebar -->
+
+      </main>
+      <!-- END: Main Workspace Area -->
+
+      <!-- BEGIN: Bottom Timeline -->
+      <footer class="h-64 bg-white border-t border-gray-100 flex flex-col z-20 m-3 mt-0 rounded-2xl shadow-sm overflow-hidden select-none">
+        
+        <!-- Timeline Header Controls -->
+        <div class="h-12 border-b border-gray-100 flex items-center justify-between px-4 bg-gray-50/80 shrink-0">
+          <div class="flex items-center gap-2">
+            <!-- Jump to Start -->
+            <button id="btn-step-start" title="Go to Start (0)" class="w-8 h-8 flex items-center justify-center text-gray-600 hover:bg-white hover:text-blue-600 rounded-lg transition-all active:scale-90">
+              <i class="fa-solid fa-backward-fast text-xs"></i>
+            </button>
+            <!-- Step Back -->
+            <button id="btn-step-back" title="Step Back 0.1s (←)" class="w-8 h-8 flex items-center justify-center text-gray-600 hover:bg-white hover:text-blue-600 rounded-lg transition-all active:scale-90">
+              <i class="fa-solid fa-backward-step text-xs"></i>
+            </button>
+            <!-- Play / Pause -->
+            <button id="btn-play-pause" title="Play / Pause (Space)" class="w-9 h-9 flex items-center justify-center bg-blue-500 text-white rounded-lg shadow-sm hover:bg-blue-600 transition-all active:scale-95">
+              <i id="play-icon" class="fa-solid fa-play text-xs"></i>
+            </button>
+            <!-- Step Forward -->
+            <button id="btn-step-forward" title="Step Forward 0.1s (→)" class="w-8 h-8 flex items-center justify-center text-gray-600 hover:bg-white hover:text-blue-600 rounded-lg transition-all active:scale-90">
+              <i class="fa-solid fa-forward-step text-xs"></i>
+            </button>
+            <div class="w-[1px] h-4 bg-gray-300 mx-1"></div>
+            <!-- Loop Toggle -->
+            <button id="btn-loop-toggle" title="Toggle Loop" class="w-8 h-8 flex items-center justify-center bg-blue-50 text-blue-600 hover:bg-blue-100 rounded-lg transition-all">
+              <i class="fa-solid fa-repeat text-xs"></i>
+            </button>
+            
+            <!-- Time Display -->
+            <div class="ml-3 text-xs font-semibold font-mono text-gray-800 flex items-center gap-1.5 bg-white px-3 py-1 rounded-md border border-gray-200/80 shadow-xs">
+              <span id="time-current" class="text-blue-600 w-10 text-right">1.05</span>
+              <span class="text-gray-400">/</span>
+              <span id="time-total" class="text-gray-500">3.00 s</span>
+            </div>
+          </div>
+
+          <!-- Right Timeline Info -->
+          <div class="flex items-center gap-4 text-xs">
+            <div class="flex items-center gap-1.5 text-gray-500 font-medium">
+              <i class="fa-regular fa-clock text-gray-400"></i>
+              <span>Duration</span>
+              <span id="timeline-duration-label" class="font-bold text-gray-800 bg-gray-100 px-2 py-0.5 rounded">3.0s</span>
+            </div>
+            <button id="btn-add-keyframe" title="Insert Keyframe at current time" class="flex items-center gap-1 bg-white hover:bg-gray-50 text-gray-700 border border-gray-200 px-2.5 py-1 rounded-md font-medium text-xs shadow-xs transition-colors">
+              <i class="fa-solid fa-gem text-blue-500 text-[10px]"></i> Add Keyframe
+            </button>
+          </div>
+        </div>
+
+        <!-- Timeline Tracks Area -->
+        <div class="flex-1 flex overflow-hidden">
+          
+          <!-- Track Labels (Left Sidebar of Timeline) -->
+          <div id="timeline-track-labels" class="w-64 border-r border-gray-100 flex flex-col overflow-y-auto bg-white shrink-0">
+            <!-- Dynamically populated track headers & property rows -->
+          </div>
+
+          <!-- Timeline Grid & Playhead (Right Area) -->
+          <div id="timeline-scroll-container" class="flex-1 relative overflow-x-hidden overflow-y-auto bg-[#fafafa] flex flex-col">
+            
+            <!-- Time Ruler Bar -->
+            <div id="timeline-ruler" class="h-8 border-b border-gray-100 relative text-[10px] text-gray-400 bg-white cursor-pointer select-none shrink-0 sticky top-0 z-20">
+              <!-- Ruler Second Numbers -->
+              <div class="absolute left-2 bottom-1.5 font-mono font-medium">0.0s</div>
+              <div class="absolute left-[33.33%] bottom-1.5 font-mono font-medium -translate-x-1/2">1.0s</div>
+              <div class="absolute left-[66.66%] bottom-1.5 font-mono font-medium -translate-x-1/2">2.0s</div>
+              <div class="absolute right-3 bottom-1.5 font-mono font-medium">3.0s</div>
+              
+              <!-- Sub-tick Marks -->
+              <div class="w-full h-full flex justify-between items-end pb-0 px-4 opacity-40 pointer-events-none">
+                <div class="w-px h-2 bg-gray-400"></div>
+                <div class="w-px h-1 bg-gray-300"></div><div class="w-px h-1 bg-gray-300"></div><div class="w-px h-1 bg-gray-300"></div>
+                <div class="w-px h-2 bg-gray-400"></div>
+                <div class="w-px h-1 bg-gray-300"></div><div class="w-px h-1 bg-gray-300"></div><div class="w-px h-1 bg-gray-300"></div>
+                <div class="w-px h-2 bg-gray-400"></div>
+                <div class="w-px h-1 bg-gray-300"></div><div class="w-px h-1 bg-gray-300"></div><div class="w-px h-1 bg-gray-300"></div>
+                <div class="w-px h-2 bg-gray-400"></div>
+              </div>
+            </div>
+
+            <!-- Tracks Content (Grid & Keyframes) -->
+            <div id="timeline-grid-area" class="relative flex-1 min-h-[140px] cursor-crosshair">
+              
+              <!-- Grid background vertical guide lines -->
+              <div class="absolute inset-0 flex justify-between pointer-events-none opacity-20">
+                <div class="w-px h-full bg-gray-300"></div>
+                <div class="w-px h-full bg-gray-300"></div>
+                <div class="w-px h-full bg-gray-300"></div>
+                <div class="w-px h-full bg-gray-300"></div>
+                <div class="w-px h-full bg-gray-300"></div>
+                <div class="w-px h-full bg-gray-300"></div>
+                <div class="w-px h-full bg-gray-300"></div>
+              </div>
+
+              <!-- Dynamic Track Rows & Keyframe Diamonds Container -->
+              <div id="timeline-tracks-content" class="relative w-full h-full pt-1 pb-4">
+                <!-- Dynamically rendered duration bars and diamonds -->
+              </div>
+
+              <!-- Draggable Playhead Scrubber Bar -->
+              <div id="timeline-playhead" class="absolute top-[-32px] bottom-0 w-[2px] bg-blue-500 z-30 pointer-events-none transform -translate-x-1/2" style="left: 35%;">
+                <!-- Playhead Scrubber Handle -->
+                <div id="playhead-handle" class="w-3.5 h-4 bg-blue-500 rounded-b-sm absolute top-0 -left-[6px] shadow-md flex items-center justify-center cursor-ew-resize pointer-events-auto hover:bg-blue-600 transition-colors">
+                  <div class="w-1 h-2 bg-white/80 rounded-full"></div>
+                </div>
+              </div>
+
+            </div>
+
+          </div>
+        </div>
+
+      </footer>
+      <!-- END: Bottom Timeline -->
+
+    </div>
+  </div>
+  <!-- END: Main Layout -->
+
+  <!-- Export Modal -->
+  <div id="export-modal" class="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm hidden items-center justify-center p-4">
+    <div class="bg-white rounded-3xl shadow-2xl border border-gray-100 max-w-md w-full p-6 modal-enter">
+      <div class="flex items-center justify-between pb-4 border-b border-gray-100">
+        <h3 class="text-base font-bold text-gray-800 flex items-center gap-2">
+          <i class="fa-solid fa-cloud-arrow-down text-blue-500"></i> Export Animation
+        </h3>
+        <button id="close-export-modal" class="text-gray-400 hover:text-gray-700 w-8 h-8 rounded-full flex items-center justify-center hover:bg-gray-100">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+
+      <div class="py-5 flex flex-col gap-4">
+        <p class="text-xs text-gray-500">Chọn định dạng bạn muốn xuất ra từ dự án OpenSVG:</p>
+        
+        <button id="export-svg-btn" class="flex items-center justify-between p-3.5 border border-gray-200 rounded-2xl hover:border-blue-500 hover:bg-blue-50/50 transition-all text-left group">
+          <div class="flex items-center gap-3">
+            <div class="w-10 h-10 rounded-xl bg-blue-100 text-blue-600 flex items-center justify-center group-hover:scale-105 transition-transform">
+              <i class="fa-solid fa-file-code text-lg"></i>
+            </div>
+            <div>
+              <div class="text-xs font-bold text-gray-800">Animated SVG (.svg)</div>
+              <div class="text-[11px] text-gray-400">File SVG nhúng CSS @keyframes độc lập</div>
+            </div>
+          </div>
+          <i class="fa-solid fa-chevron-right text-gray-400 group-hover:text-blue-500 text-xs"></i>
+        </button>
+
+        <button id="export-json-btn" class="flex items-center justify-between p-3.5 border border-gray-200 rounded-2xl hover:border-indigo-500 hover:bg-indigo-50/50 transition-all text-left group">
+          <div class="flex items-center gap-3">
+            <div class="w-10 h-10 rounded-xl bg-indigo-100 text-indigo-600 flex items-center justify-center group-hover:scale-105 transition-transform">
+              <i class="fa-solid fa-code text-lg"></i>
+            </div>
+            <div>
+              <div class="text-xs font-bold text-gray-800">Project JSON (.json)</div>
+              <div class="text-[11px] text-gray-400">Dữ liệu state & keyframe dự án</div>
+            </div>
+          </div>
+          <i class="fa-solid fa-chevron-right text-gray-400 group-hover:text-indigo-500 text-xs"></i>
+        </button>
+
+        <button id="export-html-btn" class="flex items-center justify-between p-3.5 border border-gray-200 rounded-2xl hover:border-emerald-500 hover:bg-emerald-50/50 transition-all text-left group">
+          <div class="flex items-center gap-3">
+            <div class="w-10 h-10 rounded-xl bg-emerald-100 text-emerald-600 flex items-center justify-center group-hover:scale-105 transition-transform">
+              <i class="fa-solid fa-globe text-lg"></i>
+            </div>
+            <div>
+              <div class="text-xs font-bold text-gray-800">Web Animation Package (.html)</div>
+              <div class="text-[11px] text-gray-400">Trang HTML chạy animation mượt mà</div>
+            </div>
+          </div>
+          <i class="fa-solid fa-chevron-right text-gray-400 group-hover:text-emerald-500 text-xs"></i>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Settings Modal -->
+  <div id="settings-modal" class="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm hidden items-center justify-center p-4">
+    <div class="bg-white rounded-3xl shadow-2xl border border-gray-100 max-w-md w-full p-6 modal-enter">
+      <div class="flex items-center justify-between pb-4 border-b border-gray-100">
+        <h3 class="text-base font-bold text-gray-800 flex items-center gap-2">
+          <i class="fa-solid fa-sliders text-blue-500"></i> Project Settings
+        </h3>
+        <button id="close-settings-modal" class="text-gray-400 hover:text-gray-700 w-8 h-8 rounded-full flex items-center justify-center hover:bg-gray-100">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+
+      <div class="py-5 flex flex-col gap-4">
+        <div>
+          <label class="text-xs font-semibold text-gray-600 block mb-1.5">Timeline Total Duration (seconds)</label>
+          <input id="setting-duration-input" type="number" min="1" max="60" step="0.5" value="3.0" class="w-full bg-gray-50 border border-gray-200 rounded-xl px-3 py-2 text-sm font-medium focus:ring-2 focus:ring-blue-500 focus:outline-none">
+        </div>
+        <div>
+          <label class="text-xs font-semibold text-gray-600 block mb-1.5">Default Frame Background</label>
+          <div class="flex items-center gap-3">
+            <input id="setting-frame-bg" type="color" value="#ffffff" class="w-10 h-10 rounded-lg border border-gray-200 cursor-pointer">
+            <span class="text-xs font-mono text-gray-600">Canvas Canvas View Color</span>
+          </div>
+        </div>
+        <div class="pt-2 flex justify-end gap-2">
+          <button id="save-settings-btn" class="bg-blue-500 hover:bg-blue-600 text-white px-5 py-2 rounded-xl text-xs font-semibold shadow-sm transition-colors">
+            Save Changes
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- JAVASCRIPT APPLICATION CORE -->
+  <script>
+    (function () {
+      'use strict';
+
+      // --- APPLICATION STATE ---
+      const state = {
+        isPlaying: false,
+        currentTime: 1.05,
+        duration: 3.0,
+        loop: true,
+        zoom: 56, // 56%
+        selectedTool: 'select',
+        selectedId: 'card', // 'frame-1' | 'card' | 'ball' | etc.
+        undoStack: [],
+        redoStack: [],
+        frame: {
+          id: 'frame-1',
+          name: 'Frame 1',
+          width: 600,
+          height: 400,
+          bg: '#ffffff',
+          canvasBg: '#f1f2f5',
+          clip: true
+        },
+        elements: [
+          {
+            id: 'card',
+            name: 'Card',
+            type: 'rect',
+            visible: true,
+            width: 128,
+            height: 128,
+            borderRadius: 24,
+            bg: '#111827',
+            x: 150,
+            y: 100,
+            rotation: 12,
+            scaleX: 1,
+            scaleY: 1,
+            tracks: [
+              {
+                property: 'rotation',
+                label: 'Rotation',
+                unit: '°',
+                keyframes: [
+                  { time: 0.15, value: 12 },
+                  { time: 0.90, value: 102 },
+                  { time: 2.10, value: 200 },
+                  { time: 3.00, value: 372 }
+                ]
+              },
+              {
+                property: 'x',
+                label: 'X Position',
+                unit: 'px',
+                keyframes: [
+                  { time: 0.00, value: 150 },
+                  { time: 1.50, value: 240 },
+                  { time: 3.00, value: 150 }
+                ]
+              }
+            ]
+          },
+          {
+            id: 'ball',
+            name: 'Ball',
+            type: 'circle',
+            visible: true,
+            width: 96,
+            height: 96,
+            borderRadius: 9999,
+            bg: '#3b82f6',
+            x: 340,
+            y: 250,
+            rotation: 0,
+            scaleX: 1,
+            scaleY: 1,
+            tracks: [
+              {
+                property: 'x',
+                label: 'X',
+                unit: 'px',
+                keyframes: [
+                  { time: 0.06, value: 180 },
+                  { time: 0.66, value: 340 },
+                  { time: 1.20, value: 450 },
+                  { time: 2.10, value: 280 },
+                  { time: 3.00, value: 180 }
+                ]
+              },
+              {
+                property: 'scaleX',
+                label: 'Scale X',
+                unit: '',
+                keyframes: [
+                  { time: 0.06, value: 1.0 },
+                  { time: 0.36, value: 1.35 },
+                  { time: 0.66, value: 1.0 },
+                  { time: 1.20, value: 1.25 },
+                  { time: 2.10, value: 0.85 },
+                  { time: 3.00, value: 1.0 }
+                ]
+              }
+            ]
+          }
+        ]
+      };
+
+      // --- DOM REFERENCES ---
+      const elementsContainer = document.getElementById('canvas-objects');
+      const canvasFrame = document.getElementById('canvas-frame');
+      const canvasTransformWrapper = document.getElementById('canvas-transform-wrapper');
+      const canvasFrameName = document.getElementById('canvas-frame-name');
+      const canvasClipBadge = document.getElementById('canvas-clip-badge');
+      const selectionBox = document.getElementById('selection-box');
+      
+      const layersList = document.getElementById('layers-list');
+      const layerCountBadge = document.getElementById('layer-count-badge');
+      const propertiesPanel = document.getElementById('properties-panel');
+      
+      const btnPlayPause = document.getElementById('btn-play-pause');
+      const playIcon = document.getElementById('play-icon');
+      const btnStepStart = document.getElementById('btn-step-start');
+      const btnStepBack = document.getElementById('btn-step-back');
+      const btnStepForward = document.getElementById('btn-step-forward');
+      const btnLoopToggle = document.getElementById('btn-loop-toggle');
+      const timeCurrent = document.getElementById('time-current');
+      const timeTotal = document.getElementById('time-total');
+      const timelineDurationLabel = document.getElementById('timeline-duration-label');
+      
+      const timelineTrackLabels = document.getElementById('timeline-track-labels');
+      const timelineTracksContent = document.getElementById('timeline-tracks-content');
+      const timelineGridArea = document.getElementById('timeline-grid-area');
+      const timelinePlayhead = document.getElementById('timeline-playhead');
+      const playheadHandle = document.getElementById('playhead-handle');
+      
+      const zoomText = document.getElementById('zoom-text');
+      const btnZoomIn = document.getElementById('btn-zoom-in');
+      const btnZoomOut = document.getElementById('btn-zoom-out');
+      const btnZoomReset = document.getElementById('btn-zoom-reset');
+      const btnZoomFit = document.getElementById('btn-zoom-fit');
+
+      const btnUndo = document.getElementById('btn-undo');
+      const btnRedo = document.getElementById('btn-redo');
+      const btnExport = document.getElementById('btn-export');
+      const btnSettings = document.getElementById('btn-settings');
+      const btnAddElement = document.getElementById('btn-add-element');
+      const btnAddKeyframe = document.getElementById('btn-add-keyframe');
+
+      const toolShapesBtn = document.getElementById('tool-shapes');
+      const shapesDropdown = document.getElementById('shapes-dropdown');
+      const addRectBtn = document.getElementById('add-rect-btn');
+      const addCircleBtn = document.getElementById('add-circle-btn');
+      const addStarBtn = document.getElementById('add-star-btn');
+
+      const exportModal = document.getElementById('export-modal');
+      const closeExportModal = document.getElementById('close-export-modal');
+      const exportSvgBtn = document.getElementById('export-svg-btn');
+      const exportJsonBtn = document.getElementById('export-json-btn');
+      const exportHtmlBtn = document.getElementById('export-html-btn');
+
+      const settingsModal = document.getElementById('settings-modal');
+      const closeSettingsModal = document.getElementById('close-settings-modal');
+      const saveSettingsBtn = document.getElementById('save-settings-btn');
+      const settingDurationInput = document.getElementById('setting-duration-input');
+      const settingFrameBg = document.getElementById('setting-frame-bg');
+
+      // --- HELPER / MATH FUNCTIONS ---
+      function interpolate(keyframes, time, fallback) {
+        if (!keyframes || keyframes.length === 0) return fallback;
+        if (keyframes.length === 1) return keyframes[0].value;
+
+        // Sort by time
+        const sorted = [...keyframes].sort((a, b) => a.time - b.time);
+        if (time <= sorted[0].time) return sorted[0].value;
+        if (time >= sorted[sorted.length - 1].time) return sorted[sorted.length - 1].value;
+
+        for (let i = 0; i < sorted.length - 1; i++) {
+          const k0 = sorted[i];
+          const k1 = sorted[i + 1];
+          if (time >= k0.time && time <= k1.time) {
+            const progress = (time - k0.time) / (k1.time - k0.time);
+            // Smooth ease in-out
+            const ease = progress * progress * (3 - 2 * progress);
+            return k0.value + (k1.value - k0.value) * ease;
+          }
+        }
+        return fallback;
+      }
+
+      function getElementAnimatedState(el, time) {
+        let x = el.x;
+        let y = el.y;
+        let rotation = el.rotation || 0;
+        let scaleX = el.scaleX || 1;
+        let scaleY = el.scaleY || 1;
+
+        if (el.tracks) {
+          el.tracks.forEach(track => {
+            const val = interpolate(track.keyframes, time, el[track.property]);
+            if (track.property === 'x') x = val;
+            else if (track.property === 'y') y = val;
+            else if (track.property === 'rotation') rotation = val;
+            else if (track.property === 'scaleX') scaleX = val;
+            else if (track.property === 'scaleY') scaleY = val;
+          });
+        }
+        return { x, y, rotation, scaleX, scaleY };
+      }
+
+      function showToast(msg, icon = 'fa-circle-check', isError = false) {
+        const toast = document.getElementById('toast');
+        const toastMsg = document.getElementById('toast-msg');
+        const toastIcon = document.getElementById('toast-icon');
+
+        toastMsg.textContent = msg;
+        toastIcon.className = `fa-solid ${icon} ${isError ? 'text-red-400' : 'text-green-400'}`;
+        
+        toast.classList.remove('translate-y-[-100px]', 'opacity-0');
+        toast.classList.add('translate-y-0', 'opacity-100');
+
+        setTimeout(() => {
+          toast.classList.remove('translate-y-0', 'opacity-100');
+          toast.classList.add('translate-y-[-100px]', 'opacity-0');
+        }, 2200);
+      }
+
+      function saveHistory(actionName = 'Edit') {
+        state.undoStack.push(JSON.stringify({
+          elements: state.elements,
+          frame: state.frame,
+          currentTime: state.currentTime,
+          duration: state.duration
+        }));
+        if (state.undoStack.length > 30) state.undoStack.shift();
+        state.redoStack = [];
+        updateUndoRedoUI();
+      }
+
+      function undo() {
+        if (state.undoStack.length === 0) return;
+        const current = JSON.stringify({
+          elements: state.elements,
+          frame: state.frame,
+          currentTime: state.currentTime,
+          duration: state.duration
+        });
+        state.redoStack.push(current);
+        const prev = JSON.parse(state.undoStack.pop());
+        state.elements = prev.elements;
+        state.frame = prev.frame;
+        state.currentTime = prev.currentTime;
+        state.duration = prev.duration;
+        renderAll();
+        updateUndoRedoUI();
+        showToast('Undo executed');
+      }
+
+      function redo() {
+        if (state.redoStack.length === 0) return;
+        const current = JSON.stringify({
+          elements: state.elements,
+          frame: state.frame,
+          currentTime: state.currentTime,
+          duration: state.duration
+        });
+        state.undoStack.push(current);
+        const next = JSON.parse(state.redoStack.pop());
+        state.elements = next.elements;
+        state.frame = next.frame;
+        state.currentTime = next.currentTime;
+        state.duration = next.duration;
+        renderAll();
+        updateUndoRedoUI();
+        showToast('Redo executed');
+      }
+
+      function updateUndoRedoUI() {
+        btnUndo.disabled = state.undoStack.length === 0;
+        btnRedo.disabled = state.redoStack.length === 0;
+      }
+
+      // --- RENDERING ENGINES ---
+
+      // 1. Render Canvas Elements
+      function renderCanvas() {
+        // Frame styling
+        canvasFrame.style.width = `${state.frame.width}px`;
+        canvasFrame.style.height = `${state.frame.height}px`;
+        canvasFrame.style.backgroundColor = state.frame.bg;
+        canvasFrame.style.overflow = state.frame.clip ? 'hidden' : 'visible';
+        
+        canvasFrameName.innerHTML = `<i class="fa-regular fa-square text-[10px]"></i> ${state.frame.name}`;
+        canvasClipBadge.style.display = state.frame.clip ? 'inline-block' : 'none';
+
+        // Render each element DOM
+        elementsContainer.innerHTML = '';
+        state.elements.forEach(el => {
+          if (!el.visible) return;
+
+          const animated = getElementAnimatedState(el, state.currentTime);
+          const div = document.createElement('div');
+          div.id = `canvas-item-${el.id}`;
+          div.className = `absolute cursor-grab active:cursor-grabbing transition-shadow ${state.selectedId === el.id ? 'ring-2 ring-blue-500 ring-offset-2' : 'hover:ring-1 hover:ring-blue-300'}`;
+          
+          div.style.left = `${animated.x}px`;
+          div.style.top = `${animated.y}px`;
+          div.style.width = `${el.width}px`;
+          div.style.height = `${el.height}px`;
+          div.style.backgroundColor = el.bg;
+          div.style.borderRadius = `${el.borderRadius}px`;
+          div.style.transform = `rotate(${animated.rotation}deg) scale(${animated.scaleX}, ${animated.scaleY})`;
+          div.style.transformOrigin = 'center center';
+
+          // Decorative content inside star or custom shapes if any
+          if (el.type === 'star') {
+            div.innerHTML = `<div class="w-full h-full flex items-center justify-center text-white"><i class="fa-solid fa-star text-2xl"></i></div>`;
+          }
+
+          // Drag event listeners
+          div.addEventListener('mousedown', (e) => {
+            e.stopPropagation();
+            selectElement(el.id);
+            initCanvasDrag(e, el);
+          });
+
+          elementsContainer.appendChild(div);
+        });
+
+        // Update selection overlay positioning
+        updateSelectionBox();
+      }
+
+      function updateSelectionBox() {
+        if (!state.selectedId || state.selectedId === 'frame-1') {
+          selectionBox.classList.add('hidden');
+          return;
+        }
+
+        const el = state.elements.find(item => item.id === state.selectedId);
+        if (!el || !el.visible) {
+          selectionBox.classList.add('hidden');
+          return;
+        }
+
+        const animated = getElementAnimatedState(el, state.currentTime);
+        selectionBox.classList.remove('hidden');
+        selectionBox.style.left = `${animated.x}px`;
+        selectionBox.style.top = `${animated.y}px`;
+        selectionBox.style.width = `${el.width}px`;
+        selectionBox.style.height = `${el.height}px`;
+        selectionBox.style.transform = `rotate(${animated.rotation}deg) scale(${animated.scaleX}, ${animated.scaleY})`;
+        selectionBox.style.transformOrigin = 'center center';
+      }
+
+      // 2. Render Layers Sidebar
+      function renderLayers() {
+        layersList.innerHTML = '';
+        layerCountBadge.textContent = `${state.elements.length} items`;
+
+        // Frame Layer Item
+        const frameRow = document.createElement('div');
+        frameRow.className = `flex items-center gap-2 px-3 py-2 rounded-xl cursor-pointer transition-all ${state.selectedId === 'frame-1' ? 'bg-blue-50 text-blue-600 font-semibold border border-blue-200' : 'hover:bg-gray-50 text-gray-700'}`;
+        frameRow.innerHTML = `
+          <i class="fa-solid fa-caret-down text-xs w-3 text-gray-400"></i>
+          <i class="fa-regular fa-square text-xs text-blue-500"></i>
+          <span class="flex-1 truncate">${state.frame.name}</span>
+          <span class="text-[11px] text-gray-400">${state.elements.length}</span>
+        `;
+        frameRow.addEventListener('click', () => selectElement('frame-1'));
+        layersList.appendChild(frameRow);
+
+        // Children Container
+        const childrenContainer = document.createElement('div');
+        childrenContainer.className = 'pl-5 pr-1 py-0.5 flex flex-col gap-1';
+
+        state.elements.forEach(el => {
+          const itemRow = document.createElement('div');
+          const isSelected = state.selectedId === el.id;
+          itemRow.className = `flex items-center justify-between px-2.5 py-1.5 rounded-lg cursor-pointer transition-all ${isSelected ? 'bg-blue-500 text-white font-medium shadow-xs' : 'hover:bg-gray-100 text-gray-700'}`;
+          
+          itemRow.innerHTML = `
+            <div class="flex items-center gap-2 truncate flex-1">
+              <div class="w-3 h-3 rounded-sm shrink-0" style="background-color: ${el.bg}; ${el.type === 'circle' ? 'border-radius: 9999px;' : ''}"></div>
+              <span class="truncate text-xs">${el.name}</span>
+            </div>
+            <div class="flex items-center gap-1.5">
+              <button data-id="${el.id}" class="eye-toggle p-1 rounded hover:bg-black/10 transition-colors ${isSelected ? 'text-white' : 'text-gray-400 hover:text-gray-600'}">
+                <i class="fa-regular ${el.visible ? 'fa-eye' : 'fa-eye-slash'} text-xs"></i>
+              </button>
+            </div>
+          `;
+
+          itemRow.addEventListener('click', (e) => {
+            if (e.target.closest('.eye-toggle')) {
+              e.stopPropagation();
+              el.visible = !el.visible;
+              saveHistory('Toggle Visibility');
+              renderAll();
+              return;
+            }
+            selectElement(el.id);
+          });
+
+          childrenContainer.appendChild(itemRow);
+        });
+
+        layersList.appendChild(childrenContainer);
+      }
+
+      // 3. Render Properties Inspector Panel
+      function renderProperties() {
+        propertiesPanel.innerHTML = '';
+
+        // If Frame is selected
+        if (state.selectedId === 'frame-1' || !state.selectedId) {
+          propertiesPanel.innerHTML = `
+            <div class="px-5 py-4 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
+              <div class="flex items-center gap-2">
+                <i class="fa-regular fa-square text-blue-500"></i>
+                <h2 class="font-bold text-gray-800 text-sm">${state.frame.name}</h2>
+              </div>
+              <span class="text-[11px] bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full font-medium">Root Frame</span>
+            </div>
+            
+            <div class="p-5 flex flex-col gap-5">
+              <!-- Dimensions -->
+              <div>
+                <label class="text-xs text-gray-400 font-semibold mb-2 block uppercase tracking-wider">Canvas Size</label>
+                <div class="grid grid-cols-2 gap-3">
+                  <div class="flex items-center bg-gray-50 rounded-xl px-3 py-2 border border-gray-200 focus-within:border-blue-500 focus-within:bg-white transition-all">
+                    <span class="text-gray-400 text-xs font-mono font-medium mr-2">W</span>
+                    <input id="prop-frame-w" class="w-full border-none bg-transparent p-0 text-xs font-semibold text-gray-800 focus:ring-0 outline-none" type="number" value="${state.frame.width}">
+                  </div>
+                  <div class="flex items-center bg-gray-50 rounded-xl px-3 py-2 border border-gray-200 focus-within:border-blue-500 focus-within:bg-white transition-all">
+                    <span class="text-gray-400 text-xs font-mono font-medium mr-2">H</span>
+                    <input id="prop-frame-h" class="w-full border-none bg-transparent p-0 text-xs font-semibold text-gray-800 focus:ring-0 outline-none" type="number" value="${state.frame.height}">
+                  </div>
+                </div>
+              </div>
+
+              <!-- Background Color -->
+              <div>
+                <label class="text-xs text-gray-400 font-semibold mb-2 block uppercase tracking-wider">Background</label>
+                <div class="flex items-center justify-between p-2.5 bg-gray-50 rounded-xl border border-gray-200">
+                  <div class="flex items-center gap-2.5">
+                    <input id="prop-frame-bg" type="color" value="${state.frame.bg}" class="w-7 h-7 rounded-lg border border-gray-300 cursor-pointer p-0 bg-transparent">
+                    <span class="text-xs font-mono font-semibold text-gray-700 uppercase">${state.frame.bg}</span>
+                  </div>
+                  <span class="text-[11px] text-gray-400 font-medium">Fill</span>
+                </div>
+              </div>
+
+              <hr class="border-gray-100">
+
+              <!-- Clip Content Toggle -->
+              <div class="flex items-center justify-between">
+                <div>
+                  <span class="text-xs font-semibold text-gray-800 block">Clip content</span>
+                  <span class="text-[11px] text-gray-400">Hide overflow outside frame</span>
+                </div>
+                <button id="prop-frame-clip-btn" class="w-10 h-6 ${state.frame.clip ? 'bg-blue-500' : 'bg-gray-300'} rounded-full relative transition-colors duration-200 focus:outline-none shadow-inner">
+                  <span class="absolute top-1 ${state.frame.clip ? 'right-1' : 'left-1'} w-4 h-4 bg-white rounded-full shadow transition-all duration-200"></span>
+                </button>
+              </div>
+
+              <div class="mt-2 p-3 bg-blue-50/70 rounded-xl border border-blue-100 text-[11px] text-blue-700 leading-relaxed">
+                <i class="fa-solid fa-circle-info mr-1"></i> Nhấp đúp vào đối tượng trên Canvas hoặc chọn từ Layers để chỉnh sửa thuộc tính chuyển động.
+              </div>
+            </div>
+          `;
+
+          // Event Listeners for Frame props
+          document.getElementById('prop-frame-w').addEventListener('change', (e) => {
+            state.frame.width = Math.max(100, parseInt(e.target.value) || 600);
+            saveHistory('Resize Frame Width');
+            renderCanvas();
+          });
+          document.getElementById('prop-frame-h').addEventListener('change', (e) => {
+            state.frame.height = Math.max(100, parseInt(e.target.value) || 400);
+            saveHistory('Resize Frame Height');
+            renderCanvas();
+          });
+          document.getElementById('prop-frame-bg').addEventListener('input', (e) => {
+            state.frame.bg = e.target.value;
+            renderCanvas();
+          });
+          document.getElementById('prop-frame-bg').addEventListener('change', () => {
+            saveHistory('Change Frame BG');
+          });
+          document.getElementById('prop-frame-clip-btn').addEventListener('click', () => {
+            state.frame.clip = !state.frame.clip;
+            saveHistory('Toggle Clip');
+            renderCanvas();
+            renderProperties();
+          });
+          return;
+        }
+
+        // Element is selected
+        const el = state.elements.find(item => item.id === state.selectedId);
+        if (!el) return;
+
+        const anim = getElementAnimatedState(el, state.currentTime);
+
+        propertiesPanel.innerHTML = `
+          <div class="px-5 py-4 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
+            <div class="flex items-center gap-2">
+              <div class="w-3.5 h-3.5 rounded-sm" style="background-color: ${el.bg}"></div>
+              <h2 class="font-bold text-gray-800 text-sm">${el.name}</h2>
+            </div>
+            <button id="btn-delete-element" title="Delete Element" class="text-gray-400 hover:text-red-500 p-1.5 rounded-lg hover:bg-red-50 transition-colors">
+              <i class="fa-solid fa-trash-can text-xs"></i>
+            </button>
+          </div>
+
+          <div class="p-5 flex flex-col gap-5">
+            <!-- Position (X, Y) -->
+            <div>
+              <label class="text-xs text-gray-400 font-semibold mb-2 block uppercase tracking-wider">Position</label>
+              <div class="grid grid-cols-2 gap-3">
+                <div class="flex items-center bg-gray-50 rounded-xl px-3 py-2 border border-gray-200 focus-within:border-blue-500 focus-within:bg-white transition-all">
+                  <span class="text-gray-400 text-xs font-mono font-medium mr-2">X</span>
+                  <input id="prop-el-x" class="w-full border-none bg-transparent p-0 text-xs font-semibold text-gray-800 focus:ring-0 outline-none" type="number" value="${Math.round(anim.x)}">
+                </div>
+                <div class="flex items-center bg-gray-50 rounded-xl px-3 py-2 border border-gray-200 focus-within:border-blue-500 focus-within:bg-white transition-all">
+                  <span class="text-gray-400 text-xs font-mono font-medium mr-2">Y</span>
+                  <input id="prop-el-y" class="w-full border-none bg-transparent p-0 text-xs font-semibold text-gray-800 focus:ring-0 outline-none" type="number" value="${Math.round(anim.y)}">
+                </div>
+              </div>
+            </div>
+
+            <!-- Size (W, H) -->
+            <div>
+              <label class="text-xs text-gray-400 font-semibold mb-2 block uppercase tracking-wider">Dimensions</label>
+              <div class="grid grid-cols-2 gap-3">
+                <div class="flex items-center bg-gray-50 rounded-xl px-3 py-2 border border-gray-200 focus-within:border-blue-500 focus-within:bg-white transition-all">
+                  <span class="text-gray-400 text-xs font-mono font-medium mr-2">W</span>
+                  <input id="prop-el-w" class="w-full border-none bg-transparent p-0 text-xs font-semibold text-gray-800 focus:ring-0 outline-none" type="number" value="${el.width}">
+                </div>
+                <div class="flex items-center bg-gray-50 rounded-xl px-3 py-2 border border-gray-200 focus-within:border-blue-500 focus-within:bg-white transition-all">
+                  <span class="text-gray-400 text-xs font-mono font-medium mr-2">H</span>
+                  <input id="prop-el-h" class="w-full border-none bg-transparent p-0 text-xs font-semibold text-gray-800 focus:ring-0 outline-none" type="number" value="${el.height}">
+                </div>
+              </div>
+            </div>
+
+            <!-- Rotation -->
+            <div>
+              <div class="flex justify-between items-center mb-1.5">
+                <label class="text-xs text-gray-400 font-semibold uppercase tracking-wider">Rotation</label>
+                <span class="text-xs font-mono font-bold text-blue-600">${Math.round(anim.rotation)}°</span>
+              </div>
+              <input id="prop-el-rot" type="range" min="0" max="360" value="${Math.round(anim.rotation) % 360}" class="w-full">
+            </div>
+
+            <!-- Fill Color -->
+            <div>
+              <label class="text-xs text-gray-400 font-semibold mb-2 block uppercase tracking-wider">Fill Color</label>
+              <div class="flex items-center justify-between p-2.5 bg-gray-50 rounded-xl border border-gray-200">
+                <div class="flex items-center gap-2.5">
+                  <input id="prop-el-color" type="color" value="${el.bg}" class="w-7 h-7 rounded-lg border border-gray-300 cursor-pointer p-0 bg-transparent">
+                  <span class="text-xs font-mono font-semibold text-gray-700 uppercase">${el.bg}</span>
+                </div>
+                <span class="text-[11px] text-gray-400 font-medium">Color</span>
+              </div>
+            </div>
+
+            <!-- Border Radius -->
+            <div>
+              <div class="flex justify-between items-center mb-1.5">
+                <label class="text-xs text-gray-400 font-semibold uppercase tracking-wider">Corner Radius</label>
+                <span class="text-xs font-mono font-bold text-gray-700">${el.borderRadius}px</span>
+              </div>
+              <input id="prop-el-radius" type="range" min="0" max="64" value="${el.borderRadius}" class="w-full">
+            </div>
+
+            <hr class="border-gray-100">
+
+            <!-- Tracks count -->
+            <div class="bg-gray-50 p-3 rounded-xl border border-gray-100 text-xs text-gray-600">
+              <div class="font-semibold text-gray-800 mb-1 flex items-center gap-1.5">
+                <i class="fa-solid fa-timeline text-blue-500"></i> Animation Tracks
+              </div>
+              <div class="text-[11px] text-gray-500">${el.tracks ? el.tracks.length : 0} animated properties in timeline</div>
+            </div>
+          </div>
+        `;
+
+        // Listeners for Element props
+        document.getElementById('prop-el-x').addEventListener('change', (e) => {
+          el.x = parseInt(e.target.value) || 0;
+          saveHistory('Change Element X');
+          renderCanvas();
+        });
+        document.getElementById('prop-el-y').addEventListener('change', (e) => {
+          el.y = parseInt(e.target.value) || 0;
+          saveHistory('Change Element Y');
+          renderCanvas();
+        });
+        document.getElementById('prop-el-w').addEventListener('change', (e) => {
+          el.width = Math.max(10, parseInt(e.target.value) || 50);
+          saveHistory('Change Element W');
+          renderCanvas();
+        });
+        document.getElementById('prop-el-h').addEventListener('change', (e) => {
+          el.height = Math.max(10, parseInt(e.target.value) || 50);
+          saveHistory('Change Element H');
+          renderCanvas();
+        });
+        document.getElementById('prop-el-rot').addEventListener('input', (e) => {
+          el.rotation = parseInt(e.target.value);
+          renderCanvas();
+        });
+        document.getElementById('prop-el-rot').addEventListener('change', () => {
+          saveHistory('Change Element Rotation');
+        });
+        document.getElementById('prop-el-color').addEventListener('input', (e) => {
+          el.bg = e.target.value;
+          renderCanvas();
+          renderLayers();
+        });
+        document.getElementById('prop-el-color').addEventListener('change', () => {
+          saveHistory('Change Fill Color');
+        });
+        document.getElementById('prop-el-radius').addEventListener('input', (e) => {
+          el.borderRadius = parseInt(e.target.value);
+          renderCanvas();
+        });
+        document.getElementById('prop-el-radius').addEventListener('change', () => {
+          saveHistory('Change Border Radius');
+        });
+        document.getElementById('btn-delete-element').addEventListener('click', () => {
+          deleteSelectedElement();
+        });
+      }
+
+      // 4. Render Timeline
+      function renderTimeline() {
+        // Headers & labels
+        timeCurrent.textContent = state.currentTime.toFixed(2);
+        timeTotal.textContent = `${state.duration.toFixed(2)} s`;
+        timelineDurationLabel.textContent = `${state.duration.toFixed(1)}s`;
+
+        // Update Scrubber Playhead X position
+        const progressPercent = (state.currentTime / state.duration) * 100;
+        timelinePlayhead.style.left = `${Math.min(100, Math.max(0, progressPercent))}%`;
+
+        // Render Track Labels on the Left
+        timelineTrackLabels.innerHTML = `
+          <div class="px-4 py-2 text-xs font-semibold text-gray-400 flex justify-between items-center h-8 border-b border-gray-100 bg-gray-50/50">
+            <span>LAYERS & TRACKS</span>
+            <span class="text-[10px] bg-gray-200/60 text-gray-600 px-1.5 py-0.5 rounded">Timeline</span>
+          </div>
+        `;
+
+        timelineTracksContent.innerHTML = '';
+
+        let rowTopOffset = 4;
+
+        state.elements.forEach(el => {
+          if (!el.visible) return;
+
+          const isSelected = state.selectedId === el.id;
+
+          // Track Label Main Row
+          const labelRow = document.createElement('div');
+          labelRow.className = `flex items-center px-4 py-2 hover:bg-gray-50 cursor-pointer border-b border-gray-50 transition-colors ${isSelected ? 'bg-blue-50/80 font-medium' : ''}`;
+          labelRow.innerHTML = `
+            <i class="fa-solid fa-caret-down text-gray-400 text-xs w-4"></i>
+            <div class="w-2.5 h-2.5 rounded-sm mr-2 shrink-0" style="background-color: ${el.bg}"></div>
+            <span class="text-xs text-gray-700 flex-1 truncate">${el.name}</span>
+          `;
+          labelRow.addEventListener('click', () => selectElement(el.id));
+          timelineTrackLabels.appendChild(labelRow);
+
+          // Track Main Duration Bar in Grid Area
+          const durationBar = document.createElement('div');
+          durationBar.className = 'absolute h-5 bg-blue-100/70 border border-blue-200/80 rounded-full flex items-center justify-between px-1.5 cursor-pointer shadow-xs';
+          durationBar.style.top = `${rowTopOffset}px`;
+          durationBar.style.left = `2%`;
+          durationBar.style.right = `4%`;
+          durationBar.innerHTML = `
+            <div class="w-1.5 h-2.5 bg-blue-400 rounded-full"></div>
+            <span class="text-[9px] font-semibold text-blue-600 truncate px-2 select-none">${el.name} duration</span>
+            <div class="w-1.5 h-2.5 bg-blue-400 rounded-full"></div>
+          `;
+          timelineTracksContent.appendChild(durationBar);
+
+          rowTopOffset += 28;
+
+          // Sub-property Tracks (Rotation, X, Scale)
+          if (el.tracks) {
+            el.tracks.forEach(track => {
+              // Sub label row
+              const subLabel = document.createElement('div');
+              subLabel.className = `flex items-center px-4 py-1.5 pl-8 hover:bg-gray-50 cursor-pointer text-xs text-gray-500 border-b border-gray-50/50 ${isSelected ? 'bg-blue-50/40' : ''}`;
+              subLabel.innerHTML = `
+                <span class="flex-1 text-[11px] truncate">${track.label}</span>
+                <i class="fa-solid fa-gem text-[10px] text-blue-400"></i>
+              `;
+              subLabel.addEventListener('click', () => selectElement(el.id));
+              timelineTrackLabels.appendChild(subLabel);
+
+              // Keyframe Markers Row in Grid Area
+              const kfRow = document.createElement('div');
+              kfRow.className = 'absolute w-full h-6 flex items-center pointer-events-auto';
+              kfRow.style.top = `${rowTopOffset}px`;
+
+              track.keyframes.forEach((kf, idx) => {
+                const kfPos = (kf.time / state.duration) * 100;
+                const isCurrent = Math.abs(state.currentTime - kf.time) < 0.04;
+                
+                const diamond = document.createElement('div');
+                diamond.title = `${track.label}: ${kf.value}${track.unit || ''} at ${kf.time.toFixed(2)}s`;
+                diamond.className = `keyframe-diamond absolute w-2.5 h-2.5 bg-gray-700 rounded-xs cursor-pointer shadow-sm ${isCurrent ? 'active' : ''}`;
+                diamond.style.left = `${kfPos}%`;
+                diamond.style.top = '50%';
+
+                diamond.addEventListener('click', (e) => {
+                  e.stopPropagation();
+                  state.currentTime = kf.time;
+                  renderTimeline();
+                  renderCanvas();
+                  renderProperties();
+                });
+
+                kfRow.appendChild(diamond);
+              });
+
+              timelineTracksContent.appendChild(kfRow);
+              rowTopOffset += 24;
+            });
+          }
+          rowTopOffset += 6;
+        });
+      }
+
+      // Render Everything Synchronously
+      function renderAll() {
+        renderCanvas();
+        renderLayers();
+        renderProperties();
+        renderTimeline();
+      }
+
+      function selectElement(id) {
+        state.selectedId = id;
+        renderLayers();
+        renderProperties();
+        renderCanvas();
+        renderTimeline();
+      }
+
+      function deleteSelectedElement() {
+        if (!state.selectedId || state.selectedId === 'frame-1') return;
+        saveHistory('Delete Element');
+        state.elements = state.elements.filter(item => item.id !== state.selectedId);
+        state.selectedId = 'frame-1';
+        renderAll();
+        showToast('Element deleted', 'fa-trash');
+      }
+
+      // --- CANVAS DRAG ENGINE ---
+      function initCanvasDrag(e, el) {
+        if (state.selectedTool !== 'select' && state.selectedTool !== 'transform') return;
+
+        const startX = e.clientX;
+        const startY = e.clientY;
+        const initElX = el.x;
+        const initElY = el.y;
+
+        const scale = state.zoom / 100;
+
+        function onMouseMove(moveEvent) {
+          const dx = (moveEvent.clientX - startX) / scale;
+          const dy = (moveEvent.clientY - startY) / scale;
+
+          el.x = Math.round(initElX + dx);
+          el.y = Math.round(initElY + dy);
+
+          renderCanvas();
+          // Update inputs in properties panel if open
+          const xInput = document.getElementById('prop-el-x');
+          const yInput = document.getElementById('prop-el-y');
+          if (xInput) xInput.value = el.x;
+          if (yInput) yInput.value = el.y;
+        }
+
+        function onMouseUp() {
+          window.removeEventListener('mousemove', onMouseMove);
+          window.removeEventListener('mouseup', onMouseUp);
+          saveHistory('Drag Element');
+          renderAll();
+        }
+
+        window.addEventListener('mousemove', onMouseMove);
+        window.addEventListener('mouseup', onMouseUp);
+      }
+
+      // --- TIMELINE PLAYHEAD SCRUBBING & PLAYBACK ---
+      let isScrubbing = false;
+
+      function seekToX(clientX) {
+        const rect = timelineGridArea.getBoundingClientRect();
+        const offsetX = Math.max(0, Math.min(rect.width, clientX - rect.left));
+        const progress = offsetX / rect.width;
+        state.currentTime = Math.max(0, Math.min(state.duration, progress * state.duration));
+        
+        renderTimeline();
+        renderCanvas();
+        renderProperties();
+      }
+
+      timelineGridArea.addEventListener('mousedown', (e) => {
+        isScrubbing = true;
+        seekToX(e.clientX);
+
+        function onMouseMove(moveEvent) {
+          if (!isScrubbing) return;
+          seekToX(moveEvent.clientX);
+        }
+
+        function onMouseUp() {
+          isScrubbing = false;
+          window.removeEventListener('mousemove', onMouseMove);
+          window.removeEventListener('mouseup', onMouseUp);
+        }
+
+        window.addEventListener('mousemove', onMouseMove);
+        window.addEventListener('mouseup', onMouseUp);
+      });
+
+      // Ruler clicking
+      document.getElementById('timeline-ruler').addEventListener('mousedown', (e) => {
+        isScrubbing = true;
+        seekToX(e.clientX);
+      });
+
+      // Animation Loop with requestAnimationFrame
+      let lastTime = null;
+      function animationLoop(timestamp) {
+        if (!state.isPlaying) {
+          lastTime = null;
+          return;
+        }
+
+        if (!lastTime) lastTime = timestamp;
+        const dt = (timestamp - lastTime) / 1000;
+        lastTime = timestamp;
+
+        state.currentTime += dt;
+
+        if (state.currentTime >= state.duration) {
+          if (state.loop) {
+            state.currentTime = 0;
+          } else {
+            state.currentTime = state.duration;
+            togglePlay(false);
+          }
+        }
+
+        renderTimeline();
+        renderCanvas();
+        renderProperties();
+
+        if (state.isPlaying) {
+          requestAnimationFrame(animationLoop);
+        }
+      }
+
+      function togglePlay(forceState) {
+        state.isPlaying = typeof forceState === 'boolean' ? forceState : !state.isPlaying;
+        
+        if (state.isPlaying) {
+          playIcon.className = 'fa-solid fa-pause text-xs';
+          btnPlayPause.classList.add('bg-blue-600');
+          if (state.currentTime >= state.duration) state.currentTime = 0;
+          requestAnimationFrame(animationLoop);
+        } else {
+          playIcon.className = 'fa-solid fa-play text-xs';
+          btnPlayPause.classList.remove('bg-blue-600');
+        }
+      }
+
+      // --- ZOOM CONTROLS ---
+      function setZoom(val) {
+        state.zoom = Math.max(25, Math.min(250, val));
+        zoomText.textContent = `${Math.round(state.zoom)}%`;
+        canvasTransformWrapper.style.transform = `scale(${state.zoom / 100})`;
+      }
+
+      btnZoomIn.addEventListener('click', () => setZoom(state.zoom + 10));
+      btnZoomOut.addEventListener('click', () => setZoom(state.zoom - 10));
+      btnZoomReset.addEventListener('click', () => setZoom(100));
+      btnZoomFit.addEventListener('click', () => setZoom(56));
+
+      // --- BUTTON CONTROLS ---
+      btnPlayPause.addEventListener('click', () => togglePlay());
+      btnStepStart.addEventListener('click', () => {
+        state.currentTime = 0;
+        renderAll();
+      });
+      btnStepBack.addEventListener('click', () => {
+        state.currentTime = Math.max(0, state.currentTime - 0.1);
+        renderAll();
+      });
+      btnStepForward.addEventListener('click', () => {
+        state.currentTime = Math.min(state.duration, state.currentTime + 0.1);
+        renderAll();
+      });
+      btnLoopToggle.addEventListener('click', () => {
+        state.loop = !state.loop;
+        btnLoopToggle.className = `w-8 h-8 flex items-center justify-center rounded-lg transition-all ${state.loop ? 'bg-blue-50 text-blue-600 font-bold' : 'text-gray-400 hover:bg-gray-100'}`;
+        showToast(state.loop ? 'Loop: Enabled' : 'Loop: Disabled');
+      });
+
+      // Insert Keyframe
+      btnAddKeyframe.addEventListener('click', () => {
+        if (!state.selectedId || state.selectedId === 'frame-1') {
+          showToast('Select an element on canvas first!', 'fa-circle-exclamation', true);
+          return;
+        }
+        const el = state.elements.find(item => item.id === state.selectedId);
+        if (!el) return;
+
+        if (!el.tracks || el.tracks.length === 0) {
+          el.tracks = [{ property: 'rotation', label: 'Rotation', unit: '°', keyframes: [] }];
+        }
+
+        saveHistory('Add Keyframe');
+        el.tracks.forEach(tr => {
+          const curVal = getElementAnimatedState(el, state.currentTime)[tr.property] || 0;
+          // Check if keyframe exists at current time
+          const existing = tr.keyframes.find(k => Math.abs(k.time - state.currentTime) < 0.05);
+          if (existing) {
+            existing.value = curVal;
+          } else {
+            tr.keyframes.push({ time: parseFloat(state.currentTime.toFixed(2)), value: curVal });
+            tr.keyframes.sort((a, b) => a.time - b.time);
+          }
+        });
+
+        renderAll();
+        showToast(`Keyframe added at ${state.currentTime.toFixed(2)}s`, 'fa-gem');
+      });
+
+      // Add New Element / Shapes
+      function addNewShape(type = 'rect') {
+        saveHistory('Add Shape');
+        const id = `shape-${Date.now()}`;
+        const newEl = {
+          id: id,
+          name: type === 'circle' ? 'Circle' : (type === 'star' ? 'Star Card' : 'Rectangle'),
+          type: type,
+          visible: true,
+          width: 100,
+          height: 100,
+          borderRadius: type === 'circle' ? 9999 : (type === 'star' ? 20 : 12),
+          bg: type === 'circle' ? '#10b981' : (type === 'star' ? '#f59e0b' : '#8b5cf6'),
+          x: Math.round(state.frame.width / 2 - 50),
+          y: Math.round(state.frame.height / 2 - 50),
+          rotation: 0,
+          scaleX: 1,
+          scaleY: 1,
+          tracks: [
+            {
+              property: 'rotation',
+              label: 'Rotation',
+              unit: '°',
+              keyframes: [
+                { time: 0.0, value: 0 },
+                { time: state.duration, value: 360 }
+              ]
+            }
+          ]
+        };
+
+        state.elements.push(newEl);
+        selectElement(id);
+        renderAll();
+        showToast(`Added new ${newEl.name}`);
+      }
+
+      btnAddElement.addEventListener('click', () => addNewShape('rect'));
+      toolShapesBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        shapesDropdown.classList.toggle('hidden');
+      });
+      document.addEventListener('click', () => shapesDropdown.classList.add('hidden'));
+
+      addRectBtn.addEventListener('click', () => addNewShape('rect'));
+      addCircleBtn.addEventListener('click', () => addNewShape('circle'));
+      addStarBtn.addEventListener('click', () => addNewShape('star'));
+
+      // Tool Switching
+      document.querySelectorAll('.tool-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          document.querySelectorAll('.tool-btn').forEach(b => {
+            b.className = 'tool-btn w-9 h-9 rounded-full flex items-center justify-center text-gray-600 hover:bg-white hover:text-gray-900 transition-all duration-150';
+          });
+          btn.className = 'tool-btn w-9 h-9 rounded-full flex items-center justify-center bg-blue-500 text-white shadow-sm transition-all duration-150';
+          state.selectedTool = btn.dataset.tool;
+          showToast(`Tool: ${state.selectedTool.toUpperCase()}`);
+        });
+      });
+
+      // Undo / Redo
+      btnUndo.addEventListener('click', undo);
+      btnRedo.addEventListener('click', redo);
+
+      // --- EXPORT ENGINE ---
+      btnExport.addEventListener('click', () => {
+        exportModal.classList.remove('hidden');
+        exportModal.classList.add('flex');
+      });
+      closeExportModal.addEventListener('click', () => {
+        exportModal.classList.add('hidden');
+        exportModal.classList.remove('flex');
+      });
+
+      function downloadFile(filename, content, type = 'text/plain') {
+        const blob = new Blob([content], { type });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        showToast(`Downloaded ${filename}`, 'fa-download');
+        exportModal.classList.add('hidden');
+        exportModal.classList.remove('flex');
+      }
+
+      exportSvgBtn.addEventListener('click', () => {
+        let svgContent = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${state.frame.width} ${state.frame.height}" width="${state.frame.width}" height="${state.frame.height}">\n`;
+        svgContent += `  <style>\n`;
+        svgContent += `    @keyframes rotateLoop { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }\n`;
+        svgContent += `    .animated-card { transform-origin: center; animation: rotateLoop ${state.duration}s infinite linear; }\n`;
+        svgContent += `  </style>\n`;
+        svgContent += `  <rect width="100%" height="100%" fill="${state.frame.bg}" />\n`;
+        
+        state.elements.forEach(el => {
+          if (!el.visible) return;
+          if (el.type === 'circle') {
+            svgContent += `  <circle cx="${el.x + el.width/2}" cy="${el.y + el.height/2}" r="${el.width/2}" fill="${el.bg}" />\n`;
+          } else {
+            svgContent += `  <rect x="${el.x}" y="${el.y}" width="${el.width}" height="${el.height}" rx="${el.borderRadius}" fill="${el.bg}" class="animated-card" />\n`;
+          }
+        });
+        svgContent += `</svg>`;
+        downloadFile('opensvg-animation.svg', svgContent, 'image/svg+xml');
+      });
+
+      exportJsonBtn.addEventListener('click', () => {
+        const json = JSON.stringify({ project: 'OpenSVG Animation', version: '1.0', frame: state.frame, duration: state.duration, elements: state.elements }, null, 2);
+        downloadFile('opensvg-project.json', json, 'application/json');
+      });
+
+      exportHtmlBtn.addEventListener('click', () => {
+        const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Exported OpenSVG</title><style>body{margin:0;display:flex;align-items:center;justify-content:center;height:100vh;background:#111;}</style></head><body><div style="width:${state.frame.width}px;height:${state.frame.height}px;background:${state.frame.bg};position:relative;overflow:hidden;border-radius:16px;">${elementsContainer.innerHTML}</div></body></html>`;
+        downloadFile('opensvg-preview.html', html, 'text/html');
+      });
+
+      // Settings Modal
+      btnSettings.addEventListener('click', () => {
+        settingDurationInput.value = state.duration;
+        settingFrameBg.value = state.frame.bg;
+        settingsModal.classList.remove('hidden');
+        settingsModal.classList.add('flex');
+      });
+      closeSettingsModal.addEventListener('click', () => {
+        settingsModal.classList.add('hidden');
+        settingsModal.classList.remove('flex');
+      });
+      saveSettingsBtn.addEventListener('click', () => {
+        state.duration = Math.max(1, parseFloat(settingDurationInput.value) || 3.0);
+        state.frame.bg = settingFrameBg.value;
+        settingsModal.classList.add('hidden');
+        settingsModal.classList.remove('flex');
+        renderAll();
+        showToast('Settings saved!');
+      });
+
+      // --- KEYBOARD SHORTCUTS ---
+      window.addEventListener('keydown', (e) => {
+        if (e.target.tagName === 'INPUT') return;
+
+        if (e.code === 'Space') {
+          e.preventDefault();
+          togglePlay();
+        } else if (e.code === 'ArrowLeft') {
+          e.preventDefault();
+          state.currentTime = Math.max(0, state.currentTime - (e.shiftKey ? 0.5 : 0.05));
+          renderAll();
+        } else if (e.code === 'ArrowRight') {
+          e.preventDefault();
+          state.currentTime = Math.min(state.duration, state.currentTime + (e.shiftKey ? 0.5 : 0.05));
+          renderAll();
+        } else if (e.key === '0') {
+          state.currentTime = 0;
+          renderAll();
+        } else if (e.key === 'Delete' || e.key === 'Backspace') {
+          deleteSelectedElement();
+        } else if ((e.ctrlKey || e.metaKey) && e.key === 'z') {
+          e.preventDefault();
+          if (e.shiftKey) redo();
+          else undo();
+        } else if ((e.ctrlKey || e.metaKey) && e.key === 'y') {
+          e.preventDefault();
+          redo();
+        }
+      });
+
+      // Canvas Background click to deselect / select frame
+      canvasFrame.addEventListener('mousedown', (e) => {
+        if (e.target === canvasFrame || e.target.id === 'canvas-objects') {
+          selectElement('frame-1');
+        }
+      });
+
+      // --- INITIALIZE APPLICATION ---
+      setZoom(56);
+      renderAll();
+      showToast('OpenSVG Editor Ready!');
+
+    })();
+  </script>
+</body>
+</html>
