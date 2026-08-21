@@ -1,12 +1,24 @@
-﻿import React from 'react';
+import React from 'react';
 import { useStudioStore } from '../store/useStudioStore';
-import { Square, Trash2, Sliders, Info } from 'lucide-react';
+import {
+  Square,
+  Trash2,
+  Sliders,
+  Info,
+  AlignLeft,
+  AlignCenter,
+  AlignRight,
+  AlignStartVertical,
+  AlignCenterVertical,
+  AlignEndVertical
+} from 'lucide-react';
 
 export const PropertiesPanel: React.FC = () => {
   const {
     rootFrame,
     nodes,
     selectedId,
+    alignSelected,
     updateRootFrame,
     updateNode,
     deleteNode,
@@ -137,6 +149,76 @@ export const PropertiesPanel: React.FC = () => {
       </div>
 
       <div className="p-5 flex flex-col gap-5">
+        {/* Alignment Quick Actions */}
+        <div>
+          <label className="text-[11px] text-gray-400 font-semibold mb-2 block uppercase tracking-wider">
+            Align
+          </label>
+          <div className="flex items-center justify-between bg-gray-50 p-1 rounded-xl border border-gray-200">
+            <button
+              title="Align Left"
+              onClick={() => {
+                alignSelected('left');
+                showToast('Aligned Left');
+              }}
+              className="p-1.5 rounded-lg text-gray-500 hover:text-blue-600 hover:bg-white transition-colors"
+            >
+              <AlignLeft className="w-3.5 h-3.5" />
+            </button>
+            <button
+              title="Align Center Horizontally"
+              onClick={() => {
+                alignSelected('center');
+                showToast('Aligned Center');
+              }}
+              className="p-1.5 rounded-lg text-gray-500 hover:text-blue-600 hover:bg-white transition-colors"
+            >
+              <AlignCenter className="w-3.5 h-3.5" />
+            </button>
+            <button
+              title="Align Right"
+              onClick={() => {
+                alignSelected('right');
+                showToast('Aligned Right');
+              }}
+              className="p-1.5 rounded-lg text-gray-500 hover:text-blue-600 hover:bg-white transition-colors"
+            >
+              <AlignRight className="w-3.5 h-3.5" />
+            </button>
+            <div className="w-[1px] h-4 bg-gray-200" />
+            <button
+              title="Align Top"
+              onClick={() => {
+                alignSelected('top');
+                showToast('Aligned Top');
+              }}
+              className="p-1.5 rounded-lg text-gray-500 hover:text-blue-600 hover:bg-white transition-colors"
+            >
+              <AlignStartVertical className="w-3.5 h-3.5" />
+            </button>
+            <button
+              title="Align Middle Vertically"
+              onClick={() => {
+                alignSelected('middle');
+                showToast('Aligned Middle');
+              }}
+              className="p-1.5 rounded-lg text-gray-500 hover:text-blue-600 hover:bg-white transition-colors"
+            >
+              <AlignCenterVertical className="w-3.5 h-3.5" />
+            </button>
+            <button
+              title="Align Bottom"
+              onClick={() => {
+                alignSelected('bottom');
+                showToast('Aligned Bottom');
+              }}
+              className="p-1.5 rounded-lg text-gray-500 hover:text-blue-600 hover:bg-white transition-colors"
+            >
+              <AlignEndVertical className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        </div>
+
         {/* Position */}
         <div>
           <label className="text-[11px] text-gray-400 font-semibold mb-2 block uppercase tracking-wider">

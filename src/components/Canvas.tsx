@@ -2,6 +2,7 @@ import React, { useRef, useEffect, useState } from 'react';
 import { useStudioStore } from '../store/useStudioStore';
 import { evaluateNode } from '../engine/evaluator';
 import { renderCanvasScene } from '../engine/renderer';
+import { computeSnapping } from '../engine/snapping';
 import { Minus, Plus, Maximize2, Square } from 'lucide-react';
 
 export const Canvas: React.FC = () => {
@@ -15,6 +16,8 @@ export const Canvas: React.FC = () => {
     selectedTool,
     selectedPointIndex,
     setSelectedPointIndex,
+    activeSnapLines,
+    setActiveSnapLines,
     zoom,
     setZoom,
     panX,
@@ -79,9 +82,10 @@ export const Canvas: React.FC = () => {
       selectedId,
       selectedTool,
       selectedPointIndex,
-      dpr
+      dpr,
+      activeSnapLines
     );
-  }, [rootFrame, evaluatedNodes, selectedId, selectedTool, selectedPointIndex, currentTime]);
+  }, [rootFrame, evaluatedNodes, selectedId, selectedTool, selectedPointIndex, activeSnapLines, currentTime]);
 
   // Main Canvas Pointer Event Handler
   const handleMouseDown = (e: React.MouseEvent) => {
@@ -363,13 +367,28 @@ export const Canvas: React.FC = () => {
     const onMove = (moveEvent: MouseEvent) => {
       const dx = (moveEvent.clientX - startClientX) / zoom;
       const dy = (moveEvent.clientY - startClientY) / zoom;
+      const rawX = Math.round(initialX + dx);
+      const rawY = Math.round(initialY + dy);
+
+      const snapping = computeSnapping(
+        nodeId,
+        rawX,
+        rawY,
+        node.width,
+        node.height,
+        rootFrame,
+        evaluatedNodes
+      );
+
+      setActiveSnapLines(snapping.snapLines);
       updateNode(nodeId, {
-        x: Math.round(initialX + dx),
-        y: Math.round(initialY + dy)
+        x: snapping.x,
+        y: snapping.y
       });
     };
 
     const onUp = () => {
+      setActiveSnapLines([]);
       window.removeEventListener('mousemove', onMove);
       window.removeEventListener('mouseup', onUp);
     };

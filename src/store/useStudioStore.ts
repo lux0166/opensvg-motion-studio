@@ -1,6 +1,7 @@
 ﻿import { create } from 'zustand';
 import { immer } from 'zustand/middleware/immer';
 import { FrameNode, SceneNode, ToolMode, TimelineMode, BezierPoint, CubicBezierCurve } from '../engine/types';
+import { SnapLine } from '../engine/snapping';
 
 interface StudioState {
   // Playback
@@ -22,6 +23,9 @@ interface StudioState {
   selectedPointIndex: number | null;
   selectedTrackId: string | null;
   expandedNodeIds: Record<string, boolean>;
+
+  // Snapping
+  activeSnapLines: SnapLine[];
 
   // Scene Graph
   rootFrame: FrameNode;
@@ -46,7 +50,11 @@ interface StudioState {
   setSelectedId: (id: string | null) => void;
   setSelectedPointIndex: (index: number | null) => void;
   setSelectedTrackId: (trackId: string | null) => void;
+  setActiveSnapLines: (lines: SnapLine[]) => void;
   toggleNodeExpand: (id: string) => void;
+
+  // Alignments
+  alignSelected: (type: 'left' | 'center' | 'right' | 'top' | 'middle' | 'bottom') => void;
 
   // Scene manipulation
   updateRootFrame: (updates: Partial<FrameNode>) => void;
@@ -89,6 +97,8 @@ export const useStudioStore = create<StudioState>()(
     selectedPointIndex: null,
     selectedTrackId: 'tr-rot',
     expandedNodeIds: { 'frame-1': true, card: true, ball: true },
+
+    activeSnapLines: [],
 
     rootFrame: {
       id: 'frame-1',
@@ -232,9 +242,39 @@ export const useStudioStore = create<StudioState>()(
       }),
     setSelectedPointIndex: (index) => set({ selectedPointIndex: index }),
     setSelectedTrackId: (trackId) => set({ selectedTrackId: trackId }),
+    setActiveSnapLines: (lines) => set({ activeSnapLines: lines }),
     toggleNodeExpand: (id) =>
       set((state) => {
         state.expandedNodeIds[id] = !state.expandedNodeIds[id];
+      }),
+
+    alignSelected: (type) =>
+      set((state) => {
+        const id = state.selectedId;
+        if (!id || id === 'frame-1' || !state.nodes[id]) return;
+        const node = state.nodes[id];
+        const rf = state.rootFrame;
+
+        switch (type) {
+          case 'left':
+            node.x = 0;
+            break;
+          case 'center':
+            node.x = Math.round((rf.width - node.width) / 2);
+            break;
+          case 'right':
+            node.x = rf.width - node.width;
+            break;
+          case 'top':
+            node.y = 0;
+            break;
+          case 'middle':
+            node.y = Math.round((rf.height - node.height) / 2);
+            break;
+          case 'bottom':
+            node.y = rf.height - node.height;
+            break;
+        }
       }),
 
     updateRootFrame: (updates) =>

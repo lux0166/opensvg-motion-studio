@@ -1,4 +1,5 @@
 import { SceneNode, FrameNode, ToolMode, BezierPoint } from './types';
+import { SnapLine } from './snapping';
 
 export interface DragHandleInfo {
   type: 'move' | 'nw' | 'ne' | 'se' | 'sw' | 'n' | 's' | 'e' | 'w' | 'rotate' | 'anchor' | 'cp1' | 'cp2';
@@ -15,7 +16,8 @@ export function renderCanvasScene(
   selectedId: string | null,
   selectedTool: ToolMode,
   selectedPointIndex: number | null,
-  dpr: number
+  dpr: number,
+  snapLines: SnapLine[] = []
 ) {
   const width = rootFrame.width;
   const height = rootFrame.height;
@@ -125,6 +127,22 @@ export function renderCanvasScene(
         drawSelectionOverlay(ctx, selectedNode);
       }
     }
+  }
+
+  // Draw Magnetic Snap Alignment Guides
+  if (snapLines && snapLines.length > 0) {
+    ctx.save();
+    ctx.strokeStyle = '#ef4444'; // Precision red alignment guide
+    ctx.lineWidth = 1;
+    ctx.setLineDash([4, 3]);
+
+    for (const line of snapLines) {
+      ctx.beginPath();
+      ctx.moveTo(line.x1, line.y1);
+      ctx.lineTo(line.x2, line.y2);
+      ctx.stroke();
+    }
+    ctx.restore();
   }
 
   ctx.restore();
