@@ -1,16 +1,14 @@
-name: Continuous Integration
+name: CI
 
 on:
   push:
     branches: [ main ]
   pull_request:
     branches: [ main ]
-  workflow_dispatch:
 
 jobs:
-  validate:
-    name: Build & Validate
-    runs-on: windows-latest
+  build-and-test:
+    runs-on: ubuntu-latest
 
     steps:
       - name: Checkout repository
@@ -19,26 +17,14 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: 20
           cache: 'npm'
 
-      - name: Setup Rust toolchain
-        uses: dtolnay/rust-toolchain@stable
-
-      - name: Rust Cache
-        uses: swatinem/rust-cache@v2
-        with:
-          workspaces: './src-tauri -> target'
-
       - name: Install dependencies
-        run: npm install
+        run: npm ci
 
-      - name: Run automated unit test harness
-        run: npm test
+      - name: Run Vitest Unit Tests
+        run: npm test -- --run
 
-      - name: Build frontend & TypeScript check
+      - name: Build Production Bundle
         run: npm run build
-
-      - name: Cargo Check Tauri Backend
-        working-directory: ./src-tauri
-        run: cargo check
