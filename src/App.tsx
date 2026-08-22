@@ -6,6 +6,7 @@ import { Header } from './components/Header';
 import { WorkspaceLayout } from './components/workspace/WorkspaceLayout';
 import { ExportModal } from './components/ExportModal';
 import { MotionPresetsModal } from './components/MotionPresetsModal';
+import { ProjectSettingsModal } from './components/ProjectSettingsModal';
 
 export const App: React.FC = () => {
   const { toastMessage } = useStudioStore();
@@ -34,6 +35,7 @@ export const App: React.FC = () => {
 
       <ExportModal />
       <MotionPresetsModal />
+      <ProjectSettingsModal />
     </div>
   );
 };

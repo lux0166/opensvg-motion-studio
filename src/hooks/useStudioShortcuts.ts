@@ -157,7 +157,6 @@ export function useStudioShortcuts() {
         case 'v':
           setSelectedTool('select');
           break;
-        case 't':
         case 'a':
           setSelectedTool('direct-select');
           break;
@@ -166,6 +165,27 @@ export function useStudioShortcuts() {
           break;
         case 'f':
           setSelectedTool('frame');
+          break;
+        case 'r':
+          setSelectedTool('rect');
+          break;
+        case 'o':
+          setSelectedTool('circle');
+          break;
+        case 's':
+          if (!isCtrlOrCmd) setSelectedTool('star');
+          break;
+        case 't':
+          if (!isCtrlOrCmd) setSelectedTool('text');
+          break;
+        case 'y':
+          if (!isCtrlOrCmd) setSelectedTool('pivot');
+          break;
+        case 'h':
+          setSelectedTool('hand');
+          break;
+        case 'z':
+          if (!isCtrlOrCmd) setSelectedTool('zoom');
           break;
       }
     };

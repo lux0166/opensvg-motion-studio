@@ -34,7 +34,9 @@ import {
   Moon,
   Sparkles,
   LayoutTemplate,
-  Monitor
+  Monitor,
+  Target,
+  Hand
 } from 'lucide-react';
 
 interface ContextMenuState {
@@ -204,9 +206,10 @@ export const Header: React.FC = () => {
 
   const tools: { id: ToolMode; label: string; icon: React.ReactNode }[] = [
     { id: 'select', label: 'Select Tool (V)', icon: <MousePointer className="w-3.5 h-3.5" /> },
-    { id: 'direct-select', label: 'Transform Tool (T)', icon: <Crop className="w-3.5 h-3.5" /> },
+    { id: 'direct-select', label: 'Transform / Direct Select (A)', icon: <Crop className="w-3.5 h-3.5" /> },
     { id: 'frame', label: 'Frame Tool (F)', icon: <Square className="w-3.5 h-3.5" /> },
     { id: 'pen', label: 'Pen Tool (P)', icon: <PenTool className="w-3.5 h-3.5" /> },
+    { id: 'hand', label: 'Hand / Pan Tool (H)', icon: <Hand className="w-3.5 h-3.5" /> },
   ];
 
   const handleAddShape = (type: 'rect' | 'circle' | 'star') => {
@@ -558,7 +561,7 @@ export const Header: React.FC = () => {
               onClick={() => setSelectedTool(t.id)}
               className={`w-8 h-8 rounded-full flex items-center justify-center transition-all duration-150 ${
                 isActive
-                  ? 'bg-blue-500 text-white shadow-sm'
+                  ? 'bg-blue-500 text-white shadow-sm ring-2 ring-blue-400/30 font-bold'
                   : 'text-gray-600 dark:text-zinc-400 hover:bg-white hover:dark:bg-zinc-700 hover:text-gray-900 hover:dark:text-zinc-100'
               }`}
             >
@@ -567,48 +570,124 @@ export const Header: React.FC = () => {
           );
         })}
 
-        {/* Shapes Menu */}
+        {/* Shapes Menu (Interactive Tool Selector & Quick Insert) */}
         <div className="relative">
           <button
             type="button"
-            title="Shapes Tool"
-            aria-label="Shapes Tool"
+            title="Shape Tools (R, O, S)"
+            aria-label="Shape Tools"
             onClick={() => setShapesDropdownOpen(!shapesDropdownOpen)}
             className={`w-8 h-8 rounded-full flex items-center justify-center transition-all duration-150 ${
-              shapesDropdownOpen
-                ? 'bg-blue-500 text-white shadow-sm'
+              shapesDropdownOpen || selectedTool === 'rect' || selectedTool === 'circle' || selectedTool === 'star'
+                ? 'bg-blue-500 text-white shadow-sm ring-2 ring-blue-400/30'
                 : 'text-gray-600 dark:text-zinc-400 hover:bg-white hover:dark:bg-zinc-700 hover:text-gray-900 hover:dark:text-zinc-100'
             }`}
           >
-            <Shapes className="w-3.5 h-3.5" />
+            {selectedTool === 'circle' ? (
+              <Circle className="w-3.5 h-3.5" />
+            ) : selectedTool === 'star' ? (
+              <Star className="w-3.5 h-3.5" />
+            ) : selectedTool === 'rect' ? (
+              <Square className="w-3.5 h-3.5" />
+            ) : (
+              <Shapes className="w-3.5 h-3.5" />
+            )}
           </button>
 
           {shapesDropdownOpen && (
-            <div className="absolute top-10 left-0 bg-white/95 dark:bg-zinc-900/95 backdrop-blur-md rounded-2xl shadow-xl border border-gray-100 dark:border-zinc-800 p-1.5 flex flex-col gap-0.5 min-w-[140px] z-50 animate-in fade-in zoom-in-95">
+            <div className="absolute top-10 left-1/2 -translate-x-1/2 bg-white/95 dark:bg-zinc-900/95 backdrop-blur-md rounded-2xl shadow-xl border border-gray-100 dark:border-zinc-800 p-1.5 flex flex-col gap-1 min-w-[170px] z-50 animate-in fade-in zoom-in-95">
+              <div className="px-2.5 py-1 text-[10px] font-bold text-gray-400 dark:text-zinc-500 uppercase tracking-wider">
+                Select Shape Tool
+              </div>
               <button
                 type="button"
-                onClick={() => handleAddShape('rect')}
-                className="flex items-center gap-2 px-3 py-1.5 text-xs font-semibold text-gray-700 dark:text-zinc-300 hover:bg-gray-100 hover:dark:bg-zinc-800 rounded-xl transition-colors text-left"
+                onClick={() => {
+                  setSelectedTool('rect');
+                  setShapesDropdownOpen(false);
+                  showToast('Rectangle Tool selected (drag on canvas to draw)');
+                }}
+                className={`flex items-center justify-between px-2.5 py-1.5 text-xs font-semibold rounded-xl transition-colors text-left ${
+                  selectedTool === 'rect'
+                    ? 'bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400'
+                    : 'text-gray-700 dark:text-zinc-300 hover:bg-gray-100 hover:dark:bg-zinc-800'
+                }`}
               >
-                <Square className="w-3.5 h-3.5 text-purple-500" />
-                Rectangle
+                <div className="flex items-center gap-2">
+                  <Square className="w-3.5 h-3.5 text-purple-500" />
+                  <span>Rectangle (R)</span>
+                </div>
+                <span className="text-[10px] font-mono text-gray-400">Drag</span>
               </button>
               <button
                 type="button"
-                onClick={() => handleAddShape('circle')}
-                className="flex items-center gap-2 px-3 py-1.5 text-xs font-semibold text-gray-700 dark:text-zinc-300 hover:bg-gray-100 hover:dark:bg-zinc-800 rounded-xl transition-colors text-left"
+                onClick={() => {
+                  setSelectedTool('circle');
+                  setShapesDropdownOpen(false);
+                  showToast('Circle Tool selected (drag on canvas to draw)');
+                }}
+                className={`flex items-center justify-between px-2.5 py-1.5 text-xs font-semibold rounded-xl transition-colors text-left ${
+                  selectedTool === 'circle'
+                    ? 'bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400'
+                    : 'text-gray-700 dark:text-zinc-300 hover:bg-gray-100 hover:dark:bg-zinc-800'
+                }`}
               >
-                <Circle className="w-3.5 h-3.5 text-emerald-500" />
-                Circle / Oval
+                <div className="flex items-center gap-2">
+                  <Circle className="w-3.5 h-3.5 text-emerald-500" />
+                  <span>Circle / Oval (O)</span>
+                </div>
+                <span className="text-[10px] font-mono text-gray-400">Drag</span>
               </button>
               <button
                 type="button"
-                onClick={() => handleAddShape('star')}
-                className="flex items-center gap-2 px-3 py-1.5 text-xs font-semibold text-gray-700 dark:text-zinc-300 hover:bg-gray-100 hover:dark:bg-zinc-800 rounded-xl transition-colors text-left"
+                onClick={() => {
+                  setSelectedTool('star');
+                  setShapesDropdownOpen(false);
+                  showToast('Star Tool selected (drag on canvas to draw)');
+                }}
+                className={`flex items-center justify-between px-2.5 py-1.5 text-xs font-semibold rounded-xl transition-colors text-left ${
+                  selectedTool === 'star'
+                    ? 'bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400'
+                    : 'text-gray-700 dark:text-zinc-300 hover:bg-gray-100 hover:dark:bg-zinc-800'
+                }`}
               >
-                <Star className="w-3.5 h-3.5 text-amber-500" />
-                Star Shape
+                <div className="flex items-center gap-2">
+                  <Star className="w-3.5 h-3.5 text-amber-500" />
+                  <span>Star (S)</span>
+                </div>
+                <span className="text-[10px] font-mono text-gray-400">Drag</span>
               </button>
+
+              <div className="h-[1px] bg-gray-100 dark:bg-zinc-800 my-0.5" />
+
+              <div className="px-2.5 py-0.5 text-[10px] font-medium text-gray-400 dark:text-zinc-500">
+                Or Insert Instantly:
+              </div>
+              <div className="flex items-center gap-1 px-1">
+                <button
+                  type="button"
+                  title="Insert Rectangle at Center"
+                  onClick={() => handleAddShape('rect')}
+                  className="flex-1 py-1 flex items-center justify-center bg-gray-50 dark:bg-zinc-800 hover:bg-purple-50 hover:dark:bg-purple-950/40 rounded-lg text-purple-600 dark:text-purple-400 transition-colors"
+                >
+                  <Square className="w-3 h-3" />
+                </button>
+                <button
+                  type="button"
+                  title="Insert Circle at Center"
+                  onClick={() => handleAddShape('circle')}
+                  className="flex-1 py-1 flex items-center justify-center bg-gray-50 dark:bg-zinc-800 hover:bg-emerald-50 hover:dark:bg-emerald-950/40 rounded-lg text-emerald-600 dark:text-emerald-400 transition-colors"
+                >
+                  <Circle className="w-3 h-3" />
+                </button>
+                <button
+                  type="button"
+                  title="Insert Star at Center"
+                  onClick={() => handleAddShape('star')}
+                  className="flex-1 py-1 flex items-center justify-center bg-gray-50 dark:bg-zinc-800 hover:bg-amber-50 hover:dark:bg-amber-950/40 rounded-lg text-amber-600 dark:text-amber-400 transition-colors"
+                >
+                  <Star className="w-3 h-3" />
+                </button>
+              </div>
             </div>
           )}
         </div>
@@ -617,14 +696,34 @@ export const Header: React.FC = () => {
           type="button"
           title="Text Tool (T)"
           aria-label="Text Tool (T)"
-          onClick={() => setSelectedTool('text')}
+          onClick={() => {
+            setSelectedTool('text');
+            showToast('Text Tool selected (click on canvas to place text)');
+          }}
           className={`w-8 h-8 rounded-full flex items-center justify-center transition-all duration-150 ${
             selectedTool === 'text'
-              ? 'bg-blue-500 text-white shadow-sm'
+              ? 'bg-blue-500 text-white shadow-sm ring-2 ring-blue-400/30'
               : 'text-gray-600 dark:text-zinc-400 hover:bg-white hover:dark:bg-zinc-700 hover:text-gray-900 hover:dark:text-zinc-100'
           }`}
         >
           <Type className="w-3.5 h-3.5" />
+        </button>
+
+        <button
+          type="button"
+          title="Pivot Point Tool (Y)"
+          aria-label="Pivot Point Tool (Y)"
+          onClick={() => {
+            setSelectedTool('pivot');
+            showToast('Pivot Tool selected (drag crosshair to change pivot)');
+          }}
+          className={`w-8 h-8 rounded-full flex items-center justify-center transition-all duration-150 ${
+            selectedTool === 'pivot'
+              ? 'bg-blue-500 text-white shadow-sm ring-2 ring-blue-400/30'
+              : 'text-gray-600 dark:text-zinc-400 hover:bg-white hover:dark:bg-zinc-700 hover:text-gray-900 hover:dark:text-zinc-100'
+          }`}
+        >
+          <Target className="w-3.5 h-3.5" />
         </button>
 
         <div className="w-[1px] h-4 bg-gray-300 dark:bg-zinc-700 mx-1" />

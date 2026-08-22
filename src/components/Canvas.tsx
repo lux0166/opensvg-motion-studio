@@ -55,6 +55,10 @@ export const Canvas: React.FC = () => {
       if (e.code === 'Space' && (e.target as HTMLElement).tagName !== 'INPUT') {
         setIsSpacePressed(true);
       }
+      if ((e.key === 'Escape' || e.key === 'Enter') && selectedTool === 'pen') {
+        setSelectedTool('select');
+        showToast('Finished pen path');
+      }
     };
     const onKeyUp = (e: KeyboardEvent) => {
       if (e.code === 'Space') {
@@ -114,7 +118,7 @@ export const Canvas: React.FC = () => {
 
   // Main Canvas Pointer Event Handler
   const handleMouseDown = (e: React.MouseEvent) => {
-    // 1. Space Pan or Middle Mouse
+    // 1. Space Pan, Hand Tool or Middle Mouse
     if (e.button === 1 || isSpacePressed || e.altKey || selectedTool === 'hand') {
       setIsPanning(true);
       setPanStart({ x: e.clientX - panX, y: e.clientY - panY });
@@ -127,7 +131,35 @@ export const Canvas: React.FC = () => {
     const mouseX = Math.round((e.clientX - rect.left) / zoom);
     const mouseY = Math.round((e.clientY - rect.top) / zoom);
 
-    // 2. Text Tool (T)
+    // 2. Zoom Tool (Z)
+    if (selectedTool === 'zoom') {
+      const zoomFactor = e.altKey ? 0.8 : 1.25;
+      const nextZoom = Math.max(0.1, Math.min(5, zoom * zoomFactor));
+      setZoom(nextZoom);
+      showToast(`Zoom: ${Math.round(nextZoom * 100)}%`);
+      return;
+    }
+
+    // 3. Pivot Point Tool (Y)
+    if (selectedTool === 'pivot') {
+      if (selectedId && selectedId !== 'frame-1' && nodes[selectedId]) {
+        initPivotDrag(e, selectedId, nodes[selectedId]);
+        return;
+      }
+    }
+
+    // 4. Shape & Frame Drag-to-Draw Tools (R, O, S, F)
+    if (
+      selectedTool === 'rect' ||
+      selectedTool === 'circle' ||
+      selectedTool === 'star' ||
+      selectedTool === 'frame'
+    ) {
+      initShapeDraw(e, mouseX, mouseY, selectedTool);
+      return;
+    }
+
+    // 5. Text Tool (T)
     if (selectedTool === 'text') {
       const newTextId = `text-${Date.now()}`;
       addNode({
@@ -160,13 +192,13 @@ export const Canvas: React.FC = () => {
       return;
     }
 
-    // 3. Vector Pen Tool
+    // 6. Vector Pen Tool (P)
     if (selectedTool === 'pen') {
       handlePenToolClick(mouseX, mouseY, e);
       return;
     }
 
-    // 3. Direct Select Tool (A) for Path Points
+    // 7. Direct Select Tool (A) for Path Points
     if (selectedTool === 'direct-select' && selectedId && nodes[selectedId]?.type === 'path') {
       const pathNode = nodes[selectedId];
       if (pathNode.pathPoints) {
@@ -174,7 +206,7 @@ export const Canvas: React.FC = () => {
           const pt = pathNode.pathPoints[i];
           const px = pt.x + pathNode.x;
           const py = pt.y + pathNode.y;
-          if (Math.hypot(mouseX - px, mouseY - py) < 10) {
+          if (Math.hypot(mouseX - px, mouseY - py) < 12) {
             setSelectedPointIndex(i);
             initAnchorDrag(e, selectedId, i, pt);
             return;
@@ -183,7 +215,7 @@ export const Canvas: React.FC = () => {
       }
     }
 
-    // 4. Check Selection Handles (Rotate, Resize) on currently selected node
+    // 8. Check Selection Handles (Rotate, Resize) on currently selected node
     if (selectedId && selectedId !== 'frame-1') {
       const selectedNode = nodes[selectedId];
       if (selectedNode) {
@@ -198,7 +230,7 @@ export const Canvas: React.FC = () => {
       }
     }
 
-    // 5. Hit Test Nodes on Canvas
+    // 9. Hit Test Nodes on Canvas
     let clickedId: string | null = null;
     for (let i = evaluatedNodes.length - 1; i >= 0; i--) {
       const n = evaluatedNodes[i];
@@ -282,6 +314,135 @@ export const Canvas: React.FC = () => {
     window.addEventListener('mouseup', onUp);
   };
 
+  const initPivotDrag = (_startEvent: React.MouseEvent, nodeId: string, node: any) => {
+    pushSnapshot();
+    const onMove = (moveEvent: MouseEvent) => {
+      const rect = canvasRef.current?.getBoundingClientRect();
+      if (!rect) return;
+      const currentX = Math.round((moveEvent.clientX - rect.left) / zoom);
+      const currentY = Math.round((moveEvent.clientY - rect.top) / zoom);
+
+      const normX = Math.max(0, Math.min(1, (currentX - node.x) / (node.width || 1)));
+      const normY = Math.max(0, Math.min(1, (currentY - node.y) / (node.height || 1)));
+
+      updateNode(nodeId, {
+        pivotX: parseFloat(normX.toFixed(2)),
+        pivotY: parseFloat(normY.toFixed(2))
+      });
+    };
+
+    const onUp = () => {
+      window.removeEventListener('mousemove', onMove);
+      window.removeEventListener('mouseup', onUp);
+      showToast('Updated pivot point (Y)');
+    };
+
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
+  };
+
+  const initShapeDraw = (
+    _startEvent: React.MouseEvent,
+    startX: number,
+    startY: number,
+    shapeTool: 'rect' | 'circle' | 'star' | 'frame'
+  ) => {
+    let lastX = startX;
+    let lastY = startY;
+
+    const onMove = (moveEvent: MouseEvent) => {
+      const rect = canvasRef.current?.getBoundingClientRect();
+      if (!rect) return;
+      lastX = Math.round((moveEvent.clientX - rect.left) / zoom);
+      lastY = Math.round((moveEvent.clientY - rect.top) / zoom);
+
+      setMarqueeRect({ x1: startX, y1: startY, x2: lastX, y2: lastY });
+    };
+
+    const onUp = () => {
+      setMarqueeRect(null);
+      window.removeEventListener('mousemove', onMove);
+      window.removeEventListener('mouseup', onUp);
+
+      let minX = Math.min(startX, lastX);
+      let minY = Math.min(startY, lastY);
+      let width = Math.abs(lastX - startX);
+      let height = Math.abs(lastY - startY);
+
+      // Single click fallback: 100x100 default size
+      if (width < 10 && height < 10) {
+        width = 100;
+        height = 100;
+        minX = Math.round(startX - 50);
+        minY = Math.round(startY - 50);
+      }
+
+      pushSnapshot();
+
+      const newId = `${shapeTool}-${Date.now()}`;
+      if (shapeTool === 'frame') {
+        addNode({
+          id: newId,
+          name: 'Frame Card',
+          type: 'rect',
+          visible: true,
+          locked: false,
+          x: minX,
+          y: minY,
+          width,
+          height,
+          rotation: 0,
+          scaleX: 1,
+          scaleY: 1,
+          opacity: 1,
+          borderRadius: 16,
+          fill: '#f8fafc',
+          stroke: '#94a3b8',
+          strokeWidth: 2,
+          tracks: []
+        });
+      } else {
+        addNode({
+          id: newId,
+          name: shapeTool === 'circle' ? 'Circle' : shapeTool === 'star' ? 'Star Card' : 'Rectangle',
+          type: shapeTool,
+          visible: true,
+          locked: false,
+          x: minX,
+          y: minY,
+          width,
+          height,
+          rotation: 0,
+          scaleX: 1,
+          scaleY: 1,
+          opacity: 1,
+          borderRadius: shapeTool === 'circle' ? 9999 : shapeTool === 'star' ? 20 : 12,
+          fill: shapeTool === 'circle' ? '#10b981' : shapeTool === 'star' ? '#f59e0b' : '#8b5cf6',
+          tracks: [
+            {
+              id: `tr-rot-${Date.now()}`,
+              property: 'rotation',
+              label: 'Rotation',
+              unit: '°',
+              color: '#8b5cf6',
+              keyframes: [
+                { id: 'k1', time: 0, value: 0, curve: { x1: 0.42, y1: 0, x2: 0.58, y2: 1 } },
+                { id: 'k2', time: 3, value: 360, curve: { x1: 0.42, y1: 0, x2: 0.58, y2: 1 } }
+              ]
+            }
+          ]
+        });
+      }
+
+      setSelectedId(newId);
+      setSelectedTool('select');
+      showToast(`Created ${shapeTool} layer!`);
+    };
+
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
+  };
+
   const handlePenToolClick = (x: number, y: number, startEvent: React.MouseEvent) => {
     let targetNodeId = selectedId;
     if (!targetNodeId || !nodes[targetNodeId] || nodes[targetNodeId].type !== 'path') {
@@ -312,6 +473,15 @@ export const Canvas: React.FC = () => {
     }
 
     const currentPoints = nodes[targetNodeId]?.pathPoints || [];
+
+    // Check if clicking close to the starting point to close the path
+    if (currentPoints.length > 2 && Math.hypot(x - currentPoints[0].x, y - currentPoints[0].y) < 15) {
+      addPathPoint(targetNodeId, { x: currentPoints[0].x, y: currentPoints[0].y, type: 'close' });
+      setSelectedTool('select');
+      showToast('Vector path closed!');
+      return;
+    }
+
     const newPointIndex = currentPoints.length;
     const newPoint = { x, y, type: 'cubic' as const };
     addPathPoint(targetNodeId, newPoint);

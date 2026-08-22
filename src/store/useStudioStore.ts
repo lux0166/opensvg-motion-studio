@@ -238,6 +238,7 @@ interface StudioState {
   toggleAutoKeyframe: () => void;
   setCurrentTime: (time: number) => void;
   setDuration: (duration: number) => void;
+  setFps: (fps: number) => void;
   setLoop: (loop: boolean) => void;
   toggleGraphEditor: () => void;
   setTimelineMode: (mode: TimelineMode) => void;
@@ -572,6 +573,7 @@ export const useStudioStore = create<StudioState>()(
       }),
     setCurrentTime: (time) => set({ currentTime: Math.max(0, Math.min(get().duration, time)) }),
     setDuration: (duration) => set({ duration: Math.max(1, duration) }),
+    setFps: (fps) => set({ fps: Math.max(1, Math.min(240, fps)) }),
     setLoop: (loop) => set({ loop }),
     toggleGraphEditor: () => set((state) => ({ isGraphEditorOpen: !state.isGraphEditorOpen })),
     setTimelineMode: (mode) => set({ timelineMode: mode }),
