@@ -6,6 +6,7 @@ import { StudioSnapshot, createStudioSnapshot, MAX_HISTORY_STEPS } from '../engi
 import { BooleanOpType, executeBooleanOperation } from '../engine/booleanOps';
 import { detectSyntheticBeats } from '../engine/audioEngine';
 import { applyMotionPresetToNode, PresetOptions } from '../engine/motionPresets';
+import { scaleKeyframes, reverseKeyframes, createKeyframeClipboard, pasteKeyframesToNode, KeyframeClipboard } from '../engine/timelineOps';
 import { WorkspaceLayoutState, WORKSPACE_PRESETS, PanelId, SnapPosition, DockContainer, ActiveDraggingState, DragHoverTargetState } from '../engine/workspaceTypes';
 
 function pushDraftSnapshot(state: any) {
@@ -190,8 +191,9 @@ function loadTabState(state: any, targetTab: DocumentTab) {
 }
 
 interface StudioState {
-  // Playback
+  // Playback & Recording
   isPlaying: boolean;
+  isAutoKeyframe: boolean;
   currentTime: number;
   duration: number;
   fps: number;
@@ -233,6 +235,7 @@ interface StudioState {
 
   // Actions
   setPlaying: (playing: boolean) => void;
+  toggleAutoKeyframe: () => void;
   setCurrentTime: (time: number) => void;
   setDuration: (duration: number) => void;
   setLoop: (loop: boolean) => void;
@@ -278,10 +281,15 @@ interface StudioState {
   addPathPoint: (nodeId: string, point: BezierPoint) => void;
   updatePathPoint: (nodeId: string, index: number, updates: Partial<BezierPoint>) => void;
 
-  // Keyframes
+  // Keyframes & Time Transformations (Task 2.2 & 2.5)
+  keyframeClipboard: KeyframeClipboard | null;
   setSelectedKeyframeIds: (ids: string[]) => void;
   toggleKeyframeSelection: (kfId: string, isShift: boolean) => void;
   staggerSelectedKeyframes: (offsetStep?: number) => void;
+  scaleSelectedKeyframes: (factor: number) => void;
+  reverseSelectedKeyframes: () => void;
+  copySelectedKeyframes: () => void;
+  pasteKeyframes: () => void;
   addOrUpdateKeyframe: (nodeId: string, property: string, time: number, value: any) => void;
   removeKeyframe: (nodeId: string, property: string, keyframeId: string) => void;
   updateKeyframeTime: (nodeId: string, property: string, keyframeId: string, newTime: number) => void;
@@ -354,6 +362,7 @@ export const useStudioStore = create<StudioState>()(
     activeTabId: initialTab1.id,
 
     isPlaying: false,
+    isAutoKeyframe: false,
     currentTime: 1.05,
     duration: 3.0,
     fps: 60,
@@ -368,6 +377,7 @@ export const useStudioStore = create<StudioState>()(
     selectedId: 'card',
     selectedIds: ['card'],
     selectedKeyframeIds: [],
+    keyframeClipboard: null,
     selectedPointIndex: null,
     selectedTrackId: 'tr-rot',
     expandedNodeIds: { 'frame-1': true, card: true, ball: true },
@@ -554,6 +564,12 @@ export const useStudioStore = create<StudioState>()(
 
     // Action implementations
     setPlaying: (playing) => set({ isPlaying: playing }),
+    toggleAutoKeyframe: () =>
+      set((state) => {
+        state.isAutoKeyframe = !state.isAutoKeyframe;
+        state.toastMessage = state.isAutoKeyframe ? 'Auto-Keyframing Record ON' : 'Auto-Keyframing OFF';
+        state.toastType = state.isAutoKeyframe ? 'success' : 'info';
+      }),
     setCurrentTime: (time) => set({ currentTime: Math.max(0, Math.min(get().duration, time)) }),
     setDuration: (duration) => set({ duration: Math.max(1, duration) }),
     setLoop: (loop) => set({ loop }),
@@ -841,9 +857,50 @@ export const useStudioStore = create<StudioState>()(
 
     updateNode: (id, updates, recordHistory = false) =>
       set((state) => {
-        if (state.nodes[id]) {
+        const node = state.nodes[id];
+        if (node) {
           if (recordHistory) pushDraftSnapshot(state);
-          Object.assign(state.nodes[id], updates);
+          Object.assign(node, updates);
+
+          // Auto-Keyframing Record Mode (Task 2.3)
+          if (state.isAutoKeyframe && state.currentTime > 0) {
+            const animatableProps = [
+              'x', 'y', 'width', 'height', 'rotation', 'scaleX', 'scaleY',
+              'pivotX', 'pivotY', 'opacity', 'borderRadius', 'fill', 'stroke',
+              'strokeWidth', 'trimStart', 'trimEnd', 'trimOffset', 'fontSize',
+              'shadowBlur', 'shadowOffsetX', 'shadowOffsetY', 'filterBlur'
+            ];
+
+            for (const [prop, val] of Object.entries(updates)) {
+              if (animatableProps.includes(prop) && val !== undefined) {
+                let track = node.tracks.find((t) => t.property === prop);
+                if (!track) {
+                  track = {
+                    id: `tr-${Date.now()}-${prop}`,
+                    property: prop as any,
+                    label: prop.toUpperCase(),
+                    unit: '',
+                    color: '#3b82f6',
+                    keyframes: []
+                  };
+                  node.tracks.push(track);
+                }
+
+                const existing = track.keyframes.find((k) => Math.abs(k.time - state.currentTime) < 0.04);
+                if (existing) {
+                  existing.value = val as any;
+                } else {
+                  track.keyframes.push({
+                    id: `kf-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
+                    time: parseFloat(state.currentTime.toFixed(2)),
+                    value: val as any,
+                    curve: { x1: 0.42, y1: 0, x2: 0.58, y2: 1 }
+                  });
+                  track.keyframes.sort((a, b) => a.time - b.time);
+                }
+              }
+            }
+          }
         }
       }),
 
@@ -945,6 +1002,91 @@ export const useStudioStore = create<StudioState>()(
           state.toastMessage = `Staggered ${node.tracks.length} tracks by +${offsetStep}s`;
           state.toastType = 'info';
         }
+      }),
+
+    scaleSelectedKeyframes: (factor) =>
+      set((state) => {
+        if (state.selectedKeyframeIds.length === 0) return;
+        pushDraftSnapshot(state);
+
+        for (const nodeId in state.nodes) {
+          const n = state.nodes[nodeId];
+          if (!n.tracks) continue;
+          for (const t of n.tracks) {
+            const affected = t.keyframes.filter((k) => state.selectedKeyframeIds.includes(k.id));
+            if (affected.length > 0) {
+              const anchor = Math.min(...affected.map((k) => k.time));
+              t.keyframes = scaleKeyframes(t.keyframes, factor, anchor, state.duration);
+            }
+          }
+        }
+        state.toastMessage = `Scaled keyframes by ${factor}x`;
+        state.toastType = 'info';
+      }),
+
+    reverseSelectedKeyframes: () =>
+      set((state) => {
+        if (state.selectedKeyframeIds.length <= 1) {
+          const node = state.selectedId ? state.nodes[state.selectedId] : null;
+          if (!node || !node.tracks) return;
+          pushDraftSnapshot(state);
+          for (const t of node.tracks) {
+            t.keyframes = reverseKeyframes(t.keyframes, 0, state.duration);
+          }
+          state.toastMessage = `Reversed keyframes on ${node.name}`;
+          state.toastType = 'info';
+          return;
+        }
+
+        pushDraftSnapshot(state);
+        for (const nodeId in state.nodes) {
+          const n = state.nodes[nodeId];
+          if (!n.tracks) continue;
+          for (const t of n.tracks) {
+            const hasSelected = t.keyframes.some((k) => state.selectedKeyframeIds.includes(k.id));
+            if (hasSelected) {
+              t.keyframes = reverseKeyframes(t.keyframes);
+            }
+          }
+        }
+        state.toastMessage = `Reversed ${state.selectedKeyframeIds.length} keyframes`;
+        state.toastType = 'info';
+      }),
+
+    copySelectedKeyframes: () =>
+      set((state) => {
+        const clipboard = createKeyframeClipboard(state.selectedKeyframeIds, state.nodes);
+        if (!clipboard) {
+          state.toastMessage = 'No keyframes selected to copy';
+          state.toastType = 'error';
+          return;
+        }
+        state.keyframeClipboard = clipboard;
+        state.toastMessage = `Copied ${clipboard.items.length} keyframe(s)`;
+        state.toastType = 'success';
+      }),
+
+    pasteKeyframes: () =>
+      set((state) => {
+        if (!state.keyframeClipboard || state.keyframeClipboard.items.length === 0) {
+          state.toastMessage = 'Keyframe clipboard is empty';
+          state.toastType = 'error';
+          return;
+        }
+        const targetNodeId = state.selectedId;
+        if (!targetNodeId || !state.nodes[targetNodeId]) {
+          state.toastMessage = 'Select a target node to paste keyframes';
+          state.toastType = 'error';
+          return;
+        }
+
+        pushDraftSnapshot(state);
+        const targetNode = state.nodes[targetNodeId];
+        const res = pasteKeyframesToNode(state.keyframeClipboard, targetNode, state.currentTime);
+        targetNode.tracks = res.updatedTracks;
+
+        state.toastMessage = `Pasted ${res.pastedCount} keyframe(s) at ${state.currentTime.toFixed(2)}s`;
+        state.toastType = 'success';
       }),
 
     addOrUpdateKeyframe: (nodeId, property, time, value) =>

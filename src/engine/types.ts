@@ -12,6 +12,7 @@ export interface BezierPoint {
   cp2x?: number; // Control point 2
   cp2y?: number;
   type?: 'move' | 'line' | 'cubic' | 'close';
+  pointType?: 'corner' | 'smooth' | 'asymmetric';
 }
 
 export interface CubicBezierCurve {
@@ -47,11 +48,18 @@ export type AnimatableProperty =
   | 'rotation'
   | 'scaleX'
   | 'scaleY'
+  | 'pivotX'
+  | 'pivotY'
   | 'opacity'
   | 'borderRadius'
   | 'fill'
   | 'stroke'
   | 'strokeWidth'
+  | 'trimStart'
+  | 'trimEnd'
+  | 'trimOffset'
+  | 'textPathOffset'
+  | 'staggerDelay'
   | 'pathPoints'
   | 'fontSize'
   | 'shadowBlur'
@@ -105,21 +113,27 @@ export interface BaseNode {
   rotation: number; // degrees
   scaleX: number;
   scaleY: number;
+  pivotX?: number; // 0.0 to 1.0 (default 0.5 center)
+  pivotY?: number; // 0.0 to 1.0 (default 0.5 center)
   opacity: number; // 0 to 1
   borderRadius: number;
 
   // Appearance & Gradient Fills
   fillType?: FillType;
   fill: string;
+  fillRule?: 'nonzero' | 'evenodd';
   linearGradient?: LinearGradientConfig;
   radialGradient?: RadialGradientConfig;
 
-  // Stroke Styling
+  // Stroke Styling & Path Trimming
   stroke?: string;
   strokeWidth?: number;
   strokeDash?: number[];
   strokeCap?: 'butt' | 'round' | 'square';
   strokeJoin?: 'miter' | 'round' | 'bevel';
+  trimStart?: number; // 0.0 to 1.0
+  trimEnd?: number; // 0.0 to 1.0
+  trimOffset?: number; // 0.0 to 1.0
 
   // Filters & Shadows
   shadowColor?: string;
@@ -130,8 +144,15 @@ export interface BaseNode {
 
   // Path data (if type === 'path')
   pathPoints?: BezierPoint[];
+  subPaths?: BezierPoint[][]; // For compound paths & holes
 
-  // Text & Typography (if type === 'text')
+  // Masking & Clipping (Rules L1, L2, L3)
+  isMask?: boolean;
+  maskMode?: 'alpha' | 'clip' | 'none';
+  maskTargetId?: string | null;
+  maskId?: string | null;
+
+  // Text & Typography (if type === 'text') (Rules K1, K2, K3, K4, K5)
   textContent?: string;
   fontFamily?: string;
   fontSize?: number;
@@ -139,6 +160,10 @@ export interface BaseNode {
   letterSpacing?: number;
   lineHeight?: number;
   textAlign?: 'left' | 'center' | 'right';
+  textPathNodeId?: string | null;
+  textPathOffset?: number; // 0.0 to 1.0 progress along path
+  staggerType?: 'none' | 'typewriter' | 'wave' | 'cascade';
+  staggerDelay?: number; // Delay per glyph/character in seconds
 
   // Animation tracks
   tracks: PropertyTrack<any>[];
@@ -188,6 +213,7 @@ export interface SceneProject {
 export type ToolMode =
   | 'select'
   | 'direct-select'
+  | 'pivot'
   | 'frame'
   | 'rect'
   | 'circle'

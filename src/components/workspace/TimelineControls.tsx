@@ -12,7 +12,10 @@ import {
   Music,
   Bookmark,
   Gem,
-  Activity
+  Activity,
+  ArrowLeftRight,
+  Copy,
+  ClipboardPaste
 } from 'lucide-react';
 
 /**
@@ -103,10 +106,17 @@ export const TimelineActionButtons: React.FC = () => {
     currentTime,
     audioTrack,
     isGraphEditorOpen,
+    isAutoKeyframe,
     selectedId,
     nodes,
+    keyframeClipboard,
     toggleGraphEditor,
+    toggleAutoKeyframe,
     staggerSelectedKeyframes,
+    scaleSelectedKeyframes,
+    reverseSelectedKeyframes,
+    copySelectedKeyframes,
+    pasteKeyframes,
     setAudioTrack,
     addMarker,
     addOrUpdateKeyframe,
@@ -136,6 +146,75 @@ export const TimelineActionButtons: React.FC = () => {
 
   return (
     <div className="flex items-center gap-1 select-none shrink-0 pl-1">
+      {/* Auto-Keyframe Record Toggle (Task 2.3) */}
+      <button
+        type="button"
+        title="Toggle Auto-Keyframing Record Mode (Any change creates a keyframe at playhead)"
+        onClick={toggleAutoKeyframe}
+        className={`flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-semibold transition-all border shadow-2xs ${
+          isAutoKeyframe
+            ? 'bg-red-50 dark:bg-red-950/60 text-red-600 dark:text-red-400 border-red-300 dark:border-red-700 font-bold animate-pulse'
+            : 'bg-white dark:bg-zinc-800 text-slate-600 dark:text-zinc-400 border-slate-200 dark:border-zinc-700 hover:bg-slate-50 hover:dark:bg-zinc-700'
+        }`}
+      >
+        <div className={`w-2.5 h-2.5 rounded-full ${isAutoKeyframe ? 'bg-red-500' : 'bg-slate-400 dark:bg-zinc-500'}`} />
+        <span>Auto-Key</span>
+      </button>
+
+      {/* Reverse Keyframes (Task 2.2) */}
+      <button
+        type="button"
+        title="Reverse Keyframes / Animation Direction (with Easing inversion)"
+        onClick={reverseSelectedKeyframes}
+        className="flex items-center gap-1 bg-white dark:bg-zinc-800 hover:bg-slate-50 hover:dark:bg-zinc-700 text-slate-700 dark:text-zinc-300 border border-slate-200 dark:border-zinc-700 px-2 py-1 rounded-lg text-xs font-semibold transition-all active:scale-95 shadow-2xs"
+      >
+        <ArrowLeftRight className="w-3.5 h-3.5 text-blue-500" />
+        <span>Reverse</span>
+      </button>
+
+      {/* Scale Time Speed (Task 2.2) */}
+      <button
+        type="button"
+        title="Scale Keyframes 0.5x (Speed up 2x)"
+        onClick={() => scaleSelectedKeyframes(0.5)}
+        className="px-1.5 py-1 bg-white dark:bg-zinc-800 hover:bg-slate-50 hover:dark:bg-zinc-700 text-slate-600 dark:text-zinc-400 border border-slate-200 dark:border-zinc-700 rounded-lg text-xs font-mono font-medium shadow-2xs"
+      >
+        0.5x
+      </button>
+      <button
+        type="button"
+        title="Scale Keyframes 2.0x (Slow down 0.5x)"
+        onClick={() => scaleSelectedKeyframes(2.0)}
+        className="px-1.5 py-1 bg-white dark:bg-zinc-800 hover:bg-slate-50 hover:dark:bg-zinc-700 text-slate-600 dark:text-zinc-400 border border-slate-200 dark:border-zinc-700 rounded-lg text-xs font-mono font-medium shadow-2xs"
+      >
+        2x
+      </button>
+
+      {/* Copy Keyframes (Task 2.5) */}
+      <button
+        type="button"
+        title="Copy Selected Keyframes (Ctrl+C)"
+        onClick={copySelectedKeyframes}
+        className="w-7 h-7 flex items-center justify-center bg-white dark:bg-zinc-800 hover:bg-slate-50 hover:dark:bg-zinc-700 text-slate-700 dark:text-zinc-300 border border-slate-200 dark:border-zinc-700 rounded-lg shadow-2xs transition-colors"
+      >
+        <Copy className="w-3.5 h-3.5 text-slate-600 dark:text-zinc-400" />
+      </button>
+
+      {/* Paste Keyframes (Task 2.5) */}
+      <button
+        type="button"
+        title={keyframeClipboard ? `Paste ${keyframeClipboard.items.length} Keyframe(s) at Playhead (Ctrl+V)` : 'Clipboard empty'}
+        onClick={pasteKeyframes}
+        disabled={!keyframeClipboard}
+        className={`w-7 h-7 flex items-center justify-center rounded-lg shadow-2xs transition-colors border ${
+          keyframeClipboard
+            ? 'bg-blue-50 dark:bg-blue-950/50 text-blue-600 dark:text-blue-400 border-blue-200 dark:border-blue-800 hover:bg-blue-100'
+            : 'bg-slate-50 dark:bg-zinc-800/50 text-slate-300 dark:text-zinc-600 border-slate-200 dark:border-zinc-700 cursor-not-allowed'
+        }`}
+      >
+        <ClipboardPaste className="w-3.5 h-3.5" />
+      </button>
+
       {/* Stagger Action */}
       <button
         type="button"

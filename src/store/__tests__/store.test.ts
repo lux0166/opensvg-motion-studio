@@ -1,4 +1,4 @@
-﻿import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import { useStudioStore } from '../useStudioStore';
 
 describe('Studio Central Store (Zustand + Immer)', () => {
@@ -104,5 +104,38 @@ describe('Studio Central Store (Zustand + Immer)', () => {
 
     store.addPathPoint(pathId, { x: 50, y: 80, cp1x: 30, cp1y: 60, type: 'cubic' });
     expect(useStudioStore.getState().nodes[pathId].pathPoints?.length).toBe(2);
+  });
+
+  it('automatically inserts keyframes when Auto-Keyframing is active', () => {
+    const store = useStudioStore.getState();
+    const nodeId = 'card';
+
+    // Enable Auto-Keyframing
+    store.toggleAutoKeyframe();
+    expect(useStudioStore.getState().isAutoKeyframe).toBe(true);
+
+    // Set time to 1.5s
+    store.setCurrentTime(1.5);
+
+    // Update node properties
+    store.updateNode(nodeId, { x: 280, rotation: 90, pivotX: 0.25 });
+
+    const cardNode = useStudioStore.getState().nodes[nodeId];
+    const xTrack = cardNode.tracks.find(t => t.property === 'x');
+    const rotTrack = cardNode.tracks.find(t => t.property === 'rotation');
+    const pivotTrack = cardNode.tracks.find(t => t.property === 'pivotX');
+
+    expect(xTrack).toBeDefined();
+    expect(rotTrack).toBeDefined();
+    expect(pivotTrack).toBeDefined();
+
+    const xKf = xTrack?.keyframes.find(k => Math.abs(k.time - 1.5) < 0.05);
+    expect(xKf?.value).toBe(280);
+
+    const rotKf = rotTrack?.keyframes.find(k => Math.abs(k.time - 1.5) < 0.05);
+    expect(rotKf?.value).toBe(90);
+
+    const pivotKf = pivotTrack?.keyframes.find(k => Math.abs(k.time - 1.5) < 0.05);
+    expect(pivotKf?.value).toBe(0.25);
   });
 });

@@ -353,6 +353,52 @@ export const PropertiesPanel: React.FC = () => {
           />
         </div>
 
+        {/* Pivot / Anchor Point (Task 1.1) */}
+        <div>
+          <div className="flex justify-between items-center mb-1.5">
+            <label className="text-[11px] text-gray-400 dark:text-zinc-500 font-semibold uppercase tracking-wider flex items-center gap-1">
+              <Navigation className="w-3 h-3 text-red-500" /> Pivot / Anchor Point
+            </label>
+            <span className="text-[10px] font-mono text-gray-500 dark:text-zinc-400">
+              {Math.round((selectedNode.pivotX ?? 0.5) * 100)}%, {Math.round((selectedNode.pivotY ?? 0.5) * 100)}%
+            </span>
+          </div>
+          <div className="grid grid-cols-3 gap-1 bg-gray-50 dark:bg-zinc-800/70 p-1.5 rounded-xl border border-gray-200 dark:border-zinc-700">
+            {[
+              { label: 'TL', x: 0, y: 0 },
+              { label: 'TC', x: 0.5, y: 0 },
+              { label: 'TR', x: 1, y: 0 },
+              { label: 'CL', x: 0, y: 0.5 },
+              { label: 'Center', x: 0.5, y: 0.5 },
+              { label: 'CR', x: 1, y: 0.5 },
+              { label: 'BL', x: 0, y: 1 },
+              { label: 'BC', x: 0.5, y: 1 },
+              { label: 'BR', x: 1, y: 1 }
+            ].map((p) => {
+              const isCurrent =
+                Math.abs((selectedNode.pivotX ?? 0.5) - p.x) < 0.05 &&
+                Math.abs((selectedNode.pivotY ?? 0.5) - p.y) < 0.05;
+              return (
+                <button
+                  key={p.label}
+                  type="button"
+                  onClick={() => {
+                    updateNode(selectedId, { pivotX: p.x, pivotY: p.y }, true);
+                    showToast(`Pivot: ${p.label}`);
+                  }}
+                  className={`py-1 rounded-lg text-[10px] font-mono font-medium transition-all ${
+                    isCurrent
+                      ? 'bg-red-500 text-white font-bold shadow-xs'
+                      : 'text-gray-600 dark:text-zinc-400 hover:bg-gray-200 dark:hover:bg-zinc-700'
+                  }`}
+                >
+                  {p.label}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
         {/* Typography Controls (When Text Node is Selected) */}
         {selectedNode.type === 'text' && (
           <div className="p-3 bg-gray-50 dark:bg-zinc-800/70 rounded-2xl border border-gray-200 dark:border-zinc-700 flex flex-col gap-3">
@@ -797,6 +843,42 @@ export const PropertiesPanel: React.FC = () => {
                 >
                   Dashed
                 </button>
+              </div>
+            </div>
+
+            {/* Trim Path Controls (Task 4.3) */}
+            <div className="pt-2 border-t border-gray-200/60 dark:border-zinc-700/60 space-y-2">
+              <div className="flex justify-between items-center text-[10px] font-bold text-gray-500 dark:text-zinc-400 uppercase tracking-wider">
+                <span>Trim Path Animation</span>
+                <span className="font-mono text-blue-600 dark:text-blue-400">
+                  {Math.round((selectedNode.trimStart ?? 0) * 100)}% - {Math.round((selectedNode.trimEnd ?? 1) * 100)}%
+                </span>
+              </div>
+              <div>
+                <div className="flex justify-between text-[10px] text-gray-400 dark:text-zinc-500 mb-0.5">
+                  <span>Start</span>
+                  <span>{Math.round((selectedNode.trimStart ?? 0) * 100)}%</span>
+                </div>
+                <input
+                  type="range"
+                  min="0"
+                  max="100"
+                  value={Math.round((selectedNode.trimStart ?? 0) * 100)}
+                  onChange={(e) => updateNode(selectedId, { trimStart: parseInt(e.target.value) / 100 })}
+                />
+              </div>
+              <div>
+                <div className="flex justify-between text-[10px] text-gray-400 dark:text-zinc-500 mb-0.5">
+                  <span>End</span>
+                  <span>{Math.round((selectedNode.trimEnd ?? 1) * 100)}%</span>
+                </div>
+                <input
+                  type="range"
+                  min="0"
+                  max="100"
+                  value={Math.round((selectedNode.trimEnd ?? 1) * 100)}
+                  onChange={(e) => updateNode(selectedId, { trimEnd: parseInt(e.target.value) / 100 })}
+                />
               </div>
             </div>
           </div>

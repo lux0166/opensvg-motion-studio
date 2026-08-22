@@ -1,5 +1,6 @@
 import { SceneNode, FrameNode, ToolMode, BezierPoint } from './types';
 import { SnapLine } from './snapping';
+import { computeTextOnPath, computeKineticTextStagger } from './textOnPath';
 
 export interface DragHandleInfo {
   type: 'move' | 'nw' | 'ne' | 'se' | 'sw' | 'n' | 's' | 'e' | 'w' | 'rotate' | 'anchor' | 'cp1' | 'cp2';
@@ -51,18 +52,20 @@ export function renderCanvasScene(
     if (!node.visible) continue;
 
     ctx.save();
-    // Transform matrix
-    const centerX = node.x + node.width / 2;
-    const centerY = node.y + node.height / 2;
+    // Transform matrix with Pivot Point Support (Task 1.1)
+    const pivotNormX = node.pivotX !== undefined ? node.pivotX : 0.5;
+    const pivotNormY = node.pivotY !== undefined ? node.pivotY : 0.5;
+    const pivotPxX = node.x + node.width * pivotNormX;
+    const pivotPxY = node.y + node.height * pivotNormY;
 
-    ctx.translate(centerX, centerY);
+    ctx.translate(pivotPxX, pivotPxY);
     if (node.rotation) {
       ctx.rotate((node.rotation * Math.PI) / 180);
     }
     if (node.scaleX !== 1 || node.scaleY !== 1) {
       ctx.scale(node.scaleX, node.scaleY);
     }
-    ctx.translate(-centerX, -centerY);
+    ctx.translate(-pivotPxX, -pivotPxY);
 
     // Apply Opacity
     ctx.globalAlpha = Math.max(0, Math.min(1, node.opacity ?? 1));
@@ -78,13 +81,26 @@ export function renderCanvasScene(
     // Apply Fill (Solid, Linear Gradient, Radial Gradient)
     ctx.fillStyle = getShapeFill(ctx, node);
 
-    // Apply Stroke & Dash/Cap/Join
+    // Apply Stroke & Dash/Cap/Join with Trim Path Support (Task 4.3)
     if (node.stroke && node.strokeWidth) {
       ctx.strokeStyle = node.stroke;
       ctx.lineWidth = node.strokeWidth;
-      ctx.setLineDash(node.strokeDash || []);
       ctx.lineCap = node.strokeCap || 'round';
       ctx.lineJoin = node.strokeJoin || 'round';
+
+      if (node.trimStart !== undefined || node.trimEnd !== undefined || node.trimOffset !== undefined) {
+        const start = Math.max(0, Math.min(1, node.trimStart ?? 0));
+        const end = Math.max(0, Math.min(1, node.trimEnd ?? 1));
+        const offset = (node.trimOffset ?? 0) % 1;
+        const perimeter = Math.max(10, (node.width + node.height) * 2);
+        const len = Math.max(0.1, (end - start) * perimeter);
+        const gap = Math.max(0.1, perimeter - len);
+        const dashOffset = -(start + offset) * perimeter;
+        ctx.setLineDash([len, gap]);
+        ctx.lineDashOffset = dashOffset;
+      } else {
+        ctx.setLineDash(node.strokeDash || []);
+      }
     }
 
     // Apply Drop Shadow & Glow Filters
@@ -126,15 +142,35 @@ export function renderCanvasScene(
       drawStar(ctx, node.x + node.width / 2, node.y + node.height / 2, 5, node.width / 2, node.width / 4);
       ctx.fill();
       if (node.stroke && node.strokeWidth) ctx.stroke();
-    } else if (node.type === 'path' && node.pathPoints && node.pathPoints.length > 0) {
-      drawBezierPath(ctx, node.pathPoints, node.x, node.y);
-      if (node.fill && node.fill !== 'transparent') ctx.fill();
-      if (node.stroke && node.strokeWidth) {
-        ctx.stroke();
-      } else if (!node.stroke) {
-        ctx.strokeStyle = '#3b82f6';
-        ctx.lineWidth = 2;
-        ctx.stroke();
+    } else if (node.type === 'path') {
+      // Compound paths & Single paths support (Task 1.2)
+      if (node.subPaths && node.subPaths.length > 0) {
+        ctx.beginPath();
+        for (const sub of node.subPaths) {
+          if (sub.length > 0) {
+            ctx.moveTo(sub[0].x + node.x, sub[0].y + node.y);
+            for (let i = 1; i < sub.length; i++) {
+              const p = sub[i];
+              if (p.cp1x !== undefined && p.cp1y !== undefined && p.cp2x !== undefined && p.cp2y !== undefined) {
+                ctx.bezierCurveTo(p.cp1x + node.x, p.cp1y + node.y, p.cp2x + node.x, p.cp2y + node.y, p.x + node.x, p.y + node.y);
+              } else {
+                ctx.lineTo(p.x + node.x, p.y + node.y);
+              }
+            }
+          }
+        }
+        if (node.fill && node.fill !== 'transparent') ctx.fill(node.fillRule || 'evenodd');
+        if (node.stroke && node.strokeWidth) ctx.stroke();
+      } else if (node.pathPoints && node.pathPoints.length > 0) {
+        drawBezierPath(ctx, node.pathPoints, node.x, node.y);
+        if (node.fill && node.fill !== 'transparent') ctx.fill(node.fillRule || 'nonzero');
+        if (node.stroke && node.strokeWidth) {
+          ctx.stroke();
+        } else if (!node.stroke) {
+          ctx.strokeStyle = '#3b82f6';
+          ctx.lineWidth = 2;
+          ctx.stroke();
+        }
       }
     } else if (node.type === 'text') {
       const weight = node.fontWeight || 600;
@@ -145,8 +181,56 @@ export function renderCanvasScene(
       ctx.textBaseline = 'top';
 
       const text = node.textContent || 'Typography';
-      const textX = node.textAlign === 'center' ? node.x + node.width / 2 : node.textAlign === 'right' ? node.x + node.width : node.x;
 
+      // Text on Path Rendering (Task 4.1 & Rule K1, K2, K3)
+      if (node.textPathNodeId) {
+        const pathNode = evaluatedNodes.find((n) => n.id === node.textPathNodeId);
+        if (pathNode && pathNode.pathPoints && pathNode.pathPoints.length >= 2) {
+          const glyphs = computeTextOnPath(
+            text,
+            pathNode.pathPoints,
+            node.textPathOffset ?? 0,
+            size,
+            node.letterSpacing ?? 2
+          );
+          for (const g of glyphs) {
+            ctx.save();
+            ctx.translate(g.x + pathNode.x, g.y + pathNode.y);
+            ctx.rotate((g.rotation * Math.PI) / 180);
+            ctx.fillText(g.char, 0, 0);
+            if (node.stroke && node.strokeWidth) ctx.strokeText(g.char, 0, 0);
+            ctx.restore();
+          }
+          ctx.restore();
+          continue;
+        }
+      }
+
+      // Kinetic Typography Stagger (Task 4.2 & Rule K4, K5)
+      if (node.staggerType && node.staggerType !== 'none') {
+        const glyphs = computeKineticTextStagger(
+          text,
+          1.0,
+          node.staggerType,
+          node.staggerDelay ?? 0.06
+        );
+        let curX = node.x;
+        const charAdvance = size * 0.6 + (node.letterSpacing || 2);
+        for (const g of glyphs) {
+          ctx.save();
+          ctx.globalAlpha *= g.opacity;
+          ctx.translate(curX, node.y + g.y);
+          ctx.scale(g.scale, g.scale);
+          ctx.fillText(g.char, 0, 0);
+          if (node.stroke && node.strokeWidth) ctx.strokeText(g.char, 0, 0);
+          ctx.restore();
+          curX += charAdvance;
+        }
+        ctx.restore();
+        continue;
+      }
+
+      const textX = node.textAlign === 'center' ? node.x + node.width / 2 : node.textAlign === 'right' ? node.x + node.width : node.x;
       ctx.fillText(text, textX, node.y);
       if (node.stroke && node.strokeWidth) {
         ctx.strokeText(text, textX, node.y);
@@ -309,17 +393,20 @@ export function drawBezierPath(ctx: CanvasRenderingContext2D, points: BezierPoin
  */
 function drawSelectionOverlay(ctx: CanvasRenderingContext2D, node: SceneNode) {
   ctx.save();
+  const pivotNormX = node.pivotX !== undefined ? node.pivotX : 0.5;
+  const pivotNormY = node.pivotY !== undefined ? node.pivotY : 0.5;
+  const pivotPxX = node.x + node.width * pivotNormX;
+  const pivotPxY = node.y + node.height * pivotNormY;
   const centerX = node.x + node.width / 2;
-  const centerY = node.y + node.height / 2;
 
-  ctx.translate(centerX, centerY);
+  ctx.translate(pivotPxX, pivotPxY);
   if (node.rotation) {
     ctx.rotate((node.rotation * Math.PI) / 180);
   }
   if (node.scaleX !== 1 || node.scaleY !== 1) {
     ctx.scale(node.scaleX, node.scaleY);
   }
-  ctx.translate(-centerX, -centerY);
+  ctx.translate(-pivotPxX, -pivotPxY);
 
   // Blue selection ring
   ctx.strokeStyle = '#3b82f6';
@@ -359,6 +446,24 @@ function drawSelectionOverlay(ctx: CanvasRenderingContext2D, node: SceneNode) {
   ctx.beginPath();
   ctx.arc(centerX, node.y - 20, 4.5, 0, Math.PI * 2);
   ctx.fill();
+  ctx.stroke();
+
+  // Pivot Point Target Handle (Red circle with crosshair)
+  ctx.beginPath();
+  ctx.arc(pivotPxX, pivotPxY, 4.5, 0, Math.PI * 2);
+  ctx.fillStyle = '#ef4444';
+  ctx.fill();
+  ctx.strokeStyle = '#ffffff';
+  ctx.lineWidth = 1.5;
+  ctx.stroke();
+
+  ctx.beginPath();
+  ctx.moveTo(pivotPxX - 6, pivotPxY);
+  ctx.lineTo(pivotPxX + 6, pivotPxY);
+  ctx.moveTo(pivotPxX, pivotPxY - 6);
+  ctx.lineTo(pivotPxX, pivotPxY + 6);
+  ctx.strokeStyle = '#ffffff';
+  ctx.lineWidth = 1;
   ctx.stroke();
 
   ctx.restore();
