@@ -1,7 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useStudioStore } from '../store/useStudioStore';
 import { ToolMode } from '../engine/types';
-import { openProjectFromFile, serializeProject } from '../engine/projectManager';
 import { importSvgString } from '../engine/svgImporter';
 import { toggleThemeWithAnimation } from '../hooks/useThemeSwitcher';
 import {
@@ -55,11 +54,7 @@ export const Header: React.FC = () => {
     setPresetsModalOpen,
     addNode,
     rootFrame,
-    nodes,
-    nodeOrder,
-    duration,
     fps,
-    loadProject,
     createNewProject,
     undo,
     redo,
@@ -216,7 +211,7 @@ export const Header: React.FC = () => {
     const id = `shape-${Date.now()}`;
     addNode({
       id,
-      name: type === 'circle' ? 'Circle' : type === 'star' ? 'Star Card' : 'Rectangle',
+      name: type === 'circle' ? 'Circle' : type === 'star' ? 'Star' : 'Rectangle',
       type,
       visible: true,
       locked: false,
@@ -230,19 +225,7 @@ export const Header: React.FC = () => {
       opacity: 1,
       borderRadius: type === 'circle' ? 9999 : type === 'star' ? 20 : 12,
       fill: type === 'circle' ? '#10b981' : type === 'star' ? '#f59e0b' : '#8b5cf6',
-      tracks: [
-        {
-          id: `tr-rot-${Date.now()}`,
-          property: 'rotation',
-          label: 'Rotation',
-          unit: '°',
-          color: '#8b5cf6',
-          keyframes: [
-            { id: 'k1', time: 0, value: 0, curve: { x1: 0.42, y1: 0, x2: 0.58, y2: 1 } },
-            { id: 'k2', time: 3, value: 360, curve: { x1: 0.42, y1: 0, x2: 0.58, y2: 1 } }
-          ]
-        }
-      ]
+      tracks: [] // STATIC SHAPE (User explicitly animates if desired)
     });
     setShapesDropdownOpen(false);
     showToast(`Added ${type} shape!`);
@@ -250,28 +233,39 @@ export const Header: React.FC = () => {
 
   const handleOpenProject = async () => {
     try {
-      const proj = await openProjectFromFile();
-      loadProject(proj);
+      const input = document.createElement('input');
+      input.type = 'file';
+      input.accept = '.osvg,.kinetic,application/json';
+      input.onchange = async (e) => {
+        const file = (e.target as HTMLInputElement).files?.[0];
+        if (!file) return;
+        try {
+          const text = await file.text();
+          useStudioStore.getState().loadOpenSVGDocument(text);
+          showToast(`Opened OpenSVG document: ${file.name}`, 'success');
+        } catch (err: any) {
+          showToast(`Failed to parse OpenSVG: ${err?.message || err}`, 'error');
+        }
+      };
+      input.click();
       setFileMenuOpen(false);
     } catch (err: any) {
-      if (err?.message !== 'No file selected') {
-        showToast(`Failed to open project: ${err?.message || err}`, 'error');
-      }
+      showToast(`Failed to open project: ${err?.message || err}`, 'error');
     }
   };
 
   const handleSaveProject = () => {
-    const jsonStr = serializeProject(rootFrame, nodes, nodeOrder, duration, fps);
-    const blob = new Blob([jsonStr], { type: 'application/json' });
+    const osvgStr = useStudioStore.getState().exportOpenSVGDocument();
+    const blob = new Blob([osvgStr], { type: 'application/vnd.opensvg+json' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `${rootFrame.name.toLowerCase().replace(/\s+/g, '-')}-project.kinetic`;
+    a.download = `${rootFrame.name.toLowerCase().replace(/\s+/g, '-')}.osvg`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
-    showToast('Saved project (.kinetic)!', 'success');
+    showToast('Saved OpenSVG document (.osvg)!', 'success');
     setFileMenuOpen(false);
   };
 
@@ -307,15 +301,17 @@ export const Header: React.FC = () => {
   };
 
   return (
-    <header className="h-14 flex items-center justify-between px-4 border-b border-app-border dark:border-zinc-800 shrink-0 z-20 bg-white/90 dark:bg-zinc-900/90 backdrop-blur-md select-none relative">
-      {/* Left: Brand & Dynamic Auto-Shrinking Document Tabs */}
-      <div className="flex items-center gap-2 max-w-[calc(50%-220px)] min-w-0 z-10">
-        {/* Brand Menu Button */}
-        <div className="relative shrink-0">
+    <header className="h-14 border-b border-gray-200 dark:border-zinc-800 bg-white/90 dark:bg-zinc-900/90 backdrop-blur-md px-3 flex items-center justify-between z-30 select-none">
+      {/* Left: Brand, File Ops & Tabs */}
+      <div className="flex items-center gap-2 min-w-0 flex-1">
+        {/* Brand Menu Trigger */}
+        <div className="relative shrink-0" ref={menuRef}>
           <button
             type="button"
+            title="OpenSVG Studio Menu"
+            aria-label="OpenSVG Studio Menu"
             onClick={() => setFileMenuOpen(!fileMenuOpen)}
-            className="h-9 bg-white dark:bg-zinc-800 px-3.5 py-1.5 rounded-2xl shadow-2xs font-semibold flex items-center gap-1.5 hover:bg-gray-50 hover:dark:bg-zinc-700/80 border border-gray-200 dark:border-zinc-700 transition-all active:scale-95 text-xs text-slate-800 dark:text-zinc-100 shrink-0"
+            className="flex items-center gap-2 px-2.5 py-1.5 rounded-xl hover:bg-gray-100 hover:dark:bg-zinc-800 text-xs transition-colors font-medium text-gray-700 dark:text-zinc-300 outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
           >
             <Compass className="w-4 h-4 text-blue-600 dark:text-blue-400" />
             <span className="bg-gradient-to-r from-gray-900 to-gray-700 dark:from-zinc-100 dark:to-zinc-300 bg-clip-text text-transparent font-bold">
@@ -344,7 +340,7 @@ export const Header: React.FC = () => {
                 className="flex items-center gap-2.5 px-3 py-2 text-xs font-semibold text-gray-700 dark:text-zinc-300 hover:bg-gray-100 hover:dark:bg-zinc-800 rounded-xl transition-colors text-left"
               >
                 <FolderOpen className="w-4 h-4 text-blue-500 dark:text-blue-400" />
-                Open File (.kinetic)
+                Open (.osvg)
               </button>
               <button
                 type="button"
@@ -360,7 +356,7 @@ export const Header: React.FC = () => {
                 className="flex items-center gap-2.5 px-3 py-2 text-xs font-semibold text-gray-700 dark:text-zinc-300 hover:bg-gray-100 hover:dark:bg-zinc-800 rounded-xl transition-colors text-left"
               >
                 <Save className="w-4 h-4 text-emerald-500 dark:text-emerald-400" />
-                Save Project (Ctrl+S)
+                Save (.osvg)
               </button>
               <div className="h-[1px] bg-gray-100 dark:bg-zinc-800 my-0.5" />
               <button
@@ -372,7 +368,7 @@ export const Header: React.FC = () => {
                 className="flex items-center gap-2.5 px-3 py-2 text-xs font-semibold text-gray-700 dark:text-zinc-300 hover:bg-blue-50 hover:dark:bg-blue-950/40 hover:text-blue-600 hover:dark:text-blue-400 rounded-xl transition-colors text-left"
               >
                 <Download className="w-4 h-4 text-indigo-500 dark:text-indigo-400" />
-                Export Assets...
+                Export OpenSVG / SVG...
               </button>
             </div>
           )}

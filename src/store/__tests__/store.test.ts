@@ -63,6 +63,25 @@ describe('Studio Central Store (Zustand + Immer)', () => {
     const store = useStudioStore.getState();
     const nodeId = 'card';
 
+    store.addNode({
+      id: nodeId,
+      name: 'Card Container',
+      type: 'rect',
+      visible: true,
+      locked: false,
+      x: 100,
+      y: 100,
+      width: 100,
+      height: 100,
+      rotation: 0,
+      scaleX: 1,
+      scaleY: 1,
+      opacity: 1,
+      borderRadius: 0,
+      fill: '#ffffff',
+      tracks: []
+    });
+
     store.addOrUpdateKeyframe(nodeId, 'rotation', 1.2, 180);
     const track = useStudioStore.getState().nodes[nodeId].tracks.find(t => t.property === 'rotation');
     expect(track).toBeDefined();
@@ -109,6 +128,25 @@ describe('Studio Central Store (Zustand + Immer)', () => {
   it('automatically inserts keyframes when Auto-Keyframing is active', () => {
     const store = useStudioStore.getState();
     const nodeId = 'card';
+
+    store.addNode({
+      id: nodeId,
+      name: 'Card Container',
+      type: 'rect',
+      visible: true,
+      locked: false,
+      x: 100,
+      y: 100,
+      width: 100,
+      height: 100,
+      rotation: 0,
+      scaleX: 1,
+      scaleY: 1,
+      opacity: 1,
+      borderRadius: 0,
+      fill: '#ffffff',
+      tracks: []
+    });
 
     // Enable Auto-Keyframing
     store.toggleAutoKeyframe();

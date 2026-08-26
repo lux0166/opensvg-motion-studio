@@ -1,6 +1,5 @@
 import { useEffect } from 'react';
 import { useStudioStore } from '../store/useStudioStore';
-import { serializeProject } from '../engine/projectManager';
 
 /**
  * Studio Global Keyboard Shortcuts Engine
@@ -108,20 +107,20 @@ export function useStudioShortcuts() {
         return;
       }
 
-      // 4. Save: Ctrl+S
+      // 4. Save: Ctrl+S (.osvg)
       if (isCtrlOrCmd && e.key.toLowerCase() === 's') {
         e.preventDefault();
-        const jsonStr = serializeProject(rootFrame, nodes, nodeOrder, duration, fps);
-        const blob = new Blob([jsonStr], { type: 'application/json' });
+        const osvgStr = useStudioStore.getState().exportOpenSVGDocument();
+        const blob = new Blob([osvgStr], { type: 'application/vnd.opensvg+json' });
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
-        a.download = `${rootFrame.name.toLowerCase().replace(/\s+/g, '-')}-project.kinetic`;
+        a.download = `${rootFrame.name.toLowerCase().replace(/\s+/g, '-')}.osvg`;
         document.body.appendChild(a);
         a.click();
         document.body.removeChild(a);
         URL.revokeObjectURL(url);
-        showToast('Saved project (.kinetic)!', 'success');
+        showToast('Saved OpenSVG document (.osvg)!', 'success');
         return;
       }
 

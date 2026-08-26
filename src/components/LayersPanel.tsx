@@ -30,18 +30,18 @@ export const LayersPanel: React.FC = () => {
     );
   };
 
-  const renderLayerRow = (id: string, isChild = false) => {
+  const renderLayerRow = (id: string, depth = 0) => {
     const node = nodes[id];
     if (!node) return null;
 
     const isSelected = selectedIds.includes(id) || selectedId === id;
+    const childIds = node.childrenIds || nodeOrder.filter((cid) => nodes[cid]?.parentId === id);
 
     return (
       <React.Fragment key={id}>
         <div
-          className={`flex items-center justify-between px-2.5 py-1 rounded-lg transition-all text-xs ${
-            isChild ? 'ml-4' : ''
-          } ${
+          style={{ paddingLeft: `${depth * 14 + 10}px` }}
+          className={`flex items-center justify-between pr-2.5 py-1 rounded-lg transition-all text-xs ${
             isSelected
               ? 'bg-blue-500 text-white font-medium shadow-xs'
               : 'hover:bg-gray-100 hover:dark:bg-zinc-800/70 text-gray-700 dark:text-zinc-300'
@@ -104,10 +104,9 @@ export const LayersPanel: React.FC = () => {
           </div>
         </div>
 
-        {/* Nested Group Children */}
-        {node.type === 'group' &&
-          node.childrenIds &&
-          node.childrenIds.map((childId) => renderLayerRow(childId, true))}
+        {/* Recursive Arbitrary-Depth Children */}
+        {childIds && childIds.length > 0 &&
+          childIds.map((childId) => renderLayerRow(childId, depth + 1))}
       </React.Fragment>
     );
   };
@@ -122,17 +121,17 @@ export const LayersPanel: React.FC = () => {
         {/* Root Frame Item */}
         <div
           role="option"
-          aria-selected={selectedId === 'frame-1'}
+          aria-selected={selectedId === rootFrame.id}
           tabIndex={0}
-          onClick={() => setSelectedId('frame-1')}
+          onClick={() => setSelectedId(rootFrame.id)}
           onKeyDown={(e) => {
             if (e.key === 'Enter' || e.key === ' ') {
               e.preventDefault();
-              setSelectedId('frame-1');
+              setSelectedId(rootFrame.id);
             }
           }}
           className={`flex items-center gap-2 px-3 py-2 rounded-xl cursor-pointer transition-all text-xs outline-none focus-visible:ring-2 focus-visible:ring-blue-500 ${
-            selectedId === 'frame-1'
+            selectedId === rootFrame.id
               ? 'bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 font-semibold border border-blue-200 dark:border-blue-800'
               : 'hover:bg-gray-50 hover:dark:bg-zinc-800/60 text-gray-700 dark:text-zinc-300'
           }`}
@@ -144,8 +143,8 @@ export const LayersPanel: React.FC = () => {
         </div>
 
         {/* Children Rows */}
-        <div className="pl-3 pr-1 py-0.5 flex flex-col gap-1">
-          {topLevelOrder.map((id) => renderLayerRow(id))}
+        <div className="py-0.5 flex flex-col gap-1">
+          {topLevelOrder.map((id) => renderLayerRow(id, 0))}
         </div>
       </div>
     </aside>

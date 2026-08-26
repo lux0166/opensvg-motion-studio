@@ -1,5 +1,6 @@
 import React, { useRef, useEffect } from 'react';
 import { useStudioStore } from '../store/useStudioStore';
+import { RuntimeClock } from '../engine/runtime/runtimeClock';
 import {
   Gem,
   Sparkles,
@@ -60,43 +61,38 @@ export const Timeline: React.FC = () => {
     }
   }, [currentTime]);
 
-  // Playback requestAnimationFrame Loop
+  // Playback Loop driven directly by canonical RuntimeClock
   useEffect(() => {
+    if (!isPlaying) return;
+
+    const clock = new RuntimeClock(duration, 60, loop ? 'loop' : 'once');
+    clock.seek(currentTime);
+    clock.play();
+
     let animId: number;
-    let lastTime: number | null = null;
+    let lastTime = performance.now();
 
     const loopFn = (now: number) => {
-      if (!isPlaying) {
-        lastTime = null;
-        return;
-      }
-
-      if (!lastTime) lastTime = now;
       const dt = (now - lastTime) / 1000;
       lastTime = now;
 
-      let nextTime = currentTime + dt;
-      if (nextTime >= duration) {
-        if (loop) {
-          nextTime = 0;
-        } else {
-          nextTime = duration;
-          setPlaying(false);
-        }
-      }
-
+      clock.advance(dt);
+      const nextTime = clock.getCurrentTime();
       setCurrentTime(nextTime);
-      animId = requestAnimationFrame(loopFn);
+
+      if (!clock.getIsPlaying()) {
+        setPlaying(false);
+      } else {
+        animId = requestAnimationFrame(loopFn);
+      }
     };
 
-    if (isPlaying) {
-      animId = requestAnimationFrame(loopFn);
-    }
+    animId = requestAnimationFrame(loopFn);
 
     return () => {
       if (animId) cancelAnimationFrame(animId);
     };
-  }, [isPlaying, currentTime, duration, loop, setCurrentTime, setPlaying]);
+  }, [isPlaying, duration, loop]);
 
   // Keyboard Shortcuts: Space for Play/Pause, M for Marker
   useEffect(() => {

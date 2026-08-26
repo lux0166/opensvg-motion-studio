@@ -1,4 +1,4 @@
-﻿import { FrameNode, SceneNode, SceneProject } from './types';
+import { FrameNode, SceneNode, SceneProject } from './types';
 
 /**
  * OpenSVG Project Schema Validator & Serialization Engine (.kinetic)
@@ -65,7 +65,7 @@ export async function openProjectFromFile(): Promise<SceneProject> {
   return new Promise((resolve, reject) => {
     const input = document.createElement('input');
     input.type = 'file';
-    input.accept = '.kinetic,.json';
+    input.accept = '.osvg,.kinetic,.json,application/json';
     input.onchange = (e: any) => {
       const file = e.target?.files?.[0];
       if (!file) {

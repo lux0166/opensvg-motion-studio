@@ -22,7 +22,7 @@ function pushDraftSnapshot(state: any) {
   state.future = [];
 }
 
-export function createDefaultTab(id = `tab-${Date.now()}`, title = 'moon_scan'): DocumentTab {
+export function createDefaultTab(id = `tab-${Date.now()}`, title = 'Untitled Project'): DocumentTab {
   const rootFrame: FrameNode = {
     id: 'frame-1',
     name: title,
@@ -33,8 +33,8 @@ export function createDefaultTab(id = `tab-${Date.now()}`, title = 'moon_scan'):
     canvasBg: '#18191d',
     x: 0,
     y: 0,
-    width: 600,
-    height: 400,
+    width: 800,
+    height: 600,
     rotation: 0,
     scaleX: 1,
     scaleY: 1,
@@ -42,70 +42,6 @@ export function createDefaultTab(id = `tab-${Date.now()}`, title = 'moon_scan'):
     borderRadius: 0,
     fill: '#ffffff',
     tracks: []
-  };
-
-  const cardNode: SceneNode = {
-    id: 'card',
-    name: 'Card Container',
-    type: 'rect',
-    visible: true,
-    locked: false,
-    x: 150,
-    y: 75,
-    width: 300,
-    height: 250,
-    rotation: 0,
-    scaleX: 1,
-    scaleY: 1,
-    opacity: 1,
-    borderRadius: 24,
-    fill: '#8b5cf6',
-    tracks: [
-      {
-        id: 'tr-rot',
-        property: 'rotation',
-        label: 'Rotation',
-        unit: '°',
-        color: '#8b5cf6',
-        keyframes: [
-          { id: 'k1', time: 0.0, value: 0, curve: { x1: 0.42, y1: 0, x2: 0.58, y2: 1 } },
-          { id: 'k2', time: 1.5, value: 180, curve: { x1: 0.42, y1: 0, x2: 0.58, y2: 1 } },
-          { id: 'k3', time: 3.0, value: 360, curve: { x1: 0.42, y1: 0, x2: 0.58, y2: 1 } }
-        ]
-      }
-    ]
-  };
-
-  const ballNode: SceneNode = {
-    id: 'ball',
-    name: 'Neon Ball',
-    type: 'circle',
-    visible: true,
-    locked: false,
-    x: 250,
-    y: 150,
-    width: 100,
-    height: 100,
-    rotation: 0,
-    scaleX: 1,
-    scaleY: 1,
-    opacity: 1,
-    borderRadius: 9999,
-    fill: '#10b981',
-    tracks: [
-      {
-        id: 'tr-scale',
-        property: 'scaleX',
-        label: 'Pulse Scale',
-        unit: 'x',
-        color: '#10b981',
-        keyframes: [
-          { id: 'bsk1', time: 0.0, value: 1.0, curve: { x1: 0.34, y1: 1.56, x2: 0.64, y2: 1 } },
-          { id: 'bsk2', time: 1.5, value: 1.4, curve: { x1: 0.34, y1: 1.56, x2: 0.64, y2: 1 } },
-          { id: 'bsk3', time: 3.0, value: 1.0, curve: { x1: 0.34, y1: 1.56, x2: 0.64, y2: 1 } }
-        ]
-      }
-    ]
   };
 
   return {
@@ -116,30 +52,27 @@ export function createDefaultTab(id = `tab-${Date.now()}`, title = 'moon_scan'):
     project: {
       id: `proj-${id}`,
       name: title,
-      version: '1.0.0',
+      version: '2.0.0',
       duration: 3.0,
       fps: 60,
       rootFrame,
-      nodes: { card: cardNode, ball: ballNode },
-      nodeOrder: ['card', 'ball']
+      nodes: {},
+      nodeOrder: []
     },
     history: {
       past: [],
       future: []
     },
     viewport: {
-      zoom: 0.56,
+      zoom: 1.0,
       panX: 0,
       panY: 0,
-      currentTime: 1.05,
-      selectedId: 'card',
-      selectedIds: ['card']
+      currentTime: 0,
+      selectedId: 'frame-1',
+      selectedIds: ['frame-1']
     },
     audioTrack: null,
-    markers: [
-      { id: 'm-start', time: 0.0, label: 'Start', color: '#10b981' },
-      { id: 'm-drop', time: 1.5, label: 'Drop', color: '#f59e0b' }
-    ]
+    markers: []
   };
 }
 
@@ -430,107 +363,10 @@ export const useStudioStore = create<StudioState>()(
       tracks: []
     },
 
-    nodes: {
-      card: {
-        id: 'card',
-        name: 'Card',
-        type: 'rect',
-        visible: true,
-        locked: false,
-        x: 150,
-        y: 100,
-        width: 128,
-        height: 128,
-        rotation: 12,
-        scaleX: 1,
-        scaleY: 1,
-        opacity: 1,
-        borderRadius: 24,
-        fill: '#111827',
-        tracks: [
-          {
-            id: 'tr-rot',
-            property: 'rotation',
-            label: 'Rotation',
-            unit: '°',
-            color: '#6366f1',
-            keyframes: [
-              { id: 'k1', time: 0.15, value: 12, curve: { x1: 0.42, y1: 0, x2: 0.58, y2: 1 } },
-              { id: 'k2', time: 0.90, value: 102, curve: { x1: 0.42, y1: 0, x2: 0.58, y2: 1 } },
-              { id: 'k3', time: 2.10, value: 200, curve: { x1: 0.42, y1: 0, x2: 0.58, y2: 1 } },
-              { id: 'k4', time: 3.00, value: 372, curve: { x1: 0.42, y1: 0, x2: 0.58, y2: 1 } }
-            ]
-          },
-          {
-            id: 'tr-x',
-            property: 'x',
-            label: 'X Position',
-            unit: 'px',
-            color: '#3b82f6',
-            keyframes: [
-              { id: 'kx1', time: 0.00, value: 150, curve: { x1: 0.25, y1: 0.1, x2: 0.25, y2: 1 } },
-              { id: 'kx2', time: 1.50, value: 240, curve: { x1: 0.25, y1: 0.1, x2: 0.25, y2: 1 } },
-              { id: 'kx3', time: 3.00, value: 150, curve: { x1: 0.25, y1: 0.1, x2: 0.25, y2: 1 } }
-            ]
-          }
-        ]
-      },
-      ball: {
-        id: 'ball',
-        name: 'Ball',
-        type: 'circle',
-        visible: true,
-        locked: false,
-        x: 340,
-        y: 250,
-        width: 96,
-        height: 96,
-        rotation: 0,
-        scaleX: 1,
-        scaleY: 1,
-        opacity: 1,
-        borderRadius: 9999,
-        fill: '#3b82f6',
-        tracks: [
-          {
-            id: 'tr-bx',
-            property: 'x',
-            label: 'X Position',
-            unit: 'px',
-            color: '#10b981',
-            keyframes: [
-              { id: 'bk1', time: 0.06, value: 180, curve: { x1: 0.42, y1: 0, x2: 0.58, y2: 1 } },
-              { id: 'bk2', time: 0.66, value: 340, curve: { x1: 0.42, y1: 0, x2: 0.58, y2: 1 } },
-              { id: 'bk3', time: 1.20, value: 450, curve: { x1: 0.42, y1: 0, x2: 0.58, y2: 1 } },
-              { id: 'bk4', time: 2.10, value: 280, curve: { x1: 0.42, y1: 0, x2: 0.58, y2: 1 } },
-              { id: 'bk5', time: 3.00, value: 180, curve: { x1: 0.42, y1: 0, x2: 0.58, y2: 1 } }
-            ]
-          },
-          {
-            id: 'tr-bsx',
-            property: 'scaleX',
-            label: 'Scale X',
-            unit: '',
-            color: '#f59e0b',
-            keyframes: [
-              { id: 'bsk1', time: 0.06, value: 1.0 },
-              { id: 'bsk2', time: 0.36, value: 1.35 },
-              { id: 'bsk3', time: 0.66, value: 1.0 },
-              { id: 'bsk4', time: 1.20, value: 1.25 },
-              { id: 'bsk5', time: 2.10, value: 0.85 },
-              { id: 'bsk6', time: 3.00, value: 1.0 }
-            ]
-          }
-        ]
-      }
-    },
-
-    nodeOrder: ['card', 'ball'],
+    nodes: {},
+    nodeOrder: [],
     audioTrack: null,
-    markers: [
-      { id: 'm-start', time: 0.0, label: 'Start', color: '#10b981' },
-      { id: 'm-drop', time: 1.5, label: 'Drop', color: '#f59e0b' }
-    ],
+    markers: [],
 
     isExportOpen: false,
     isSettingsOpen: false,

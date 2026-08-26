@@ -32,8 +32,10 @@ export const PropertiesPanel: React.FC = () => {
     selectedIds,
     alignSelected,
     applyBooleanOp,
-    addTrigger,
-    removeTrigger,
+    interactions,
+    addInteraction,
+    updateInteraction,
+    removeInteraction,
     setPresetsModalOpen,
     applyMotionPreset,
     updateRootFrame,
@@ -42,8 +44,12 @@ export const PropertiesPanel: React.FC = () => {
     showToast
   } = useStudioStore();
 
+  const nodeInteractions = (interactions || []).filter(
+    (inter) => inter.targetNodeId === selectedId
+  );
+
   // 1. Root Frame Selected
-  if (selectedId === 'frame-1' || !selectedId) {
+  if (selectedId === rootFrame.id || !selectedId) {
     return (
       <aside className="w-full h-full min-h-0 bg-white dark:bg-zinc-900 flex flex-col z-10 overflow-y-auto select-none">
         <div className="px-3.5 py-2 border-b border-gray-100 dark:border-zinc-800 flex justify-between items-center bg-gray-50/50 dark:bg-zinc-800/50">
@@ -1113,56 +1119,212 @@ export const PropertiesPanel: React.FC = () => {
           })()}
         </div>
 
-        {/* Interactivity & State Machine Triggers */}
+        {/* Document Interactions Section (Canonical OpenSVG 2.0 Interaction Architecture) */}
         <div>
           <div className="flex justify-between items-center mb-2">
             <label className="text-[11px] text-gray-400 dark:text-zinc-500 font-semibold uppercase tracking-wider flex items-center gap-1.5">
-              <Zap className="w-3 h-3 text-amber-500" /> Triggers & Events
+              <Zap className="w-3 h-3 text-amber-500" /> Interactions ({nodeInteractions.length})
             </label>
             <button
-              title="Add Click Trigger (Jump to 0.0s)"
+              title="Add Document Interaction"
               onClick={() => {
-                const newTrigger = {
-                  id: `trig-${Date.now()}`,
-                  event: 'onClick' as const,
-                  action: 'jumpToTime' as const,
-                  targetTime: 0.0
-                };
-                addTrigger(selectedId, newTrigger);
+                addInteraction({
+                  id: `inter-${Date.now()}`,
+                  targetNodeId: selectedId,
+                  event: 'click',
+                  action: {
+                    type: 'fireTrigger',
+                    triggerName: 'onClick'
+                  }
+                });
+                showToast('Added click interaction');
               }}
               className="flex items-center gap-1 text-[10px] font-bold text-blue-600 dark:text-blue-400 hover:text-blue-700 bg-blue-50 dark:bg-blue-950/50 hover:bg-blue-100 hover:dark:bg-blue-900/50 px-2 py-0.5 rounded-md transition-colors shadow-xs"
             >
-              <Plus className="w-3 h-3" /> Add Trigger
+              <Plus className="w-3 h-3" /> Add Interaction
             </button>
           </div>
 
           <div className="flex flex-col gap-2">
-            {(!selectedNode.triggers || selectedNode.triggers.length === 0) ? (
+            {nodeInteractions.length === 0 ? (
               <div className="p-3 bg-gray-50 dark:bg-zinc-800/70 rounded-xl border border-gray-200/80 dark:border-zinc-700/80 text-[11px] text-gray-400 dark:text-zinc-500 flex items-center gap-2">
                 <MousePointerClick className="w-3.5 h-3.5 text-gray-400 dark:text-zinc-500" />
-                <span>No triggers added. Add interactive hover or click actions.</span>
+                <span>No interactions configured for this layer.</span>
               </div>
             ) : (
-              selectedNode.triggers.map((trig) => (
+              nodeInteractions.map((inter) => (
                 <div
-                  key={trig.id}
-                  className="p-2.5 bg-gray-50 dark:bg-zinc-800/70 rounded-xl border border-gray-200 dark:border-zinc-700 flex items-center justify-between gap-2 text-xs"
+                  key={inter.id}
+                  className="p-3 bg-gray-50 dark:bg-zinc-800/70 rounded-xl border border-gray-200 dark:border-zinc-700 flex flex-col gap-2 text-xs"
                 >
-                  <div className="flex flex-col">
-                    <span className="font-bold text-gray-800 dark:text-zinc-200 text-[11px] uppercase">
-                      {trig.event}
-                    </span>
-                    <span className="text-[10px] text-gray-500 dark:text-zinc-400 font-mono">
-                      → {trig.action}{trig.action === 'jumpToTime' ? ` (${trig.targetTime}s)` : ''}
-                    </span>
+                  <div className="flex items-center justify-between gap-2">
+                    {/* Event Type Select */}
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-[10px] uppercase font-bold text-amber-600 dark:text-amber-400">Event:</span>
+                      <select
+                        value={inter.event}
+                        onChange={(e) =>
+                          updateInteraction(inter.id, {
+                            event: e.target.value as any
+                          })
+                        }
+                        className="text-xs font-semibold bg-white dark:bg-zinc-800 border border-gray-200 dark:border-zinc-700 rounded-lg px-2 py-1 outline-none text-gray-800 dark:text-zinc-200"
+                      >
+                        <option value="pointerenter">Hover In (pointerenter)</option>
+                        <option value="pointerleave">Hover Out (pointerleave)</option>
+                        <option value="pointerdown">Press Down (pointerdown)</option>
+                        <option value="pointerup">Press Up (pointerup)</option>
+                        <option value="click">Click (click)</option>
+                        <option value="dblclick">Double Click (dblclick)</option>
+                      </select>
+                    </div>
+
+                    <button
+                      title="Remove Interaction"
+                      onClick={() => removeInteraction(inter.id)}
+                      className="text-gray-400 dark:text-zinc-500 hover:text-red-500 hover:dark:text-red-400 p-1 rounded hover:bg-red-50 hover:dark:bg-red-950/40 transition-colors"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
                   </div>
-                  <button
-                    title="Remove Trigger"
-                    onClick={() => removeTrigger(selectedId, trig.id)}
-                    className="text-gray-400 dark:text-zinc-500 hover:text-red-500 hover:dark:text-red-400 p-1 rounded hover:bg-red-50 hover:dark:bg-red-950/40 transition-colors"
-                  >
-                    <Trash2 className="w-3 h-3" />
-                  </button>
+
+                  {/* Action Config */}
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-[10px] uppercase font-bold text-blue-600 dark:text-blue-400">Action:</span>
+                    <select
+                      value={inter.action.type}
+                      onChange={(e) => {
+                        const newType = e.target.value as any;
+                        let defaultAction: any = { type: newType };
+                        if (newType === 'setInput') {
+                          defaultAction = { type: 'setInput', inputName: 'isHovered', value: true };
+                        } else if (newType === 'fireTrigger') {
+                          defaultAction = { type: 'fireTrigger', triggerName: 'clicked' };
+                        } else if (newType === 'setState') {
+                          defaultAction = { type: 'setState', stateId: 'active' };
+                        } else if (newType === 'seek') {
+                          defaultAction = { type: 'seek', time: 0 };
+                        }
+                        updateInteraction(inter.id, { action: defaultAction });
+                      }}
+                      className="text-xs font-semibold bg-white dark:bg-zinc-800 border border-gray-200 dark:border-zinc-700 rounded-lg px-2 py-1 outline-none text-gray-800 dark:text-zinc-200"
+                    >
+                      <option value="setInput">Set Machine Input (setInput)</option>
+                      <option value="fireTrigger">Fire Machine Trigger (fireTrigger)</option>
+                      <option value="setState">Set Machine State (setState)</option>
+                      <option value="seek">Seek Timeline (seek)</option>
+                      <option value="play">Play (play)</option>
+                      <option value="pause">Pause (pause)</option>
+                      <option value="togglePlay">Toggle Play (togglePlay)</option>
+                    </select>
+                  </div>
+
+                  {/* Specific Action Param Inputs */}
+                  {inter.action.type === 'setInput' && (
+                    <div className="grid grid-cols-2 gap-2 mt-1">
+                      <div>
+                        <label className="text-[9px] text-gray-400 uppercase font-semibold">Input Name</label>
+                        <input
+                          type="text"
+                          value={inter.action.inputName}
+                          onChange={(e) =>
+                            updateInteraction(inter.id, {
+                              action: { ...inter.action, inputName: e.target.value } as any
+                            })
+                          }
+                          className="w-full text-xs font-mono bg-white dark:bg-zinc-800 border border-gray-200 dark:border-zinc-700 rounded px-2 py-1 outline-none text-gray-800 dark:text-zinc-100"
+                          placeholder="e.g. isHovered"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-[9px] text-gray-400 uppercase font-semibold">Value</label>
+                        <select
+                          value={String(inter.action.value)}
+                          onChange={(e) =>
+                            updateInteraction(inter.id, {
+                              action: {
+                                ...inter.action,
+                                value: e.target.value === 'true' ? true : e.target.value === 'false' ? false : Number(e.target.value) || 0
+                              } as any
+                            })
+                          }
+                          className="w-full text-xs font-mono bg-white dark:bg-zinc-800 border border-gray-200 dark:border-zinc-700 rounded px-2 py-1 outline-none text-gray-800 dark:text-zinc-100"
+                        >
+                          <option value="true">true</option>
+                          <option value="false">false</option>
+                          <option value="1">1</option>
+                          <option value="0">0</option>
+                        </select>
+                      </div>
+                    </div>
+                  )}
+
+                  {inter.action.type === 'fireTrigger' && (
+                    <div className="mt-1">
+                      <label className="text-[9px] text-gray-400 uppercase font-semibold">Trigger Name</label>
+                      <input
+                        type="text"
+                        value={inter.action.triggerName}
+                        onChange={(e) =>
+                          updateInteraction(inter.id, {
+                            action: { ...inter.action, triggerName: e.target.value } as any
+                          })
+                        }
+                        className="w-full text-xs font-mono bg-white dark:bg-zinc-800 border border-gray-200 dark:border-zinc-700 rounded px-2 py-1 outline-none text-gray-800 dark:text-zinc-100"
+                        placeholder="e.g. triggerPress"
+                      />
+                    </div>
+                  )}
+
+                  {inter.action.type === 'setState' && (
+                    <div className="grid grid-cols-2 gap-2 mt-1">
+                      <div>
+                        <label className="text-[9px] text-gray-400 uppercase font-semibold">State ID</label>
+                        <input
+                          type="text"
+                          value={inter.action.stateId}
+                          onChange={(e) =>
+                            updateInteraction(inter.id, {
+                              action: { ...inter.action, stateId: e.target.value } as any
+                            })
+                          }
+                          className="w-full text-xs font-mono bg-white dark:bg-zinc-800 border border-gray-200 dark:border-zinc-700 rounded px-2 py-1 outline-none text-gray-800 dark:text-zinc-100"
+                          placeholder="e.g. hovered"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-[9px] text-gray-400 uppercase font-semibold">Layer ID (Opt)</label>
+                        <input
+                          type="text"
+                          value={inter.action.layerId || ''}
+                          onChange={(e) =>
+                            updateInteraction(inter.id, {
+                              action: { ...inter.action, layerId: e.target.value || undefined } as any
+                            })
+                          }
+                          className="w-full text-xs font-mono bg-white dark:bg-zinc-800 border border-gray-200 dark:border-zinc-700 rounded px-2 py-1 outline-none text-gray-800 dark:text-zinc-100"
+                          placeholder="layer-main"
+                        />
+                      </div>
+                    </div>
+                  )}
+
+                  {inter.action.type === 'seek' && (
+                    <div className="mt-1">
+                      <label className="text-[9px] text-gray-400 uppercase font-semibold">Target Time (seconds)</label>
+                      <input
+                        type="number"
+                        step="0.1"
+                        value={inter.action.time}
+                        onChange={(e) =>
+                          updateInteraction(inter.id, {
+                            action: { ...inter.action, time: parseFloat(e.target.value) || 0 } as any
+                          })
+                        }
+                        className="w-full text-xs font-mono bg-white dark:bg-zinc-800 border border-gray-200 dark:border-zinc-700 rounded px-2 py-1 outline-none text-gray-800 dark:text-zinc-100"
+                      />
+                    </div>
+                  )}
                 </div>
               ))
             )}

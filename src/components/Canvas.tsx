@@ -1,10 +1,9 @@
-import React, { useRef, useEffect, useState } from 'react';
+import React, { useRef, useEffect, useState, useMemo } from 'react';
 import { useStudioStore } from '../store/useStudioStore';
-import { evaluateNode } from '../engine/evaluator';
+import { evaluateScenePipeline } from '../engine/runtime/evaluationPipeline';
 import { renderCanvasScene, MarqueeRect } from '../engine/renderer';
 import { computeSnapping } from '../engine/snapping';
 import { importSvgString } from '../engine/svgImporter';
-import { handleNodeTriggerEvent } from '../engine/stateMachine';
 import { Minus, Plus, Maximize2, Square, UploadCloud } from 'lucide-react';
 
 export const Canvas: React.FC = () => {
@@ -12,10 +11,9 @@ export const Canvas: React.FC = () => {
     rootFrame,
     nodes,
     nodeOrder,
-    isPlaying,
-    setPlaying,
+    duration,
+    fps,
     currentTime,
-    setCurrentTime,
     selectedId,
     selectedIds,
     setSelectedId,
@@ -73,11 +71,28 @@ export const Canvas: React.FC = () => {
     };
   }, []);
 
-  // Get evaluated state for all nodes at current time
-  const evaluatedNodes = nodeOrder
-    .map((id) => nodes[id])
-    .filter(Boolean)
-    .map((node) => evaluateNode(node, currentTime, nodes));
+  // Canonical runtime evaluation pipeline for Studio Canvas Preview
+  const evaluatedScene = useMemo(() => {
+    return evaluateScenePipeline(
+      {
+        id: 'studio-preview-project',
+        name: rootFrame.name,
+        version: '2.0.0',
+        duration,
+        fps,
+        rootFrame,
+        nodes,
+        nodeOrder
+      },
+      {
+        time: currentTime
+      }
+    );
+  }, [rootFrame, nodes, nodeOrder, duration, fps, currentTime]);
+
+  const evaluatedNodes = evaluatedScene.nodeOrder
+    .map((id) => evaluatedScene.evaluatedNodes[id])
+    .filter(Boolean);
 
   // Render Loop on Canvas 2D
   useEffect(() => {
@@ -142,7 +157,7 @@ export const Canvas: React.FC = () => {
 
     // 3. Pivot Point Tool (Y)
     if (selectedTool === 'pivot') {
-      if (selectedId && selectedId !== 'frame-1' && nodes[selectedId]) {
+      if (selectedId && selectedId !== rootFrame.id && nodes[selectedId]) {
         initPivotDrag(e, selectedId, nodes[selectedId]);
         return;
       }
@@ -216,7 +231,7 @@ export const Canvas: React.FC = () => {
     }
 
     // 8. Check Selection Handles (Rotate, Resize) on currently selected node
-    if (selectedId && selectedId !== 'frame-1') {
+    if (selectedId && selectedId !== rootFrame.id) {
       const selectedNode = nodes[selectedId];
       if (selectedNode) {
         const handleType = getHandleUnderMouse(mouseX, mouseY, selectedNode);
@@ -246,16 +261,6 @@ export const Canvas: React.FC = () => {
     }
 
     if (clickedId) {
-      // Execute Interactive Triggers
-      if (nodes[clickedId]) {
-        handleNodeTriggerEvent(nodes[clickedId], 'onClick', {
-          setCurrentTime,
-          setPlaying,
-          updateNode,
-          showToast,
-          isPlaying
-        });
-      }
 
       if (e.shiftKey) {
         toggleSelectId(clickedId, true);
@@ -267,7 +272,7 @@ export const Canvas: React.FC = () => {
       initNodeDrag(e, clickedId);
     } else {
       if (!e.shiftKey) {
-        setSelectedId('frame-1');
+        setSelectedId(rootFrame.id);
         setSelectedPointIndex(null);
       }
       // Activate Marquee Drag Selection
