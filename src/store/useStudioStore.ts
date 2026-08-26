@@ -18,12 +18,25 @@ import { ComponentDefinition, ComponentInstance } from '../engine/components/com
 import { studioSessionManager } from '../engine/studio/studioRuntimeOwner';
 
 function pushDraftSnapshot(state: any) {
-  const snap = createStudioSnapshot(state.rootFrame, state.nodes, state.nodeOrder);
+  const snap = createStudioSnapshot(state.rootFrame, state.nodes, state.nodeOrder, {
+    stateMachines: state.stateMachines,
+    interactions: state.interactions,
+    constraints: state.constraints,
+    bindings: state.bindings,
+    components: state.components,
+    componentInstances: state.componentInstances,
+    assets: state.assets
+  });
   state.past.push(snap);
   if (state.past.length > MAX_HISTORY_STEPS) {
     state.past.shift();
   }
   state.future = [];
+
+  const tab = state.tabs?.find((t: any) => t.id === state.activeTabId);
+  if (tab) {
+    tab.isDirty = true;
+  }
 }
 
 export function createDefaultTab(id = `tab-${Date.now()}`, title = 'Untitled Project'): DocumentTab {
@@ -412,19 +425,41 @@ export const useStudioStore = create<StudioState>()(
     undo: () =>
       set((state) => {
         if (state.past.length === 0) return;
-        const current = createStudioSnapshot(state.rootFrame, state.nodes, state.nodeOrder);
+        const current = createStudioSnapshot(state.rootFrame, state.nodes, state.nodeOrder, {
+          stateMachines: state.stateMachines,
+          interactions: state.interactions,
+          constraints: state.constraints,
+          bindings: state.bindings,
+          components: state.components,
+          componentInstances: state.componentInstances,
+          assets: state.assets
+        });
         state.future.push(current);
 
         const previous = state.past.pop()!;
         state.rootFrame = previous.rootFrame;
         state.nodes = previous.nodes;
         state.nodeOrder = previous.nodeOrder;
+        if (previous.stateMachines !== undefined) state.stateMachines = previous.stateMachines;
+        if (previous.interactions !== undefined) state.interactions = previous.interactions;
+        if (previous.constraints !== undefined) state.constraints = previous.constraints;
+        if (previous.bindings !== undefined) state.bindings = previous.bindings;
+        if (previous.components !== undefined) state.components = previous.components;
+        if (previous.componentInstances !== undefined) state.componentInstances = previous.componentInstances;
+        if (previous.assets !== undefined) state.assets = previous.assets;
 
         // Keep selection valid (fallback if current selected node was deleted in previous state)
         if (state.selectedId && !state.nodes[state.selectedId] && state.selectedId !== 'frame-1') {
           state.selectedId = state.nodeOrder[0] || 'frame-1';
           state.selectedIds = state.nodeOrder[0] ? [state.nodeOrder[0]] : [];
         }
+
+        const tab = state.tabs?.find((t: any) => t.id === state.activeTabId);
+        if (tab) {
+          const savedIdx = tab.savedSnapshotIndex ?? 0;
+          tab.isDirty = state.past.length !== savedIdx;
+        }
+
         state.toastMessage = 'Undo';
         state.toastType = 'info';
       }),
@@ -432,19 +467,41 @@ export const useStudioStore = create<StudioState>()(
     redo: () =>
       set((state) => {
         if (state.future.length === 0) return;
-        const current = createStudioSnapshot(state.rootFrame, state.nodes, state.nodeOrder);
+        const current = createStudioSnapshot(state.rootFrame, state.nodes, state.nodeOrder, {
+          stateMachines: state.stateMachines,
+          interactions: state.interactions,
+          constraints: state.constraints,
+          bindings: state.bindings,
+          components: state.components,
+          componentInstances: state.componentInstances,
+          assets: state.assets
+        });
         state.past.push(current);
 
         const next = state.future.pop()!;
         state.rootFrame = next.rootFrame;
         state.nodes = next.nodes;
         state.nodeOrder = next.nodeOrder;
+        if (next.stateMachines !== undefined) state.stateMachines = next.stateMachines;
+        if (next.interactions !== undefined) state.interactions = next.interactions;
+        if (next.constraints !== undefined) state.constraints = next.constraints;
+        if (next.bindings !== undefined) state.bindings = next.bindings;
+        if (next.components !== undefined) state.components = next.components;
+        if (next.componentInstances !== undefined) state.componentInstances = next.componentInstances;
+        if (next.assets !== undefined) state.assets = next.assets;
 
         // Keep selection valid
         if (state.selectedId && !state.nodes[state.selectedId] && state.selectedId !== 'frame-1') {
           state.selectedId = state.nodeOrder[0] || 'frame-1';
           state.selectedIds = state.nodeOrder[0] ? [state.nodeOrder[0]] : [];
         }
+
+        const tab = state.tabs?.find((t: any) => t.id === state.activeTabId);
+        if (tab) {
+          const savedIdx = tab.savedSnapshotIndex ?? 0;
+          tab.isDirty = state.past.length !== savedIdx;
+        }
+
         state.toastMessage = 'Redo';
         state.toastType = 'info';
       }),
@@ -1535,6 +1592,16 @@ export const useStudioStore = create<StudioState>()(
         componentInstances: state.componentInstances.length > 0 ? state.componentInstances : undefined,
         assets: Object.keys(state.assets).length > 0 ? state.assets : undefined
       };
+
+      // Mark current active tab as clean/saved
+      set((draft) => {
+        const tab = draft.tabs.find((t) => t.id === draft.activeTabId);
+        if (tab) {
+          tab.isDirty = false;
+          tab.savedSnapshotIndex = draft.past.length;
+        }
+      });
+
       return serializeDocument(doc, true);
     },
 

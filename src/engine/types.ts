@@ -248,6 +248,7 @@ export interface DocumentTab {
   id: string;
   title: string;
   isDirty?: boolean;
+  savedSnapshotIndex?: number;
   createdAt: number;
   project: SceneProject;
   history: {
