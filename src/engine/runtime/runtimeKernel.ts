@@ -170,33 +170,31 @@ export class OpenSVGRuntime {
       // 2. Reconcile Document Interactions
       this.interactions = doc.interactions ? [...doc.interactions] : [];
 
-      // 3. Reconcile Components
+      // 3. Exact Reconcile Components (no stale registrations)
       if (doc.components && doc.components.length > 0) {
-        if (!this.componentRegistry) {
-          this.componentRegistry = new ComponentRegistry();
-        }
+        this.componentRegistry = new ComponentRegistry();
         for (const comp of doc.components) {
           this.componentRegistry.register(comp);
         }
+      } else {
+        this.componentRegistry = undefined;
       }
       this.componentInstances = doc.componentInstances ? [...doc.componentInstances] : [];
 
-      // 4. Reconcile Asset Store
-      if (doc.assets) {
-        this.assetStore.loadManifest(doc.assets);
-      }
+      // 4. Exact Reconcile Asset Store (no stale assets)
+      this.assetStore.loadManifest(doc.assets || {});
 
-      // 5. Reconcile Data Bindings
+      // 5. Exact Reconcile Data Bindings (no stale bindings)
       if (doc.bindings && doc.bindings.length > 0) {
-        if (!this.dataBindingEngine) {
-          this.dataBindingEngine = new DataBindingEngine();
-        }
+        this.dataBindingEngine = new DataBindingEngine();
         for (const b of doc.bindings) {
           this.dataBindingEngine.registerBinding(b);
         }
+      } else {
+        this.dataBindingEngine = undefined;
       }
 
-      // 6. Reconcile Constraints
+      // 6. Exact Reconcile Constraints
       this.constraints = doc.constraints ? [...doc.constraints] : [];
     } else {
       this.project = createRuntimeSnapshot(docOrProject as SceneProject);
@@ -205,6 +203,22 @@ export class OpenSVGRuntime {
     // Update clock duration/fps without resetting currentTime or isPlaying
     this.clock.setDuration(this.project.duration || 1);
     this.clock.setFps(this.project.fps || 60);
+  }
+
+  /**
+   * Pure evaluation snapshot at an arbitrary time without mutating persistent runtime clock or state machines
+   */
+  public evaluateAt(time: number): EvaluatedSceneState {
+    const runtimes = this.getUniqueStateMachineRuntimes();
+    return evaluateScenePipeline(this.project, {
+      time,
+      constraints: this.constraints,
+      componentRegistry: this.componentRegistry,
+      componentInstances: this.componentInstances,
+      dataBindingEngine: this.dataBindingEngine,
+      stateMachineRuntime: runtimes.length > 0 ? runtimes : undefined,
+      externalPropertyOverrides: this.propertyOverrides
+    });
   }
 
   public setInteractions(interactions: DocumentInteraction[]): void {

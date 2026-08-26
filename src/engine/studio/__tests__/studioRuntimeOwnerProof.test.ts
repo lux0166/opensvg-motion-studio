@@ -119,7 +119,7 @@ describe('GATE UI-2: Studio Runtime Owner & Full Semantics Parity', () => {
     });
 
     // 1. Initial State evaluation in Studio Preview
-    let evaluated = owner.getEvaluatedSceneState(0);
+    let evaluated = owner.evaluateAt(0);
     expect(evaluated.evaluatedNodes['btn-main']).toBeDefined();
     expect(evaluated.evaluatedNodes['btn-main'].fill).toBe('#3b82f6');
 

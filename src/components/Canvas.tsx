@@ -123,7 +123,7 @@ export const Canvas: React.FC = () => {
 
   // Canonical runtime evaluation pipeline for Studio Canvas Preview
   const evaluatedScene = useMemo(() => {
-    return runtimeOwner.getEvaluatedSceneState(currentTime);
+    return runtimeOwner.evaluateAt(currentTime);
   }, [
     runtimeOwner,
     rootFrame,

@@ -15,6 +15,7 @@ import { serializeDocument, parseDocument } from '../engine/format/documentParse
 import { Constraint } from '../engine/constraints/constraintSolver';
 import { DataBinding } from '../engine/binding/dataBinding';
 import { ComponentDefinition, ComponentInstance } from '../engine/components/componentSystem';
+import { studioSessionManager } from '../engine/studio/studioRuntimeOwner';
 
 function pushDraftSnapshot(state: any) {
   const snap = createStudioSnapshot(state.rootFrame, state.nodes, state.nodeOrder);
@@ -1151,6 +1152,7 @@ export const useStudioStore = create<StudioState>()(
         const closeIdx = state.tabs.findIndex((t) => t.id === tabId);
         if (closeIdx === -1) return;
 
+        studioSessionManager.destroySession(tabId);
         const isClosingActive = state.activeTabId === tabId;
         state.tabs.splice(closeIdx, 1);
 
@@ -1212,6 +1214,13 @@ export const useStudioStore = create<StudioState>()(
         const targetTab = state.tabs.find((t) => t.id === tabId);
         if (!targetTab) return;
         syncCurrentTabState(state);
+
+        for (const t of state.tabs) {
+          if (t.id !== tabId) {
+            studioSessionManager.destroySession(t.id);
+          }
+        }
+
         state.tabs = [targetTab];
         loadTabState(state, targetTab);
       }),
@@ -1221,6 +1230,12 @@ export const useStudioStore = create<StudioState>()(
         const targetIdx = state.tabs.findIndex((t) => t.id === tabId);
         if (targetIdx === -1 || targetIdx === state.tabs.length - 1) return;
         syncCurrentTabState(state);
+
+        const closedTabs = state.tabs.slice(targetIdx + 1);
+        for (const t of closedTabs) {
+          studioSessionManager.destroySession(t.id);
+        }
+
         state.tabs = state.tabs.slice(0, targetIdx + 1);
         const currentActiveStillExists = state.tabs.some((t) => t.id === state.activeTabId);
         if (!currentActiveStillExists) {

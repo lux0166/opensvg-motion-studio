@@ -160,6 +160,13 @@ export function evaluateScenePipeline(
     }
   }
 
+  // Ensure all nodes in workingNodes (including grouped/nested children) are in nodeOrder
+  for (const id of Object.keys(workingNodes)) {
+    if (!nodeOrder.includes(id)) {
+      nodeOrder.push(id);
+    }
+  }
+
   // Phase 2: Animation Track Evaluation
   const evaluatedMap: Record<string, SceneNode> = {};
   for (const id of nodeOrder) {

@@ -61,7 +61,7 @@ export class StudioRuntimeOwner {
         title: state.rootFrame.name || 'Studio Composition',
         author: 'OpenSVG Motion Studio',
         createdAt: this.createdAt || state.createdAt || 1700000000000,
-        updatedAt: state.updatedAt || Date.now()
+        updatedAt: state.updatedAt || state.createdAt || 1700000000000
       },
       scene: {
         width: state.rootFrame.width,
@@ -86,13 +86,17 @@ export class StudioRuntimeOwner {
   }
 
   /**
-   * Retrieves evaluated scene state with full document semantics (state machines, constraints, bindings, components)
+   * Pure evaluation read of current scene state (does NOT mutate runtime clock or state machines)
    */
-  public getEvaluatedSceneState(time?: number): EvaluatedSceneState {
-    if (typeof time === 'number') {
-      this.runtime.seek(time);
-    }
+  public getEvaluatedSceneState(): EvaluatedSceneState {
     return this.runtime.getEvaluatedSceneState();
+  }
+
+  /**
+   * Pure evaluation snapshot at an arbitrary time without mutating persistent runtime clock
+   */
+  public evaluateAt(time: number): EvaluatedSceneState {
+    return this.runtime.evaluateAt(time);
   }
 
   /**
@@ -125,6 +129,14 @@ export class StudioRuntimeOwner {
 
   public getCurrentTime(): number {
     return this.runtime.getCurrentTime();
+  }
+
+  public getDuration(): number {
+    return this.runtime.getDuration();
+  }
+
+  public getFps(): number {
+    return this.runtime.getFps();
   }
 
   public getIsPlaying(): boolean {
