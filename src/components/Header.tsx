@@ -36,7 +36,8 @@ import {
   LayoutTemplate,
   Monitor,
   Target,
-  Hand
+  Hand,
+  AlertTriangle
 } from 'lucide-react';
 
 interface ContextMenuState {
@@ -85,6 +86,7 @@ export const Header: React.FC = () => {
   const [editingTabId, setEditingTabId] = useState<string | null>(null);
   const [editingTitle, setEditingTitle] = useState('');
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
+  const [unsavedTabId, setUnsavedTabId] = useState<string | null>(null);
 
   // Drag and Drop Tab Reordering State
   const [draggedTabIndex, setDraggedTabIndex] = useState<number | null>(null);
@@ -452,9 +454,18 @@ export const Header: React.FC = () => {
                       onClick={(e) => e.stopPropagation()}
                     />
                   ) : (
-                    <span className="truncate text-xs tracking-tight" title={`${tab.title} (Double-click to rename, Drag to reorder)`}>
-                      {tab.title}
-                    </span>
+                    <div className="flex items-center gap-1 min-w-0">
+                      <span className="truncate text-xs tracking-tight" title={`${tab.title} (Double-click to rename, Drag to reorder)`}>
+                        {tab.title}
+                      </span>
+                      {tab.isDirty && (
+                        <span
+                          title="Unsaved changes"
+                          aria-label="Unsaved changes"
+                          className="w-1.5 h-1.5 rounded-full bg-amber-500 shrink-0 shadow-xs animate-pulse"
+                        />
+                      )}
+                    </div>
                   )}
                 </div>
 
@@ -468,7 +479,11 @@ export const Header: React.FC = () => {
                     aria-hidden={!isActive}
                     onClick={(e) => {
                       e.stopPropagation();
-                      closeTab(tab.id);
+                      if (tab.isDirty) {
+                        setUnsavedTabId(tab.id);
+                      } else {
+                        closeTab(tab.id);
+                      }
                     }}
                     className={`p-1 rounded-lg hover:bg-red-50 hover:dark:bg-red-950/40 hover:text-red-500 hover:dark:text-red-400 transition-all outline-none ${
                       isActive ? 'text-slate-400 dark:text-zinc-500' : 'opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 focus:opacity-100 text-slate-400 dark:text-zinc-500'
@@ -972,6 +987,53 @@ export const Header: React.FC = () => {
             <ArrowRightToLine className="w-3.5 h-3.5 text-slate-500 dark:text-zinc-400" />
             Close Tabs to the Right
           </button>
+        </div>
+      )}
+
+      {/* Unsaved Changes Confirmation Modal Dialog */}
+      {unsavedTabId && (
+        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-zinc-900 rounded-2xl shadow-2xl border border-gray-100 dark:border-zinc-800 max-w-sm w-full p-5 flex flex-col gap-4 animate-in fade-in zoom-in-95">
+            <div className="flex items-center gap-2.5 text-amber-500">
+              <AlertTriangle className="w-5 h-5" />
+              <h3 className="text-sm font-bold text-gray-900 dark:text-zinc-100">Unsaved Changes</h3>
+            </div>
+            <p className="text-xs text-gray-600 dark:text-zinc-400">
+              You have unsaved changes in this artboard. Do you want to save before closing?
+            </p>
+            <div className="flex items-center justify-end gap-2 pt-2">
+              <button
+                type="button"
+                onClick={() => setUnsavedTabId(null)}
+                className="px-3 py-1.5 text-xs font-semibold text-gray-600 dark:text-zinc-400 hover:bg-gray-100 hover:dark:bg-zinc-800 rounded-xl transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  const id = unsavedTabId;
+                  setUnsavedTabId(null);
+                  closeTab(id);
+                }}
+                className="px-3 py-1.5 text-xs font-semibold text-red-600 dark:text-red-400 hover:bg-red-50 hover:dark:bg-red-950/40 rounded-xl transition-colors"
+              >
+                Discard
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  const id = unsavedTabId;
+                  setUnsavedTabId(null);
+                  handleSaveProject();
+                  closeTab(id);
+                }}
+                className="px-3 py-1.5 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-xl shadow-xs transition-colors"
+              >
+                Save & Close
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </header>
