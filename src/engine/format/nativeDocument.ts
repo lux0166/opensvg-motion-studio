@@ -3,6 +3,9 @@ import { StateMachineDefinition } from '../stateMachine/runtimeStateMachine';
 import { ComponentDefinition } from '../components/componentSystem';
 import { DataBinding } from '../binding/dataBinding';
 import { Constraint } from '../constraints/constraintSolver';
+import { DocumentInteraction } from '../interaction/interactionModel';
+
+export * from '../interaction/interactionModel';
 
 export const OPENSVG_FILE_EXTENSION = '.osvg';
 export const OPENSVG_MIME_TYPE = 'application/vnd.opensvg+json';
@@ -52,6 +55,7 @@ export interface OpenSVGDocument {
   nodes: Record<string, SceneNode>;
   nodeOrder: string[];
   stateMachines?: StateMachineDefinition[];
+  interactions?: DocumentInteraction[];
   components?: ComponentDefinition[];
   bindings?: DataBinding[];
   constraints?: Constraint[];

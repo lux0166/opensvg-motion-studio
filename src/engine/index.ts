@@ -28,6 +28,7 @@ export * from './runtime/runtimeKernel';
 
 // 7. Interactive SVG Web Runtime, Hit Testing & Adapters (P1 Strategic Pillar 2)
 export * from './webRuntime';
+export * from './interaction/interactionModel';
 export * from './interaction/geometryHitTest';
 export * from './adapters';
 

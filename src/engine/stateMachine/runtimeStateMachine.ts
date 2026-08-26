@@ -115,6 +115,13 @@ export class StateMachineRuntime {
   }
 
   /**
+   * Gets input value by ID or Name
+   */
+  public getInput(nameOrId: string): StateMachineInput | undefined {
+    return this.inputs.get(nameOrId);
+  }
+
+  /**
    * Sets input value by ID or Name
    */
   public setInput(nameOrId: string, value: boolean | number): void {
@@ -248,6 +255,11 @@ export class StateMachineRuntime {
     for (const cond of conditions) {
       const input = this.inputs.get(cond.inputId);
       if (!input) return false;
+
+      if (input.type === 'trigger') {
+        if (!input.fired) return false;
+        continue;
+      }
 
       switch (cond.operator) {
         case '==':

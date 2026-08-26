@@ -259,15 +259,21 @@ export class OpenSVGWebRuntime {
 
     const hitNode = hitTestScene(data.sceneState, data.scenePt);
     if (hitNode) {
-      this.runtime.setBoolean('isPressed', true);
-      this.runtime.setBoolean('pressed', true);
-      this.runtime.fireTrigger('onPointerDown');
-      this.runtime.fireTrigger('press');
+      // Document-defined interaction dispatching
+      this.runtime.dispatchInteraction(hitNode.id, 'pointerdown');
+
+      // Fallback for legacy state machines without explicit document interactions
+      if (this.runtime.getInteractions().length === 0) {
+        this.runtime.setBoolean('isPressed', true);
+        this.runtime.setBoolean('pressed', true);
+        this.runtime.fireTrigger('onPointerDown');
+        this.runtime.fireTrigger('press');
+      }
 
       this.emitEvent('nodeInteraction', {
         nodeId: hitNode.id,
         nodeName: hitNode.name,
-        eventType: 'onPointerDown',
+        eventType: 'pointerdown',
         x: data.scenePt.x,
         y: data.scenePt.y
       });
@@ -278,16 +284,22 @@ export class OpenSVGWebRuntime {
     const data = this.getScenePoint(event);
     if (!data) return;
 
-    this.runtime.setBoolean('isPressed', false);
-    this.runtime.setBoolean('pressed', false);
-    this.runtime.fireTrigger('onPointerUp');
-
     const hitNode = hitTestScene(data.sceneState, data.scenePt);
     if (hitNode) {
+      // Document-defined interaction dispatching
+      this.runtime.dispatchInteraction(hitNode.id, 'pointerup');
+
+      // Fallback for legacy state machines without explicit document interactions
+      if (this.runtime.getInteractions().length === 0) {
+        this.runtime.setBoolean('isPressed', false);
+        this.runtime.setBoolean('pressed', false);
+        this.runtime.fireTrigger('onPointerUp');
+      }
+
       this.emitEvent('nodeInteraction', {
         nodeId: hitNode.id,
         nodeName: hitNode.name,
-        eventType: 'onPointerUp',
+        eventType: 'pointerup',
         x: data.scenePt.x,
         y: data.scenePt.y
       });
@@ -304,12 +316,16 @@ export class OpenSVGWebRuntime {
     if (currentHitId !== this.hoveredNodeId) {
       if (this.hoveredNodeId && !currentHitId) {
         // Hover leave
-        this.runtime.setBoolean('isHovered', false);
-        this.runtime.setBoolean('hover', false);
-        this.runtime.fireTrigger('onHoverLeave');
+        this.runtime.dispatchInteraction(this.hoveredNodeId, 'pointerleave');
+        if (this.runtime.getInteractions().length === 0) {
+          this.runtime.setBoolean('isHovered', false);
+          this.runtime.setBoolean('hover', false);
+          this.runtime.fireTrigger('onHoverLeave');
+        }
+
         this.emitEvent('nodeInteraction', {
           nodeId: this.hoveredNodeId,
-          eventType: 'onHoverLeave',
+          eventType: 'pointerleave',
           x: data.scenePt.x,
           y: data.scenePt.y
         });
@@ -317,13 +333,17 @@ export class OpenSVGWebRuntime {
 
       if (currentHitId) {
         // Hover enter
-        this.runtime.setBoolean('isHovered', true);
-        this.runtime.setBoolean('hover', true);
-        this.runtime.fireTrigger('onHoverEnter');
+        this.runtime.dispatchInteraction(currentHitId, 'pointerenter');
+        if (this.runtime.getInteractions().length === 0) {
+          this.runtime.setBoolean('isHovered', true);
+          this.runtime.setBoolean('hover', true);
+          this.runtime.fireTrigger('onHoverEnter');
+        }
+
         this.emitEvent('nodeInteraction', {
           nodeId: currentHitId,
           nodeName: hitNode!.name,
-          eventType: 'onHoverEnter',
+          eventType: 'pointerenter',
           x: data.scenePt.x,
           y: data.scenePt.y
         });
@@ -335,13 +355,17 @@ export class OpenSVGWebRuntime {
 
   private handlePointerLeave(_event?: PointerEvent): void {
     if (this.hoveredNodeId) {
-      this.runtime.setBoolean('isHovered', false);
-      this.runtime.setBoolean('hover', false);
-      this.runtime.setBoolean('isPressed', false);
-      this.runtime.fireTrigger('onHoverLeave');
+      this.runtime.dispatchInteraction(this.hoveredNodeId, 'pointerleave');
+      if (this.runtime.getInteractions().length === 0) {
+        this.runtime.setBoolean('isHovered', false);
+        this.runtime.setBoolean('hover', false);
+        this.runtime.setBoolean('isPressed', false);
+        this.runtime.fireTrigger('onHoverLeave');
+      }
+
       this.emitEvent('nodeInteraction', {
         nodeId: this.hoveredNodeId,
-        eventType: 'onHoverLeave'
+        eventType: 'pointerleave'
       });
       this.hoveredNodeId = null;
     }
@@ -353,12 +377,16 @@ export class OpenSVGWebRuntime {
 
     const hitNode = hitTestScene(data.sceneState, data.scenePt);
     if (hitNode) {
-      this.runtime.fireTrigger('onClick');
-      this.runtime.fireTrigger('click');
+      this.runtime.dispatchInteraction(hitNode.id, 'click');
+      if (this.runtime.getInteractions().length === 0) {
+        this.runtime.fireTrigger('onClick');
+        this.runtime.fireTrigger('click');
+      }
+
       this.emitEvent('nodeInteraction', {
         nodeId: hitNode.id,
         nodeName: hitNode.name,
-        eventType: 'onClick',
+        eventType: 'click',
         x: data.scenePt.x,
         y: data.scenePt.y
       });

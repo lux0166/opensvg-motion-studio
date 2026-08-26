@@ -91,6 +91,26 @@ export function validateDocument(docOrJson: any): DocumentValidationResult {
     errors.push('Missing or invalid nodeOrder array.');
   }
 
+  // Interaction validation
+  if (doc.interactions) {
+    if (!Array.isArray(doc.interactions)) {
+      errors.push('Property "interactions" must be an array.');
+    } else {
+      doc.interactions.forEach((inter: any, idx: number) => {
+        if (!inter || typeof inter !== 'object') {
+          errors.push(`Interaction at index ${idx} is not an object.`);
+        } else {
+          if (!inter.id) errors.push(`Interaction at index ${idx} is missing "id".`);
+          if (!inter.targetNodeId) errors.push(`Interaction at index ${idx} is missing "targetNodeId".`);
+          if (!inter.event) errors.push(`Interaction at index ${idx} is missing "event".`);
+          if (!inter.action || typeof inter.action !== 'object') {
+            errors.push(`Interaction at index ${idx} is missing valid "action" object.`);
+          }
+        }
+      });
+    }
+  }
+
   // Asset validation
   if (doc.assets && typeof doc.assets === 'object') {
     for (const [id, asset] of Object.entries(doc.assets)) {
@@ -188,6 +208,7 @@ export function convertProjectToNativeDocument(
     nodes: JSON.parse(JSON.stringify(project.nodes || {})),
     nodeOrder: [...(project.nodeOrder || [])],
     stateMachines: extras.stateMachines ? JSON.parse(JSON.stringify(extras.stateMachines)) : undefined,
+    interactions: extras.interactions ? JSON.parse(JSON.stringify(extras.interactions)) : undefined,
     components: extras.components ? JSON.parse(JSON.stringify(extras.components)) : undefined,
     bindings: extras.bindings ? JSON.parse(JSON.stringify(extras.bindings)) : undefined,
     constraints: extras.constraints ? JSON.parse(JSON.stringify(extras.constraints)) : undefined,

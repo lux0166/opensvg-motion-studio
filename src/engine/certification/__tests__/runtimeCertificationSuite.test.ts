@@ -498,4 +498,153 @@ describe('OpenSVG Runtime Certification Suite (Formal Product Proof Gates)', () 
       expect(isPointInPathGeometry({ x: 75, y: 140 }, bezierPath)).toBe(false);
     });
   });
+
+  // --------------------------------------------------------------------------
+  // GATE 6: Document-Defined Interaction Resolution & Generic Mapping
+  // --------------------------------------------------------------------------
+  describe('Gate 6: Document-Defined Interaction Resolution & Generic Mapping', () => {
+    it('executes document-defined interactions with zero hardcoded input assumptions', () => {
+      // Document with completely arbitrary custom input & trigger names
+      const genericInteractiveDoc: OpenSVGDocument = {
+        format: 'opensvg',
+        schemaVersion: '2.0.0',
+        metadata: {
+          id: 'doc-generic-interactions',
+          title: 'Generic Interactions Proof',
+          createdAt: Date.now(),
+          updatedAt: Date.now()
+        },
+        scene: { width: 800, height: 600, fps: 60, duration: 4.0, background: '#ffffff' },
+        nodes: {
+          'custom-btn': {
+            id: 'custom-btn',
+            name: 'Custom Button Node',
+            type: 'rect',
+            visible: true,
+            locked: false,
+            x: 100,
+            y: 100,
+            width: 200,
+            height: 60,
+            rotation: 0,
+            scaleX: 1,
+            scaleY: 1,
+            opacity: 1,
+            borderRadius: 8,
+            fill: '#3b82f6',
+            tracks: []
+          }
+        },
+        nodeOrder: ['custom-btn'],
+        stateMachines: [
+          {
+            id: 'sm-custom',
+            name: 'Custom Controller',
+            inputs: [
+              { id: 'inp-custom-arm', name: 'shieldArmed', type: 'boolean', value: false },
+              { id: 'trig-custom-warp', name: 'triggerHyperdrive', type: 'trigger', value: false }
+            ],
+            layers: [
+              {
+                id: 'layer-custom-main',
+                name: 'Main Layer',
+                defaultStateId: 'state-dormant',
+                states: [
+                  {
+                    id: 'state-dormant',
+                    name: 'Dormant',
+                    type: 'animation',
+                    propertyOverrides: { 'custom-btn': { fill: '#3b82f6', scaleX: 1.0 } }
+                  },
+                  {
+                    id: 'state-energized',
+                    name: 'Energized',
+                    type: 'animation',
+                    propertyOverrides: { 'custom-btn': { fill: '#10b981', scaleX: 1.2 } }
+                  },
+                  {
+                    id: 'state-hyperdrive',
+                    name: 'Hyperdrive Warp',
+                    type: 'animation',
+                    propertyOverrides: { 'custom-btn': { fill: '#8b5cf6', scaleX: 1.5 } }
+                  }
+                ],
+                transitions: [
+                  {
+                    id: 'tr-energize',
+                    fromStateId: 'state-dormant',
+                    toStateId: 'state-energized',
+                    duration: 0.1,
+                    conditions: [{ inputId: 'inp-custom-arm', operator: '==', value: true }]
+                  },
+                  {
+                    id: 'tr-deenergize',
+                    fromStateId: 'state-energized',
+                    toStateId: 'state-dormant',
+                    duration: 0.1,
+                    conditions: [{ inputId: 'inp-custom-arm', operator: '==', value: false }]
+                  },
+                  {
+                    id: 'tr-warp',
+                    fromStateId: 'state-energized',
+                    toStateId: 'state-hyperdrive',
+                    duration: 0.1,
+                    conditions: [{ inputId: 'trig-custom-warp', operator: '==', value: true }]
+                  }
+                ]
+              }
+            ]
+          }
+        ],
+        interactions: [
+          {
+            id: 'inter-hover-enter',
+            targetNodeId: 'custom-btn',
+            event: 'pointerenter',
+            action: { type: 'setInput', inputName: 'shieldArmed', value: true }
+          },
+          {
+            id: 'inter-hover-leave',
+            targetNodeId: 'custom-btn',
+            event: 'pointerleave',
+            action: { type: 'setInput', inputName: 'shieldArmed', value: false }
+          },
+          {
+            id: 'inter-click-warp',
+            targetNodeId: 'custom-btn',
+            event: 'click',
+            action: { type: 'fireTrigger', triggerName: 'triggerHyperdrive' }
+          }
+        ]
+      };
+
+      const runtime = new OpenSVGRuntime(4.0, 60);
+      runtime.load(genericInteractiveDoc);
+
+      // Initial state: Dormant (#3b82f6)
+      let evaluated = runtime.getEvaluatedSceneState();
+      expect(evaluated.evaluatedNodes['custom-btn'].fill).toBe('#3b82f6');
+
+      // 1. Dispatch pointerenter event on custom-btn
+      runtime.dispatchInteraction('custom-btn', 'pointerenter');
+      runtime.advance(0.15);
+      evaluated = runtime.getEvaluatedSceneState();
+      expect(evaluated.evaluatedNodes['custom-btn'].fill).toBe('#10b981');
+      expect(evaluated.evaluatedNodes['custom-btn'].scaleX).toBe(1.2);
+
+      // 2. Dispatch click (warp trigger) on custom-btn
+      runtime.dispatchInteraction('custom-btn', 'click');
+      runtime.advance(0.15);
+      evaluated = runtime.getEvaluatedSceneState();
+      expect(evaluated.evaluatedNodes['custom-btn'].fill).toBe('#8b5cf6');
+      expect(evaluated.evaluatedNodes['custom-btn'].scaleX).toBe(1.5);
+
+      // 3. Dispatch pointerleave event on custom-btn
+      runtime.dispatchInteraction('custom-btn', 'pointerleave');
+      runtime.advance(0.15);
+      // State machine logic reflects the input change
+      expect(runtime.getStateMachineRuntime()?.getInput('shieldArmed')?.value).toBe(false);
+    });
+  });
 });
+

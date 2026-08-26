@@ -25,8 +25,8 @@ describe('Killer Product Workflow: Complex SVG -> .osvg -> Standalone WebRuntime
     expect(initialScene.evaluatedNodes['energy-core'].scaleX).toBe(1.0);
     expect(initialScene.evaluatedNodes['action-btn-label'].textContent).toBe('ACTIVATE SHIELD');
 
-    // 3. User Hovers on element -> State Machine transitions to Hover
-    runtime.setBoolean('isHovered', true);
+    // 3. User Hovers on element -> Document Interaction sets isHovered: true
+    runtime.getRuntime().dispatchInteraction('action-trigger-btn', 'pointerenter');
     runtime.getRuntime().advance(0.2); // Advance through 0.2s transition
 
     const hoverScene = runtime.getRuntime().getEvaluatedSceneState();
@@ -34,8 +34,8 @@ describe('Killer Product Workflow: Complex SVG -> .osvg -> Standalone WebRuntime
     expect(hoverScene.evaluatedNodes['energy-core'].scaleX).toBe(1.15);
     expect(hoverScene.evaluatedNodes['action-btn-label'].textContent).toBe('READY TO ARM');
 
-    // 4. User Triggers Active Overdrive
-    runtime.setBoolean('isActive', true);
+    // 4. User Clicks Action Button -> Document Interaction sets isActive: true
+    runtime.getRuntime().dispatchInteraction('action-trigger-btn', 'click');
     runtime.getRuntime().advance(0.15); // Advance through 0.15s transition
 
     const activeScene = runtime.getRuntime().getEvaluatedSceneState();

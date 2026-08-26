@@ -158,7 +158,32 @@ export function buildInteractiveHeroIllustrationDocument(): OpenSVGDocument {
     }
   ];
 
-  // 4. Construct canonical OpenSVGDocument
+  // 4. Attach Document Interactions
+  const interactions = [
+    {
+      id: 'inter-btn-hover-enter',
+      name: 'Hover Action Button',
+      targetNodeId: 'action-trigger-btn',
+      event: 'pointerenter' as const,
+      action: { type: 'setInput' as const, inputName: 'isHovered', value: true }
+    },
+    {
+      id: 'inter-btn-hover-leave',
+      name: 'Leave Action Button',
+      targetNodeId: 'action-trigger-btn',
+      event: 'pointerleave' as const,
+      action: { type: 'setInput' as const, inputName: 'isHovered', value: false }
+    },
+    {
+      id: 'inter-btn-click-activate',
+      name: 'Click Action Button',
+      targetNodeId: 'action-trigger-btn',
+      event: 'click' as const,
+      action: { type: 'setInput' as const, inputName: 'isActive', value: true }
+    }
+  ];
+
+  // 5. Construct canonical OpenSVGDocument
   const doc: OpenSVGDocument = {
     format: 'opensvg',
     schemaVersion: '2.0.0',
@@ -178,7 +203,8 @@ export function buildInteractiveHeroIllustrationDocument(): OpenSVGDocument {
     },
     nodes,
     nodeOrder,
-    stateMachines
+    stateMachines,
+    interactions
   };
 
   return doc;

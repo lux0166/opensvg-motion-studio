@@ -2,6 +2,8 @@ import React, { useState } from 'react';
 import { useStudioStore } from '../store/useStudioStore';
 import { exportToAnimatedSVG, exportToLottieJSON } from '../engine/exporter';
 import { recordSceneToVideo } from '../engine/videoRecorder';
+import { serializeDocument } from '../engine/format/documentParser';
+import { OpenSVGDocument } from '../engine/format/nativeDocument';
 import { X, FileCode, Code, Globe, Film, ChevronRight, Loader2 } from 'lucide-react';
 
 export const ExportModal: React.FC = () => {
@@ -48,17 +50,32 @@ export const ExportModal: React.FC = () => {
     downloadBlob(`${rootFrame.name.toLowerCase().replace(/\s+/g, '-')}-lottie.json`, blob);
   };
 
-  const handleExportProject = () => {
-    const project = {
-      name: rootFrame.name,
-      duration,
-      fps,
+  const handleExportOpenSVG = () => {
+    const doc: OpenSVGDocument = {
+      format: 'opensvg',
+      schemaVersion: '2.0.0',
+      metadata: {
+        id: `doc-${rootFrame.name.toLowerCase().replace(/\s+/g, '-')}`,
+        title: rootFrame.name,
+        author: 'OpenSVG Motion Studio',
+        createdAt: Date.now(),
+        updatedAt: Date.now()
+      },
+      scene: {
+        width: rootFrame.width,
+        height: rootFrame.height,
+        fps,
+        duration,
+        background: rootFrame.canvasBg || rootFrame.fill || '#ffffff',
+        clipContent: rootFrame.clipContent ?? true
+      },
       rootFrame,
       nodes,
       nodeOrder
     };
-    const blob = new Blob([JSON.stringify(project, null, 2)], { type: 'application/json' });
-    downloadBlob(`${rootFrame.name.toLowerCase().replace(/\s+/g, '-')}-project.kinetic`, blob);
+    const osvgString = serializeDocument(doc, true);
+    const blob = new Blob([osvgString], { type: 'application/vnd.opensvg+json' });
+    downloadBlob(`${rootFrame.name.toLowerCase().replace(/\s+/g, '-')}.osvg`, blob);
   };
 
   const handleExportVideo = async () => {
@@ -102,23 +119,42 @@ export const ExportModal: React.FC = () => {
           <div className="py-8 flex flex-col items-center justify-center gap-4">
             <Loader2 className="w-8 h-8 text-blue-500 animate-spin" />
             <div className="text-center">
-              <h4 className="text-xs font-bold text-gray-800 dark:text-zinc-100">Rendering 60 FPS Video...</h4>
-              <p className="text-[11px] text-gray-400 dark:text-zinc-500 mt-1">
-                Encoding vector canvas frames ({recordProgress}%)
-              </p>
+              <div className="text-sm font-bold text-gray-800 dark:text-zinc-100">
+                Rendering Video Stream ({Math.round(recordProgress * 100)}%)
+              </div>
+              <div className="text-xs text-gray-400 dark:text-zinc-500 mt-1">
+                Please wait while frames are captured at 60 FPS
+              </div>
             </div>
-            <div className="w-full bg-gray-100 dark:bg-zinc-800 h-2 rounded-full overflow-hidden">
+            <div className="w-full bg-gray-100 dark:bg-zinc-800 h-2 rounded-full overflow-hidden mt-2">
               <div
-                className="bg-blue-500 h-full transition-all duration-150 rounded-full"
-                style={{ width: `${recordProgress}%` }}
+                className="bg-blue-500 h-full transition-all duration-150"
+                style={{ width: `${recordProgress * 100}%` }}
               />
             </div>
           </div>
         ) : (
-          <div className="py-5 flex flex-col gap-3">
-            <p className="text-xs text-gray-500 dark:text-zinc-400 mb-1">
+          <div className="py-4 space-y-3">
+            <p className="text-xs text-gray-500 dark:text-zinc-400 mb-4">
               Choose format to export your vector animation:
             </p>
+
+            {/* OpenSVG Native Format Option */}
+            <button
+              onClick={handleExportOpenSVG}
+              className="flex items-center justify-between p-3.5 border border-gray-200 dark:border-zinc-700/80 rounded-2xl hover:border-emerald-500 hover:dark:border-emerald-500 hover:bg-emerald-50/50 hover:dark:bg-emerald-950/30 transition-all text-left group"
+            >
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-emerald-100 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400 flex items-center justify-center group-hover:scale-105 transition-transform">
+                  <Globe className="w-5 h-5" />
+                </div>
+                <div>
+                  <div className="text-xs font-bold text-gray-800 dark:text-zinc-100">OpenSVG Native (.osvg)</div>
+                  <div className="text-[11px] text-gray-400 dark:text-zinc-500">Autonomous interactive runtime format</div>
+                </div>
+              </div>
+              <ChevronRight className="w-4 h-4 text-gray-400 dark:text-zinc-500 group-hover:text-emerald-500" />
+            </button>
 
             {/* Video Option */}
             <button
@@ -169,23 +205,6 @@ export const ExportModal: React.FC = () => {
                 </div>
               </div>
               <ChevronRight className="w-4 h-4 text-gray-400 dark:text-zinc-500 group-hover:text-indigo-500" />
-            </button>
-
-            {/* Project File Option */}
-            <button
-              onClick={handleExportProject}
-              className="flex items-center justify-between p-3.5 border border-gray-200 dark:border-zinc-700/80 rounded-2xl hover:border-emerald-500 hover:dark:border-emerald-500 hover:bg-emerald-50/50 hover:dark:bg-emerald-950/30 transition-all text-left group"
-            >
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-emerald-100 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400 flex items-center justify-center group-hover:scale-105 transition-transform">
-                  <Globe className="w-5 h-5" />
-                </div>
-                <div>
-                  <div className="text-xs font-bold text-gray-800 dark:text-zinc-100">Kinetic Project (.kinetic)</div>
-                  <div className="text-[11px] text-gray-400 dark:text-zinc-500">Full source scene graph and keyframe tracks</div>
-                </div>
-              </div>
-              <ChevronRight className="w-4 h-4 text-gray-400 dark:text-zinc-500 group-hover:text-emerald-500" />
             </button>
           </div>
         )}

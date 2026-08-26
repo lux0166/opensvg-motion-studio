@@ -1,42 +1,70 @@
 import { SceneProject, SceneNode } from '../types';
-import { RenderScene } from './coreContracts';
-import { evaluateScenePipeline, EvaluatedSceneState } from './evaluationPipeline';
 import { RuntimeClock, LoopMode } from './runtimeClock';
-import { createRuntimeSnapshot } from './runtimeSnapshot';
 import { Constraint } from '../constraints/constraintSolver';
 import { ComponentRegistry, ComponentInstance } from '../components/componentSystem';
 import { DataBindingEngine } from '../binding/dataBinding';
 import { StateMachineRuntime } from '../stateMachine/runtimeStateMachine';
+import { evaluateScenePipeline, EvaluatedSceneState } from './evaluationPipeline';
+import { RenderScene } from './coreContracts';
 import { OpenSVGDocument } from '../format/nativeDocument';
 import { convertNativeDocumentToProject } from '../format/documentParser';
+import { createRuntimeSnapshot } from './runtimeSnapshot';
+import { DocumentInteraction, InteractionEventType, InteractionAction } from '../interaction/interactionModel';
 
 /**
- * Headless OpenSVG Runtime Kernel
- * Adheres strictly to OPENSVG_CURRENT_STRATEGIC_ROADMAP.md (P0 & P1)
- * INVARIANT: Single runtime owner & single evaluation truth via `evaluateScenePipeline()`.
- * Invariant: Evaluation produces derived state. Playback/evaluation never mutates authoring document.
+ * OpenSVG Single Runtime Owner (Headless Runtime Kernel)
+ * Standardized according to CORE_ENGINE_DEPTH.md, Section 13 & OPENSVG_CURRENT_STRATEGIC_ROADMAP.md (Section 1).
+ * INVARIANT: Sole runtime owner of Clock, StateMachine, ComponentRegistry, DataBindings, Constraints, and Document Interactions.
  */
 export class OpenSVGRuntime {
-  private project: SceneProject | null = null;
   private clock: RuntimeClock;
+  private project: SceneProject;
   private constraints: Constraint[] = [];
   private componentRegistry?: ComponentRegistry;
   private componentInstances: ComponentInstance[] = [];
   private dataBindingEngine?: DataBindingEngine;
   private stateMachineRuntime?: StateMachineRuntime;
+  private interactions: DocumentInteraction[] = [];
   private propertyOverrides: Record<string, Partial<SceneNode>> = {};
 
   constructor(duration: number = 3.0, fps: number = 60, loopMode: LoopMode = 'loop') {
     this.clock = new RuntimeClock(duration, fps, loopMode);
+    this.project = {
+      id: 'empty-scene',
+      name: 'Empty Scene',
+      version: '2.0.0',
+      duration,
+      fps,
+      rootFrame: {
+        id: 'root-default',
+        name: 'Root Frame',
+        type: 'frame',
+        visible: true,
+        locked: false,
+        clipContent: true,
+        canvasBg: '#ffffff',
+        x: 0,
+        y: 0,
+        width: 800,
+        height: 600,
+        rotation: 0,
+        scaleX: 1,
+        scaleY: 1,
+        opacity: 1,
+        borderRadius: 0,
+        fill: '#ffffff',
+        tracks: []
+      },
+      nodes: {},
+      nodeOrder: []
+    };
   }
 
   /**
-   * Loads a canonical SceneProject or OpenSVGDocument into the runtime
+   * Loads an OpenSVG document (.osvg) or legacy SceneProject directly into the runtime owner
    */
-  public load(docOrProject: SceneProject | OpenSVGDocument): void {
-    if (!docOrProject) return;
-
-    if ((docOrProject as OpenSVGDocument).format === 'opensvg') {
+  public load(docOrProject: OpenSVGDocument | SceneProject): void {
+    if ('format' in docOrProject && docOrProject.format === 'opensvg') {
       const doc = docOrProject as OpenSVGDocument;
       const converted = convertNativeDocumentToProject(doc);
       this.project = createRuntimeSnapshot(converted);
@@ -46,6 +74,13 @@ export class OpenSVGRuntime {
         this.stateMachineRuntime = new StateMachineRuntime(doc.stateMachines[0]);
       } else {
         this.stateMachineRuntime = undefined;
+      }
+
+      // Initialize Document Interactions if present
+      if (doc.interactions && doc.interactions.length > 0) {
+        this.interactions = [...doc.interactions];
+      } else {
+        this.interactions = [];
       }
 
       // Initialize Components if present
@@ -77,12 +112,59 @@ export class OpenSVGRuntime {
       }
     } else {
       this.project = createRuntimeSnapshot(docOrProject as SceneProject);
+      this.interactions = [];
     }
 
     this.clock.setDuration(this.project.duration || 1);
     this.clock.setFps(this.project.fps || 60);
     this.clock.reset();
     this.propertyOverrides = {};
+  }
+
+  public setInteractions(interactions: DocumentInteraction[]): void {
+    this.interactions = [...interactions];
+  }
+
+  public getInteractions(): DocumentInteraction[] {
+    return [...this.interactions];
+  }
+
+  /**
+   * Dispatches a document-defined interaction event to matching registered interactions
+   */
+  public dispatchInteraction(targetNodeId: string, event: InteractionEventType): void {
+    for (const inter of this.interactions) {
+      if (inter.enabled === false) continue;
+      if (inter.event === event && (inter.targetNodeId === targetNodeId || inter.targetNodeId === '*')) {
+        this.executeInteractionAction(inter.action);
+      }
+    }
+  }
+
+  private executeInteractionAction(action: InteractionAction): void {
+    switch (action.type) {
+      case 'setInput':
+        this.stateMachineRuntime?.setInput(action.inputName, action.value);
+        break;
+      case 'fireTrigger':
+        this.stateMachineRuntime?.fireTrigger(action.triggerName);
+        break;
+      case 'setState':
+        this.stateMachineRuntime?.forceState(action.layerId || '', action.stateId);
+        break;
+      case 'seek':
+        this.seek(action.time);
+        break;
+      case 'play':
+        this.play();
+        break;
+      case 'pause':
+        this.pause();
+        break;
+      case 'togglePlay':
+        this.togglePlay();
+        break;
+    }
   }
 
   public setConstraints(constraints: Constraint[]): void {
@@ -151,73 +233,6 @@ export class OpenSVGRuntime {
     this.clock.togglePlay();
   }
 
-  // State Machine APIs
-  public setBoolean(inputName: string, value: boolean): void {
-    this.stateMachineRuntime?.setInput(inputName, value);
-  }
-
-  public setNumber(inputName: string, value: number): void {
-    this.stateMachineRuntime?.setInput(inputName, value);
-  }
-
-  public fireTrigger(inputName: string): void {
-    this.stateMachineRuntime?.fireTrigger(inputName);
-  }
-
-  public setState(layerNameOrStateId: string, stateName?: string): void {
-    if (!this.stateMachineRuntime) return;
-    if (stateName) {
-      this.stateMachineRuntime.forceState(layerNameOrStateId, stateName);
-    } else {
-      this.stateMachineRuntime.forceState('layer_main', layerNameOrStateId);
-    }
-  }
-
-  // Data Binding APIs
-  public setBindingValue(sourcePath: string, value: any): void {
-    this.dataBindingEngine?.setSourceValue(sourcePath, value);
-  }
-
-  /**
-   * Evaluates and returns the complete EvaluatedSceneState using the canonical pipeline
-   */
-  public getEvaluatedSceneState(): EvaluatedSceneState {
-    if (!this.project) {
-      return {
-        projectId: 'empty',
-        time: 0,
-        duration: 0,
-        fps: 60,
-        evaluatedNodes: {},
-        nodeStates: {},
-        nodeOrder: [],
-        renderScene: {
-          id: 'empty',
-          viewport: { width: 800, height: 600, dpr: 1, background: '#ffffff' },
-          nodes: [],
-          drawOrder: []
-        }
-      };
-    }
-
-    return evaluateScenePipeline(this.project, {
-      time: this.clock.getCurrentTime(),
-      constraints: this.constraints,
-      componentRegistry: this.componentRegistry,
-      componentInstances: this.componentInstances,
-      dataBindingEngine: this.dataBindingEngine,
-      stateMachineRuntime: this.stateMachineRuntime,
-      externalPropertyOverrides: this.propertyOverrides
-    });
-  }
-
-  /**
-   * Returns current evaluated RenderScene (Single evaluation path via pipeline)
-   */
-  public getRenderState(): RenderScene {
-    return this.getEvaluatedSceneState().renderScene;
-  }
-
   public getCurrentTime(): number {
     return this.clock.getCurrentTime();
   }
@@ -234,23 +249,53 @@ export class OpenSVGRuntime {
     return this.clock.getIsPlaying();
   }
 
-  public getClock(): RuntimeClock {
-    return this.clock;
+  // State Machine control forwarding
+  public setBoolean(inputName: string, value: boolean): void {
+    this.stateMachineRuntime?.setInput(inputName, value);
+  }
+
+  public setNumber(inputName: string, value: number): void {
+    this.stateMachineRuntime?.setInput(inputName, value);
+  }
+
+  public fireTrigger(triggerName: string): void {
+    this.stateMachineRuntime?.fireTrigger(triggerName);
+  }
+
+  public setState(stateNameOrLayerId: string, stateName?: string): void {
+    const layerId = stateName ? stateNameOrLayerId : 'layer-main';
+    const targetState = stateName || stateNameOrLayerId;
+    this.stateMachineRuntime?.forceState(layerId, targetState);
+  }
+
+  // Data Binding forwarding
+  public setBindingValue(sourcePath: string, value: any): void {
+    this.dataBindingEngine?.setSourceValue(sourcePath, value);
+  }
+
+  /**
+   * Single Source of Evaluation Truth: Runs the canonical evaluation pipeline
+   */
+  public getEvaluatedSceneState(): EvaluatedSceneState {
+    return evaluateScenePipeline(this.project, {
+      time: this.clock.getCurrentTime(),
+      constraints: this.constraints,
+      componentRegistry: this.componentRegistry,
+      componentInstances: this.componentInstances,
+      dataBindingEngine: this.dataBindingEngine,
+      stateMachineRuntime: this.stateMachineRuntime,
+      externalPropertyOverrides: this.propertyOverrides
+    });
+  }
+
+  /**
+   * Derives current render scene for backends
+   */
+  public getRenderState(): RenderScene {
+    return this.getEvaluatedSceneState().renderScene;
   }
 
   public getStateMachineRuntime(): StateMachineRuntime | undefined {
     return this.stateMachineRuntime;
-  }
-
-  public getComponentRegistry(): ComponentRegistry | undefined {
-    return this.componentRegistry;
-  }
-
-  public getDataBindingEngine(): DataBindingEngine | undefined {
-    return this.dataBindingEngine;
-  }
-
-  public getProject(): SceneProject | null {
-    return this.project;
   }
 }
