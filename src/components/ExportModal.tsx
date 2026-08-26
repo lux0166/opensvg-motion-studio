@@ -15,6 +15,8 @@ export const ExportModal: React.FC = () => {
     nodeOrder,
     duration,
     fps,
+    stateMachines,
+    interactions,
     showToast
   } = useStudioStore();
 
@@ -71,7 +73,9 @@ export const ExportModal: React.FC = () => {
       },
       rootFrame,
       nodes,
-      nodeOrder
+      nodeOrder,
+      stateMachines: stateMachines.length > 0 ? stateMachines : undefined,
+      interactions: interactions.length > 0 ? interactions : undefined
     };
     const osvgString = serializeDocument(doc, true);
     const blob = new Blob([osvgString], { type: 'application/vnd.opensvg+json' });

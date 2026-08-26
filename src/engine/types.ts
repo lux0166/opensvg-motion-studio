@@ -208,6 +208,8 @@ export interface SceneProject {
   rootFrame: FrameNode;
   nodes: Record<string, SceneNode>;
   nodeOrder: string[]; // Z-order (bottom to top)
+  stateMachines?: any[];
+  interactions?: any[];
 }
 
 export type ToolMode =

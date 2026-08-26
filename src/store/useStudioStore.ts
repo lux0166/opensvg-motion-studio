@@ -8,6 +8,10 @@ import { detectSyntheticBeats } from '../engine/audioEngine';
 import { applyMotionPresetToNode, PresetOptions } from '../engine/motionPresets';
 import { scaleKeyframes, reverseKeyframes, createKeyframeClipboard, pasteKeyframesToNode, KeyframeClipboard } from '../engine/timelineOps';
 import { WorkspaceLayoutState, WORKSPACE_PRESETS, PanelId, SnapPosition, DockContainer, ActiveDraggingState, DragHoverTargetState } from '../engine/workspaceTypes';
+import { DocumentInteraction } from '../engine/interaction/interactionModel';
+import { StateMachineDefinition } from '../engine/stateMachine/runtimeStateMachine';
+import { OpenSVGDocument } from '../engine/format/nativeDocument';
+import { serializeDocument, parseDocument } from '../engine/format/documentParser';
 
 function pushDraftSnapshot(state: any) {
   const snap = createStudioSnapshot(state.rootFrame, state.nodes, state.nodeOrder);
@@ -343,6 +347,23 @@ interface StudioState {
   setDraggingPanel: (drag: ActiveDraggingState | null) => void;
   setDragHoverTarget: (target: DragHoverTargetState | null) => void;
 
+  // Document-Defined Interactions & State Machines (P0 Strategic Foundation)
+  interactions: DocumentInteraction[];
+  addInteraction: (interaction: DocumentInteraction) => void;
+  updateInteraction: (id: string, updates: Partial<DocumentInteraction>) => void;
+  removeInteraction: (id: string) => void;
+  setInteractions: (interactions: DocumentInteraction[]) => void;
+
+  stateMachines: StateMachineDefinition[];
+  addStateMachine: (sm: StateMachineDefinition) => void;
+  updateStateMachine: (id: string, updates: Partial<StateMachineDefinition>) => void;
+  removeStateMachine: (id: string) => void;
+  setStateMachines: (sms: StateMachineDefinition[]) => void;
+
+  // Native OpenSVG Document Serialization & Deserialization
+  exportOpenSVGDocument: () => string;
+  loadOpenSVGDocument: (osvgOrDoc: string | OpenSVGDocument) => void;
+
   // Modals & Feedback
   theme: 'light' | 'dark';
   setTheme: (theme: 'light' | 'dark') => void;
@@ -517,6 +538,9 @@ export const useStudioStore = create<StudioState>()(
     toastMessage: null,
     toastType: 'info',
 
+    interactions: [],
+    stateMachines: [],
+
     // History implementation
     pushSnapshot: () =>
       set((state) => {
@@ -637,6 +661,8 @@ export const useStudioStore = create<StudioState>()(
 
         state.nodes = project.nodes;
         state.nodeOrder = project.nodeOrder;
+        state.stateMachines = project.stateMachines ? [...project.stateMachines] : [];
+        state.interactions = project.interactions ? [...project.interactions] : [];
         state.duration = project.duration;
         state.fps = project.fps;
         state.currentTime = 0;
@@ -672,6 +698,8 @@ export const useStudioStore = create<StudioState>()(
         };
         state.nodes = {};
         state.nodeOrder = [];
+        state.interactions = [];
+        state.stateMachines = [];
         state.currentTime = 0;
         state.duration = 3.0;
         state.selectedId = 'frame-1';
@@ -1569,6 +1597,125 @@ export const useStudioStore = create<StudioState>()(
           localStorage.removeItem('opensvg_workspace_v2');
         }
         state.toastMessage = 'Reset workspace to default layout';
+        state.toastType = 'success';
+      }),
+
+    // Interaction Actions
+    addInteraction: (interaction) =>
+      set((state) => {
+        pushDraftSnapshot(state);
+        state.interactions.push(interaction);
+      }),
+    updateInteraction: (id, updates) =>
+      set((state) => {
+        pushDraftSnapshot(state);
+        const idx = state.interactions.findIndex((i) => i.id === id);
+        if (idx !== -1) {
+          state.interactions[idx] = { ...state.interactions[idx], ...updates };
+        }
+      }),
+    removeInteraction: (id) =>
+      set((state) => {
+        pushDraftSnapshot(state);
+        state.interactions = state.interactions.filter((i) => i.id !== id);
+      }),
+    setInteractions: (interactions) =>
+      set((state) => {
+        state.interactions = [...interactions];
+      }),
+
+    // State Machine Actions
+    addStateMachine: (sm) =>
+      set((state) => {
+        pushDraftSnapshot(state);
+        state.stateMachines.push(sm);
+      }),
+    updateStateMachine: (id, updates) =>
+      set((state) => {
+        pushDraftSnapshot(state);
+        const idx = state.stateMachines.findIndex((s) => s.id === id);
+        if (idx !== -1) {
+          state.stateMachines[idx] = { ...state.stateMachines[idx], ...updates };
+        }
+      }),
+    removeStateMachine: (id) =>
+      set((state) => {
+        pushDraftSnapshot(state);
+        state.stateMachines = state.stateMachines.filter((s) => s.id !== id);
+      }),
+    setStateMachines: (sms) =>
+      set((state) => {
+        state.stateMachines = [...sms];
+      }),
+
+    // Native OpenSVG Serialization & Deserialization
+    exportOpenSVGDocument: () => {
+      const state = get();
+      const doc: OpenSVGDocument = {
+        format: 'opensvg',
+        schemaVersion: '2.0.0',
+        metadata: {
+          id: `doc-${state.rootFrame.name.toLowerCase().replace(/\s+/g, '-')}`,
+          title: state.rootFrame.name,
+          author: 'OpenSVG Motion Studio',
+          createdAt: Date.now(),
+          updatedAt: Date.now()
+        },
+        scene: {
+          width: state.rootFrame.width,
+          height: state.rootFrame.height,
+          fps: state.fps,
+          duration: state.duration,
+          background: state.rootFrame.canvasBg || state.rootFrame.fill || '#ffffff',
+          clipContent: state.rootFrame.clipContent ?? true
+        },
+        rootFrame: state.rootFrame,
+        nodes: state.nodes,
+        nodeOrder: state.nodeOrder,
+        stateMachines: state.stateMachines.length > 0 ? state.stateMachines : undefined,
+        interactions: state.interactions.length > 0 ? state.interactions : undefined
+      };
+      return serializeDocument(doc, true);
+    },
+
+    loadOpenSVGDocument: (osvgOrDoc) =>
+      set((state) => {
+        pushDraftSnapshot(state);
+        const doc: OpenSVGDocument = typeof osvgOrDoc === 'string' ? parseDocument(osvgOrDoc) : osvgOrDoc;
+        state.duration = doc.scene.duration || 3.0;
+        state.fps = doc.scene.fps || 60;
+        state.currentTime = 0;
+        if (doc.rootFrame) {
+          state.rootFrame = { ...doc.rootFrame };
+        } else {
+          state.rootFrame = {
+            id: `root-${doc.metadata.id}`,
+            name: doc.metadata.title || 'Scene',
+            type: 'frame',
+            visible: true,
+            locked: false,
+            clipContent: doc.scene.clipContent ?? true,
+            canvasBg: doc.scene.background || '#ffffff',
+            x: 0,
+            y: 0,
+            width: doc.scene.width,
+            height: doc.scene.height,
+            rotation: 0,
+            scaleX: 1,
+            scaleY: 1,
+            opacity: 1,
+            borderRadius: 0,
+            fill: '#ffffff',
+            tracks: []
+          };
+        }
+        state.nodes = { ...doc.nodes };
+        state.nodeOrder = [...doc.nodeOrder];
+        state.stateMachines = doc.stateMachines ? [...doc.stateMachines] : [];
+        state.interactions = doc.interactions ? [...doc.interactions] : [];
+        state.selectedId = state.nodeOrder[0] || null;
+        state.selectedIds = state.selectedId ? [state.selectedId] : [];
+        state.toastMessage = `Loaded OpenSVG: ${doc.metadata.title || 'Document'}`;
         state.toastType = 'success';
       }),
 
