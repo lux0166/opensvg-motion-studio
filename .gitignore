@@ -1,4 +1,4 @@
-﻿# Node & Build
+# Node & Build
 node_modules/
 dist/
 dist-ssr/
@@ -20,3 +20,5 @@ src-tauri/gen/
 .DS_Store
 Thumbs.db
 *.tmp
+test-results/
+playwright-report/

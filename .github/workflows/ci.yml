@@ -33,5 +33,11 @@ jobs:
       - name: Enforce Runtime Certification Suite
         run: npm run test:cert
 
+      - name: Install Playwright Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Run Playwright Real Browser E2E Tests
+        run: npm run test:e2e
+
       - name: Build Production Bundle
         run: npm run build

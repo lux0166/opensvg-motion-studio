@@ -306,7 +306,7 @@ export const Header: React.FC = () => {
   return (
     <header className="h-14 border-b border-gray-200 dark:border-zinc-800 bg-white/90 dark:bg-zinc-900/90 backdrop-blur-md px-3 flex items-center justify-between z-30 select-none">
       {/* Left: Brand, File Ops & Tabs */}
-      <div className="flex items-center gap-2 min-w-0 flex-1">
+      <div className="flex items-center gap-2 min-w-0 max-w-[380px] z-30">
         {/* Brand Menu Trigger */}
         <div className="relative shrink-0" ref={menuRef}>
           <button
@@ -501,6 +501,7 @@ export const Header: React.FC = () => {
         <div className="flex items-center gap-1 shrink-0">
           <button
             type="button"
+            data-testid="btn-new-tab"
             title="New Artboard / Composition (Ctrl+T)"
             aria-label="New Artboard / Composition"
             onClick={() => openNewTab()}
