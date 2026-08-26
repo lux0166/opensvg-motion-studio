@@ -104,26 +104,39 @@ export function deriveRenderScene(
       },
       fill: fillPaint,
       stroke: strokeData,
+      clip: (node as any).clipContent
+        ? {
+            type: 'rect',
+            bounds: { x: node.x, y: node.y, width: node.width, height: node.height }
+          }
+        : undefined,
       filter: {
         blur: node.filterBlur,
-        shadow: node.shadowBlur ? {
-          color: node.shadowColor || 'rgba(0,0,0,0.25)',
-          blur: node.shadowBlur,
-          offsetX: node.shadowOffsetX || 0,
-          offsetY: node.shadowOffsetY || 0
-        } : undefined
+        shadow:
+          node.shadowBlur && node.shadowColor
+            ? {
+                color: node.shadowColor,
+                blur: node.shadowBlur,
+                offsetX: node.shadowOffsetX || 0,
+                offsetY: node.shadowOffsetY || 0
+              }
+            : undefined
       },
       geometryData: node.type === 'path' ? (node.subPaths || node.pathPoints) : undefined
     });
   }
 
+  const rootWidth = project.rootFrame?.width ?? 800;
+  const rootHeight = project.rootFrame?.height ?? 600;
+  const rootBg = project.rootFrame?.fill || project.rootFrame?.canvasBg || '#ffffff';
+
   return {
     id: project.id,
     viewport: {
-      width: project.rootFrame.width,
-      height: project.rootFrame.height,
+      width: rootWidth,
+      height: rootHeight,
       dpr: 1,
-      background: project.rootFrame.fill || '#ffffff'
+      background: rootBg
     },
     nodes: renderNodes,
     drawOrder: project.nodeOrder.filter((id) => nodeMap[id]?.visible)
