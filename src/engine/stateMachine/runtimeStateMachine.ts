@@ -257,6 +257,27 @@ export class StateMachineRuntime {
   }
 
   /**
+   * Forces a state transition on a specified layer
+   */
+  public forceState(layerId: string, stateId: string): void {
+    let targetLayer = this.layerStates.get(layerId);
+    if (!targetLayer) {
+      const firstLayer = Array.from(this.layerStates.values())[0];
+      if (firstLayer) {
+        targetLayer = firstLayer;
+      }
+    }
+
+    if (targetLayer) {
+      targetLayer.previousStateId = targetLayer.currentStateId;
+      targetLayer.currentStateId = stateId;
+      targetLayer.timeInState = 0;
+      targetLayer.isTransitioning = false;
+      targetLayer.transitionProgress = 1.0;
+    }
+  }
+
+  /**
    * Replays recorded events deterministically
    */
   public static replay(definition: StateMachineDefinition, events: ReplayEvent[], totalDuration: number, stepDt: number = 0.016): StateMachineRuntime {
