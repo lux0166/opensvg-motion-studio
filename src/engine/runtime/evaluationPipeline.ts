@@ -1,14 +1,20 @@
 import { SceneProject, SceneNode } from '../types';
 import { evaluateNode } from '../animation/animationEvaluator';
 import { Constraint, solveAllConstraints } from '../constraints/constraintSolver';
+import { ComponentRegistry, ComponentInstance } from '../components/componentSystem';
+import { DataBindingEngine } from '../binding/dataBinding';
+import { StateMachineRuntime } from '../stateMachine/runtimeStateMachine';
+import { composeTransform, multiplyMatrices } from '../transform/matrix2D';
 import { deriveRenderScene } from './renderState';
-import { RenderScene, RenderNodeState } from './coreContracts';
+import { RenderScene, RenderNodeState, Matrix2D } from './coreContracts';
 
 export interface EvaluatedNodeState {
   id: string;
   name: string;
   type: string;
   evaluatedNode: SceneNode;
+  worldTransform: Matrix2D;
+  totalOpacity: number;
   renderState?: RenderNodeState;
 }
 
@@ -18,6 +24,7 @@ export interface EvaluatedSceneState {
   duration: number;
   fps: number;
   evaluatedNodes: Record<string, SceneNode>;
+  nodeStates: Record<string, EvaluatedNodeState>;
   nodeOrder: string[];
   renderScene: RenderScene;
 }
@@ -25,19 +32,97 @@ export interface EvaluatedSceneState {
 export interface EvaluationPipelineOptions {
   time?: number;
   constraints?: Constraint[];
+  componentInstances?: ComponentInstance[];
+  componentRegistry?: ComponentRegistry;
+  dataBindingEngine?: DataBindingEngine;
+  stateMachineRuntime?: StateMachineRuntime;
   externalPropertyOverrides?: Record<string, Partial<SceneNode>>;
 }
 
 /**
- * OpenSVG Unified Evaluation Pipeline
+ * Resolves world transforms for all nodes in topological hierarchy order with cycle detection (Rule CORE-02 & P1)
+ */
+export function computeCanonicalWorldTransforms(
+  nodes: Record<string, SceneNode>,
+  nodeOrder: string[]
+): Record<string, { worldTransform: Matrix2D; totalOpacity: number }> {
+  const result: Record<string, { worldTransform: Matrix2D; totalOpacity: number }> = {};
+  const visiting = new Set<string>();
+  const visited = new Set<string>();
+
+  function resolveNodeTransform(nodeId: string, depth: number = 0): { worldTransform: Matrix2D; totalOpacity: number } {
+    if (visited.has(nodeId)) {
+      return result[nodeId];
+    }
+
+    const node = nodes[nodeId];
+    if (!node || depth > 30) {
+      const identity: Matrix2D = { a: 1, b: 0, c: 0, d: 1, e: 0, f: 0 };
+      return { worldTransform: identity, totalOpacity: 1 };
+    }
+
+    if (visiting.has(nodeId)) {
+      console.warn(`Hierarchy cycle detected for node: ${nodeId}; breaking cycle.`);
+      const identity: Matrix2D = { a: 1, b: 0, c: 0, d: 1, e: 0, f: 0 };
+      return { worldTransform: identity, totalOpacity: 1 };
+    }
+
+    visiting.add(nodeId);
+
+    // Calculate local transform
+    const localMatrix = composeTransform(
+      {
+        translation: { x: node.x, y: node.y },
+        rotation: node.rotation || 0,
+        scale: { x: node.scaleX ?? 1, y: node.scaleY ?? 1 },
+        pivot: { x: node.pivotX ?? 0.5, y: node.pivotY ?? 0.5 }
+      },
+      node.width,
+      node.height
+    );
+
+    let worldTransform = localMatrix;
+    let totalOpacity = node.opacity ?? 1;
+
+    if (node.parentId && nodes[node.parentId]) {
+      const parentResult = resolveNodeTransform(node.parentId, depth + 1);
+      worldTransform = multiplyMatrices(parentResult.worldTransform, localMatrix);
+      totalOpacity *= parentResult.totalOpacity;
+    }
+
+    visiting.delete(nodeId);
+    visited.add(nodeId);
+
+    const evaluated = {
+      worldTransform,
+      totalOpacity: Math.max(0, Math.min(1, totalOpacity))
+    };
+
+    result[nodeId] = evaluated;
+    return evaluated;
+  }
+
+  for (const id of nodeOrder) {
+    if (!visited.has(id)) {
+      resolveNodeTransform(id);
+    }
+  }
+
+  return result;
+}
+
+/**
+ * OpenSVG Unified Evaluation Pipeline (Single Source of Evaluation Truth)
+ * 
  * Pipeline Architecture:
- * 1. Authoring Document (SceneProject)
- * 2. Scene Graph Hierarchy Traversal
+ * 1. Authoring Document Input (SceneProject)
+ * 2. Component / Instance Resolution (ComponentRegistry)
  * 3. Animation Track Evaluation (Keyframes / Spring / Motion Path)
- * 4. Component / Binding Override Resolution
- * 5. Constraint Solver Execution (with cycle breaking)
- * 6. Evaluated Scene State Generation
- * 7. Render State Derivation (RenderScene)
+ * 4. Data Binding Resolution (DataBindingEngine)
+ * 5. State Machine / External Property Overrides
+ * 6. Constraint Solver Execution (with cycle breaking)
+ * 7. Canonical World Transform Resolution (topological hierarchy)
+ * 8. Evaluated Scene State & Render Scene Derivation
  * 
  * INVARIANT: Zero mutation of input SceneProject during evaluation.
  */
@@ -47,18 +132,47 @@ export function evaluateScenePipeline(
 ): EvaluatedSceneState {
   const time = options.time ?? 0;
   const originalNodes = project.nodes || {};
-  const nodeOrder = project.nodeOrder || Object.keys(originalNodes);
+  let nodeOrder = [...(project.nodeOrder || Object.keys(originalNodes))];
+  const workingNodes: Record<string, SceneNode> = { ...originalNodes };
 
-  // Phase 1 & 2: Animation Evaluation
-  const evaluatedMap: Record<string, SceneNode> = {};
-  for (const id of nodeOrder) {
-    const node = originalNodes[id];
-    if (node) {
-      evaluatedMap[id] = evaluateNode(node, time, originalNodes);
+  // Phase 1: Component Instance Resolution
+  if (options.componentRegistry && options.componentInstances) {
+    for (const inst of options.componentInstances) {
+      try {
+        const resolvedNode = options.componentRegistry.resolveInstance(inst);
+        workingNodes[resolvedNode.id] = resolvedNode;
+        if (!nodeOrder.includes(resolvedNode.id)) {
+          nodeOrder.push(resolvedNode.id);
+        }
+      } catch (err) {
+        console.warn(`Failed to resolve component instance ${inst.id}:`, err);
+      }
     }
   }
 
-  // Phase 3: External / State Machine Property Overrides
+  // Phase 2: Animation Track Evaluation
+  const evaluatedMap: Record<string, SceneNode> = {};
+  for (const id of nodeOrder) {
+    const node = workingNodes[id];
+    if (node) {
+      evaluatedMap[id] = evaluateNode(node, time, workingNodes);
+    }
+  }
+
+  // Phase 3: Data Binding Evaluation
+  if (options.dataBindingEngine) {
+    const bindingUpdates = options.dataBindingEngine.evaluateBindings(evaluatedMap);
+    for (const [nodeId, updates] of Object.entries(bindingUpdates)) {
+      if (evaluatedMap[nodeId]) {
+        evaluatedMap[nodeId] = {
+          ...evaluatedMap[nodeId],
+          ...updates
+        };
+      }
+    }
+  }
+
+  // Phase 4: State Machine / External Property Overrides
   if (options.externalPropertyOverrides) {
     for (const [nodeId, overrides] of Object.entries(options.externalPropertyOverrides)) {
       if (evaluatedMap[nodeId]) {
@@ -70,21 +184,40 @@ export function evaluateScenePipeline(
     }
   }
 
-  // Phase 4: Constraint Solving
+  // Phase 5: Constraint Solving
   if (options.constraints && options.constraints.length > 0) {
     const solvedMap = solveAllConstraints(evaluatedMap, options.constraints);
     Object.assign(evaluatedMap, solvedMap);
   }
 
-  // Phase 5 & 6: Produce evaluated node list in draw order
+  // Phase 6: Canonical World Transform Resolution
+  const transformMap = computeCanonicalWorldTransforms(evaluatedMap, nodeOrder);
+
+  // Phase 7: Build EvaluatedNodeStates and evaluated node list
+  const nodeStates: Record<string, EvaluatedNodeState> = {};
   const evaluatedList: SceneNode[] = [];
+
   for (const id of nodeOrder) {
-    if (evaluatedMap[id]) {
-      evaluatedList.push(evaluatedMap[id]);
+    const node = evaluatedMap[id];
+    if (node) {
+      evaluatedList.push(node);
+      const tf = transformMap[id] || {
+        worldTransform: { a: 1, b: 0, c: 0, d: 1, e: 0, f: 0 },
+        totalOpacity: node.opacity ?? 1
+      };
+
+      nodeStates[id] = {
+        id: node.id,
+        name: node.name,
+        type: node.type,
+        evaluatedNode: node,
+        worldTransform: tf.worldTransform,
+        totalOpacity: tf.totalOpacity
+      };
     }
   }
 
-  // Phase 7: Derive Render State
+  // Phase 8: Derive Render State
   const renderScene = deriveRenderScene(project, evaluatedList);
 
   return {
@@ -93,7 +226,8 @@ export function evaluateScenePipeline(
     duration: project.duration,
     fps: project.fps,
     evaluatedNodes: evaluatedMap,
-    nodeOrder: [...nodeOrder],
+    nodeStates,
+    nodeOrder,
     renderScene
   };
 }

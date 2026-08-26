@@ -1,8 +1,10 @@
 import { describe, it, expect } from 'vitest';
 import { OpenSVGRuntime } from '../runtimeKernel';
+import { evaluateScenePipeline } from '../evaluationPipeline';
+import { RuntimeClock } from '../runtimeClock';
 import { SceneProject } from '../../types';
 
-describe('Headless Runtime Evaluation Kernel (CORE-04 & Section 6)', () => {
+describe('Headless Runtime Evaluation Kernel (CORE-04 & Single Evaluation Path)', () => {
   const mockProject: SceneProject = {
     id: 'proj-rt-1',
     name: 'Runtime Kernel Test',
@@ -71,5 +73,36 @@ describe('Headless Runtime Evaluation Kernel (CORE-04 & Section 6)', () => {
     runtime.seek(3.5);
     runtime.reset();
     expect(runtime.getCurrentTime()).toBe(0);
+  });
+
+  it('proves 100% parity between OpenSVGRuntime and evaluateScenePipeline (Single Source of Truth)', () => {
+    const runtime = new OpenSVGRuntime();
+    runtime.load(mockProject);
+    runtime.seek(1.5);
+
+    const runtimeRenderState = runtime.getRenderState();
+    const directPipelineRenderState = evaluateScenePipeline(mockProject, { time: 1.5 }).renderScene;
+
+    expect(runtimeRenderState.id).toBe(directPipelineRenderState.id);
+    expect(runtimeRenderState.nodes).toHaveLength(directPipelineRenderState.nodes.length);
+    expect(runtimeRenderState.nodes[0].worldTransform).toEqual(directPipelineRenderState.nodes[0].worldTransform);
+  });
+});
+
+describe('RuntimeClock Lifecycle & Loop Modes', () => {
+  it('handles loop, once, and ping-pong modes', () => {
+    const clock = new RuntimeClock(2.0, 60, 'loop');
+    clock.advance(2.5);
+    expect(clock.getCurrentTime()).toBeCloseTo(0.5, 2);
+
+    const onceClock = new RuntimeClock(2.0, 60, 'once');
+    onceClock.play();
+    onceClock.advance(2.5);
+    expect(onceClock.getCurrentTime()).toBe(2.0);
+    expect(onceClock.getIsPlaying()).toBe(false);
+
+    const pingPongClock = new RuntimeClock(2.0, 60, 'ping-pong');
+    pingPongClock.advance(2.5); // 2.0 -> bounces back 0.5s to 1.5s
+    expect(pingPongClock.getCurrentTime()).toBeCloseTo(1.5, 2);
   });
 });

@@ -17,6 +17,7 @@ export * from './animation';
 // 4. Render State Derivation & Evaluation Pipeline (CORE-03, P1 Pipeline)
 export * from './runtime/renderState';
 export * from './runtime/evaluationPipeline';
+export * from './runtime/runtimeClock';
 
 // 5. Headless Runtime Kernel (CORE-04)
 export * from './runtime/runtimeKernel';

@@ -1,7 +1,9 @@
 import { describe, it, expect } from 'vitest';
-import { evaluateScenePipeline } from '../evaluationPipeline';
-import { SceneProject, FrameNode } from '../../types';
+import { evaluateScenePipeline, computeCanonicalWorldTransforms } from '../evaluationPipeline';
+import { SceneProject, FrameNode, SceneNode } from '../../types';
 import { Constraint } from '../../constraints/constraintSolver';
+import { ComponentRegistry } from '../../components/componentSystem';
+import { DataBindingEngine } from '../../binding/dataBinding';
 
 describe('Evaluation Pipeline & Runtime State Boundary (P0 & P1)', () => {
   const rootFrame: FrameNode = {
@@ -145,5 +147,77 @@ describe('Evaluation Pipeline & Runtime State Boundary (P0 & P1)', () => {
     // Canonical document must remain 100% untouched
     expect(sampleProject.nodes['parent-frame'].rotation).toBe(originalRotation);
     expect(sampleProject.nodes['child-rect'].scaleX).toBe(originalScale);
+  });
+
+  it('integrates Component Registry and Data Binding seamlessly in pipeline phases', () => {
+    const registry = new ComponentRegistry();
+    const buttonNode: SceneNode = {
+      id: 'btn-def-root',
+      name: 'Button Master',
+      type: 'rect',
+      visible: true,
+      locked: false,
+      x: 0,
+      y: 0,
+      width: 120,
+      height: 40,
+      rotation: 0,
+      scaleX: 1,
+      scaleY: 1,
+      opacity: 1,
+      borderRadius: 8,
+      fill: '#6366f1',
+      tracks: []
+    };
+
+    registry.register({
+      id: 'comp-button',
+      name: 'Button Component',
+      rootNode: buttonNode
+    });
+
+    const instance = registry.instantiate('comp-button', 'btn-instance-1', 'Save Button', { x: 300, y: 400 }, {
+      fill: '#4f46e5'
+    });
+
+    const dataBindingEngine = new DataBindingEngine();
+    dataBindingEngine.registerBinding({
+      id: 'bind-1',
+      sourcePath: 'theme.primary',
+      targetNodeId: 'btn-instance-1',
+      targetProperty: 'fill'
+    });
+    dataBindingEngine.setSourceValue('theme.primary', '#ec4899');
+
+    const result = evaluateScenePipeline(sampleProject, {
+      time: 0,
+      componentRegistry: registry,
+      componentInstances: [instance],
+      dataBindingEngine
+    });
+
+    expect(result.evaluatedNodes['btn-instance-1']).toBeDefined();
+    // Data binding overwrites component instance fill with '#ec4899'
+    expect(result.evaluatedNodes['btn-instance-1'].fill).toBe('#ec4899');
+    expect(result.evaluatedNodes['btn-instance-1'].x).toBe(300);
+  });
+
+  it('computes canonical world transforms and safely breaks hierarchy cycles', () => {
+    const cyclicNodes: Record<string, SceneNode> = {
+      nodeA: {
+        id: 'nodeA', name: 'Node A', type: 'rect', visible: true, locked: false,
+        parentId: 'nodeB', x: 10, y: 10, width: 50, height: 50, rotation: 0, scaleX: 1, scaleY: 1,
+        opacity: 1, borderRadius: 0, fill: '#ffffff', tracks: []
+      },
+      nodeB: {
+        id: 'nodeB', name: 'Node B', type: 'rect', visible: true, locked: false,
+        parentId: 'nodeA', x: 20, y: 20, width: 50, height: 50, rotation: 0, scaleX: 1, scaleY: 1,
+        opacity: 1, borderRadius: 0, fill: '#ffffff', tracks: []
+      }
+    };
+
+    const transforms = computeCanonicalWorldTransforms(cyclicNodes, ['nodeA', 'nodeB']);
+    expect(transforms['nodeA']).toBeDefined();
+    expect(transforms['nodeB']).toBeDefined();
   });
 });
