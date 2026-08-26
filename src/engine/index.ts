@@ -17,16 +17,18 @@ export * from './transform/matrix2D';
 // 4. Animation Engine (P1 Modular Core)
 export * from './animation';
 
-// 5. Render State Derivation & Evaluation Pipeline (CORE-03, P1 Single Source of Truth)
+// 5. Render State Derivation, Snapshot & Evaluation Pipeline (CORE-03, P1 Single Source of Truth)
 export * from './runtime/renderState';
 export * from './runtime/evaluationPipeline';
 export * from './runtime/runtimeClock';
+export * from './runtime/runtimeSnapshot';
 
 // 6. Headless Runtime Kernel (CORE-04)
 export * from './runtime/runtimeKernel';
 
-// 7. Interactive SVG Web Runtime & Adapters (P1 Strategic Pillar 2)
+// 7. Interactive SVG Web Runtime, Hit Testing & Adapters (P1 Strategic Pillar 2)
 export * from './webRuntime';
+export * from './interaction/geometryHitTest';
 export * from './adapters';
 
 // 8. Constraint Engine (CORE-05)

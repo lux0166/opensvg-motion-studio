@@ -218,7 +218,7 @@ export function evaluateScenePipeline(
   }
 
   // Phase 8: Derive Render State
-  const renderScene = deriveRenderScene(project, evaluatedList);
+  const renderScene = deriveRenderScene(project, evaluatedList, transformMap);
 
   return {
     projectId: project.id,

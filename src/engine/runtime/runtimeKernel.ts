@@ -2,15 +2,18 @@ import { SceneProject, SceneNode } from '../types';
 import { RenderScene } from './coreContracts';
 import { evaluateScenePipeline, EvaluatedSceneState } from './evaluationPipeline';
 import { RuntimeClock, LoopMode } from './runtimeClock';
+import { createRuntimeSnapshot } from './runtimeSnapshot';
 import { Constraint } from '../constraints/constraintSolver';
 import { ComponentRegistry, ComponentInstance } from '../components/componentSystem';
 import { DataBindingEngine } from '../binding/dataBinding';
 import { StateMachineRuntime } from '../stateMachine/runtimeStateMachine';
+import { OpenSVGDocument } from '../format/nativeDocument';
+import { convertNativeDocumentToProject } from '../format/documentParser';
 
 /**
  * Headless OpenSVG Runtime Kernel
- * Adheres strictly to OPENSVG_POST_COMMIT_ARCHITECTURE_REVIEW.md (P0 Consolidation)
- * INVARIANT: Single source of evaluation truth via `evaluateScenePipeline()`.
+ * Adheres strictly to OPENSVG_CURRENT_STRATEGIC_ROADMAP.md (P0 & P1)
+ * INVARIANT: Single runtime owner & single evaluation truth via `evaluateScenePipeline()`.
  * Invariant: Evaluation produces derived state. Playback/evaluation never mutates authoring document.
  */
 export class OpenSVGRuntime {
@@ -18,7 +21,7 @@ export class OpenSVGRuntime {
   private clock: RuntimeClock;
   private constraints: Constraint[] = [];
   private componentRegistry?: ComponentRegistry;
-  private componentInstances?: ComponentInstance[];
+  private componentInstances: ComponentInstance[] = [];
   private dataBindingEngine?: DataBindingEngine;
   private stateMachineRuntime?: StateMachineRuntime;
   private propertyOverrides: Record<string, Partial<SceneNode>> = {};
@@ -28,13 +31,56 @@ export class OpenSVGRuntime {
   }
 
   /**
-   * Loads a canonical SceneProject into the runtime
+   * Loads a canonical SceneProject or OpenSVGDocument into the runtime
    */
-  public load(project: SceneProject): void {
-    // Clone project structure to maintain runtime isolation
-    this.project = JSON.parse(JSON.stringify(project));
-    this.clock.setDuration(project.duration || 1);
-    this.clock.setFps(project.fps || 60);
+  public load(docOrProject: SceneProject | OpenSVGDocument): void {
+    if (!docOrProject) return;
+
+    if ((docOrProject as OpenSVGDocument).format === 'opensvg') {
+      const doc = docOrProject as OpenSVGDocument;
+      const converted = convertNativeDocumentToProject(doc);
+      this.project = createRuntimeSnapshot(converted);
+
+      // Initialize State Machine if present
+      if (doc.stateMachines && doc.stateMachines.length > 0) {
+        this.stateMachineRuntime = new StateMachineRuntime(doc.stateMachines[0]);
+      } else {
+        this.stateMachineRuntime = undefined;
+      }
+
+      // Initialize Components if present
+      if (doc.components && doc.components.length > 0) {
+        this.componentRegistry = new ComponentRegistry();
+        for (const comp of doc.components) {
+          this.componentRegistry.register(comp);
+        }
+      } else {
+        this.componentRegistry = undefined;
+      }
+      this.componentInstances = [];
+
+      // Initialize Data Bindings if present
+      if (doc.bindings && doc.bindings.length > 0) {
+        this.dataBindingEngine = new DataBindingEngine();
+        for (const b of doc.bindings) {
+          this.dataBindingEngine.registerBinding(b);
+        }
+      } else {
+        this.dataBindingEngine = undefined;
+      }
+
+      // Initialize Constraints if present
+      if (doc.constraints && doc.constraints.length > 0) {
+        this.constraints = [...doc.constraints];
+      } else {
+        this.constraints = [];
+      }
+    } else {
+      this.project = createRuntimeSnapshot(docOrProject as SceneProject);
+    }
+
+    this.clock.setDuration(this.project.duration || 1);
+    this.clock.setFps(this.project.fps || 60);
     this.clock.reset();
     this.propertyOverrides = {};
   }
@@ -60,11 +106,21 @@ export class OpenSVGRuntime {
     this.propertyOverrides = { ...overrides };
   }
 
+  public setProperty(nodeId: string, property: keyof SceneNode, value: any): void {
+    if (!this.propertyOverrides[nodeId]) {
+      this.propertyOverrides[nodeId] = {};
+    }
+    this.propertyOverrides[nodeId][property] = value;
+  }
+
   /**
-   * Advances runtime clock by dt seconds
+   * Advances runtime clock and active state machines by dt seconds
    */
   public advance(dt: number): void {
     this.clock.advance(dt);
+    if (this.stateMachineRuntime) {
+      this.stateMachineRuntime.advance(dt);
+    }
   }
 
   /**
@@ -91,6 +147,33 @@ export class OpenSVGRuntime {
 
   public togglePlay(): void {
     this.clock.togglePlay();
+  }
+
+  // State Machine APIs
+  public setBoolean(inputName: string, value: boolean): void {
+    this.stateMachineRuntime?.setInput(inputName, value);
+  }
+
+  public setNumber(inputName: string, value: number): void {
+    this.stateMachineRuntime?.setInput(inputName, value);
+  }
+
+  public fireTrigger(inputName: string): void {
+    this.stateMachineRuntime?.fireTrigger(inputName);
+  }
+
+  public setState(layerNameOrStateId: string, stateName?: string): void {
+    if (!this.stateMachineRuntime) return;
+    if (stateName) {
+      this.stateMachineRuntime.forceState(layerNameOrStateId, stateName);
+    } else {
+      this.stateMachineRuntime.forceState('layer_main', layerNameOrStateId);
+    }
+  }
+
+  // Data Binding APIs
+  public setBindingValue(sourcePath: string, value: any): void {
+    this.dataBindingEngine?.setSourceValue(sourcePath, value);
   }
 
   /**
@@ -151,5 +234,21 @@ export class OpenSVGRuntime {
 
   public getClock(): RuntimeClock {
     return this.clock;
+  }
+
+  public getStateMachineRuntime(): StateMachineRuntime | undefined {
+    return this.stateMachineRuntime;
+  }
+
+  public getComponentRegistry(): ComponentRegistry | undefined {
+    return this.componentRegistry;
+  }
+
+  public getDataBindingEngine(): DataBindingEngine | undefined {
+    return this.dataBindingEngine;
+  }
+
+  public getProject(): SceneProject | null {
+    return this.project;
   }
 }

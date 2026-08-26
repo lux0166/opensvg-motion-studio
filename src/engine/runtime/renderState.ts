@@ -1,11 +1,12 @@
 import { SceneProject, SceneNode } from '../types';
-import { RenderScene, RenderNodeState, RenderPaint, RenderStroke } from './coreContracts';
+import { RenderScene, RenderNodeState, RenderPaint, RenderStroke, Matrix2D } from './coreContracts';
 import { composeTransform, multiplyMatrices } from '../transform/matrix2D';
 
 /**
  * Render State Derivation Kernel
- * Adheres strictly to CORE_ENGINE_DEPTH.md (Section 3 & 4) & CORE-03
+ * Adheres strictly to CORE_ENGINE_DEPTH.md (Section 3 & 4) & STRATEGIC_ROADMAP.md (Section 4 & 8)
  * Invariant: Evaluation produces derived state. Playback/evaluation must not mutate canonical document.
+ * Invariant: Renderer layer consumes canonical world transforms without ad-hoc hierarchy traversal.
  */
 
 /**
@@ -13,11 +14,72 @@ import { composeTransform, multiplyMatrices } from '../transform/matrix2D';
  */
 export function deriveRenderScene(
   project: SceneProject,
-  evaluatedNodes: SceneNode[]
+  evaluatedNodes: SceneNode[],
+  precomputedTransforms?: Record<string, { worldTransform: Matrix2D; totalOpacity: number }>
 ): RenderScene {
   const nodeMap: Record<string, SceneNode> = {};
   for (const n of evaluatedNodes) {
     nodeMap[n.id] = n;
+  }
+
+  // If precomputed transforms are not passed, calculate canonical world transforms
+  let transforms = precomputedTransforms;
+  if (!transforms) {
+    transforms = {};
+    const visiting = new Set<string>();
+    const visited = new Set<string>();
+
+    const resolveNode = (nodeId: string): { worldTransform: Matrix2D; totalOpacity: number } => {
+      if (visited.has(nodeId)) return transforms![nodeId];
+
+      const node = nodeMap[nodeId];
+      if (!node) {
+        return { worldTransform: { a: 1, b: 0, c: 0, d: 1, e: 0, f: 0 }, totalOpacity: 1 };
+      }
+
+      if (visiting.has(nodeId)) {
+        // Hierarchy cycle detected; safely break cycle with identity
+        return { worldTransform: { a: 1, b: 0, c: 0, d: 1, e: 0, f: 0 }, totalOpacity: 1 };
+      }
+
+      visiting.add(nodeId);
+
+      const localMatrix = composeTransform(
+        {
+          translation: { x: node.x, y: node.y },
+          rotation: node.rotation || 0,
+          scale: { x: node.scaleX ?? 1, y: node.scaleY ?? 1 },
+          pivot: { x: node.pivotX ?? 0.5, y: node.pivotY ?? 0.5 }
+        },
+        node.width,
+        node.height
+      );
+
+      let worldTransform = localMatrix;
+      let totalOpacity = node.opacity ?? 1;
+
+      if (node.parentId && nodeMap[node.parentId]) {
+        const parentRes = resolveNode(node.parentId);
+        worldTransform = multiplyMatrices(parentRes.worldTransform, localMatrix);
+        totalOpacity *= parentRes.totalOpacity;
+      }
+
+      visiting.delete(nodeId);
+      visited.add(nodeId);
+
+      const result = {
+        worldTransform,
+        totalOpacity: Math.max(0, Math.min(1, totalOpacity))
+      };
+      transforms![nodeId] = result;
+      return result;
+    };
+
+    for (const node of evaluatedNodes) {
+      if (!visited.has(node.id)) {
+        resolveNode(node.id);
+      }
+    }
   }
 
   const renderNodes: RenderNodeState[] = [];
@@ -25,47 +87,12 @@ export function deriveRenderScene(
   for (const node of evaluatedNodes) {
     if (!node.visible) continue;
 
-    // 1. Calculate local transform
-    const localMatrix = composeTransform(
-      {
-        translation: { x: node.x, y: node.y },
-        rotation: node.rotation || 0,
-        scale: { x: node.scaleX ?? 1, y: node.scaleY ?? 1 },
-        pivot: { x: node.pivotX ?? 0.5, y: node.pivotY ?? 0.5 }
-      },
-      node.width,
-      node.height
-    );
+    const tf = transforms[node.id] || {
+      worldTransform: { a: 1, b: 0, c: 0, d: 1, e: 0, f: 0 },
+      totalOpacity: node.opacity ?? 1
+    };
 
-    // 2. Accumulate parent transforms up hierarchy chain
-    let worldTransform = localMatrix;
-    let curParentId = node.parentId;
-    let totalOpacity = node.opacity ?? 1;
-    let depth = 0;
-
-    while (curParentId && depth < 20) {
-      const parent = nodeMap[curParentId];
-      if (!parent) break;
-
-      totalOpacity *= parent.opacity ?? 1;
-
-      const parentMatrix = composeTransform(
-        {
-          translation: { x: parent.x, y: parent.y },
-          rotation: parent.rotation || 0,
-          scale: { x: parent.scaleX ?? 1, y: parent.scaleY ?? 1 },
-          pivot: { x: parent.pivotX ?? 0.5, y: parent.pivotY ?? 0.5 }
-        },
-        parent.width,
-        parent.height
-      );
-
-      worldTransform = multiplyMatrices(parentMatrix, worldTransform);
-      curParentId = parent.parentId;
-      depth++;
-    }
-
-    // 3. Extract Paint & Stroke
+    // Extract Paint & Stroke
     let fillPaint: RenderPaint | undefined;
     if (node.fill && node.fill !== 'transparent') {
       fillPaint = {
@@ -94,8 +121,8 @@ export function deriveRenderScene(
       name: node.name,
       type: node.type,
       visible: node.visible,
-      opacity: Math.max(0, Math.min(1, totalOpacity)),
-      worldTransform,
+      opacity: tf.totalOpacity,
+      worldTransform: tf.worldTransform,
       bounds: {
         x: node.x,
         y: node.y,

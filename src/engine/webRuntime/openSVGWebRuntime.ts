@@ -1,12 +1,10 @@
 import { OpenSVGDocument } from '../format/nativeDocument';
-import { parseDocument, convertNativeDocumentToProject } from '../format/documentParser';
+import { parseDocument } from '../format/documentParser';
 import { OpenSVGRuntime } from '../runtime/runtimeKernel';
 import { Canvas2DBackend } from '../backend/canvas2DBackend';
-import { StateMachineRuntime } from '../stateMachine/runtimeStateMachine';
-import { ComponentRegistry } from '../components/componentSystem';
-import { DataBindingEngine } from '../binding/dataBinding';
 import { LoopMode } from '../runtime/runtimeClock';
 import { SceneNode } from '../types';
+import { screenToCanvasPoint, canvasToScenePoint, hitTestScene } from '../interaction/geometryHitTest';
 
 export interface WebRuntimeOptions {
   autoplay?: boolean;
@@ -18,18 +16,15 @@ export interface WebRuntimeOptions {
 export type WebRuntimeEventListener = (eventType: string, payload: any) => void;
 
 /**
- * OpenSVG Portable Interactive Web Runtime
- * Standardized per OPENSVG_CURRENT_STRATEGIC_ROADMAP.md (Section 12 & 13)
- * Runs natively in browser without Studio UI or React dependencies.
+ * OpenSVG Web Runtime Adapter
+ * Standardized per OPENSVG_CURRENT_STRATEGIC_ROADMAP.md (Section 1 & 13)
+ * INVARIANT: OpenSVGWebRuntime is a thin adapter around OpenSVGRuntime.
+ * It does NOT duplicate evaluation, state machine, or playback ownership.
  */
 export class OpenSVGWebRuntime {
   private runtime: OpenSVGRuntime;
   private backend: Canvas2DBackend;
-  private document: OpenSVGDocument | null = null;
   private canvas: HTMLCanvasElement | null = null;
-  private stateMachine?: StateMachineRuntime;
-  private componentRegistry?: ComponentRegistry;
-  private dataBindingEngine?: DataBindingEngine;
   private listeners: Set<WebRuntimeEventListener> = new Set();
 
   private animationFrameId: number | null = null;
@@ -57,43 +52,11 @@ export class OpenSVGWebRuntime {
   }
 
   /**
-   * Loads an OpenSVG document (Object or raw JSON string)
+   * Loads an OpenSVG document (Object or raw JSON string) directly into the headless runtime owner
    */
   public load(docOrJson: OpenSVGDocument | string): void {
     const doc: OpenSVGDocument = typeof docOrJson === 'string' ? parseDocument(docOrJson) : docOrJson;
-    this.document = doc;
-
-    const project = convertNativeDocumentToProject(doc);
-    this.runtime.load(project);
-
-    // Initialize State Machine if present in document
-    if (doc.stateMachines && doc.stateMachines.length > 0) {
-      this.stateMachine = new StateMachineRuntime(doc.stateMachines[0]);
-      this.runtime.setStateMachineRuntime(this.stateMachine);
-    }
-
-    // Initialize Components if present
-    if (doc.components && doc.components.length > 0) {
-      this.componentRegistry = new ComponentRegistry();
-      for (const comp of doc.components) {
-        this.componentRegistry.register(comp);
-      }
-      this.runtime.setComponentSystem(this.componentRegistry, []);
-    }
-
-    // Initialize Data Bindings if present
-    if (doc.bindings && doc.bindings.length > 0) {
-      this.dataBindingEngine = new DataBindingEngine();
-      for (const b of doc.bindings) {
-        this.dataBindingEngine.registerBinding(b);
-      }
-      this.runtime.setDataBindingEngine(this.dataBindingEngine);
-    }
-
-    // Initialize Constraints if present
-    if (doc.constraints && doc.constraints.length > 0) {
-      this.runtime.setConstraints(doc.constraints);
-    }
+    this.runtime.load(doc);
 
     if (this.options.autoplay) {
       this.play();
@@ -103,7 +66,7 @@ export class OpenSVGWebRuntime {
   }
 
   /**
-   * Mounts the runtime to an HTML5 Canvas element
+   * Mounts the runtime adapter to an HTML5 Canvas element
    */
   public async mount(canvas: HTMLCanvasElement): Promise<void> {
     this.canvas = canvas;
@@ -131,7 +94,7 @@ export class OpenSVGWebRuntime {
     this.emitEvent('unmounted', {});
   }
 
-  // Playback Control APIs
+  // Playback Control APIs (Delegated 100% to runtime owner)
   public play(): void {
     this.runtime.play();
   }
@@ -170,48 +133,35 @@ export class OpenSVGWebRuntime {
     return this.runtime.getIsPlaying();
   }
 
-  // State Machine Control APIs (Developer-friendly)
+  // State Machine APIs (Forwarded directly to runtime owner)
   public setBoolean(inputName: string, value: boolean): void {
-    if (!this.stateMachine) return;
-    this.stateMachine.setInput(inputName, value);
+    this.runtime.setBoolean(inputName, value);
     this.emitEvent('inputChange', { name: inputName, value });
   }
 
   public setNumber(inputName: string, value: number): void {
-    if (!this.stateMachine) return;
-    this.stateMachine.setInput(inputName, value);
+    this.runtime.setNumber(inputName, value);
     this.emitEvent('inputChange', { name: inputName, value });
   }
 
   public fireTrigger(inputName: string): void {
-    if (!this.stateMachine) return;
-    this.stateMachine.fireTrigger(inputName);
+    this.runtime.fireTrigger(inputName);
     this.emitEvent('triggerFired', { name: inputName });
   }
 
   public setState(stateNameOrLayerId: string, stateName?: string): void {
-    if (!this.stateMachine) return;
-    if (stateName) {
-      this.stateMachine.forceState(stateNameOrLayerId, stateName);
-    } else {
-      this.stateMachine.forceState('layer_main', stateNameOrLayerId);
-    }
+    this.runtime.setState(stateNameOrLayerId, stateName);
     this.emitEvent('stateChange', { state: stateName || stateNameOrLayerId });
   }
 
-  // Data Binding Control APIs
+  // Data Binding APIs (Forwarded to runtime owner)
   public setBindingValue(sourcePath: string, value: any): void {
-    if (!this.dataBindingEngine) return;
-    this.dataBindingEngine.setSourceValue(sourcePath, value);
+    this.runtime.setBindingValue(sourcePath, value);
   }
 
-  // Dynamic Property Overrides
+  // Dynamic Property Overrides (Forwarded to runtime owner)
   public setProperty(nodeId: string, property: keyof SceneNode, value: any): void {
-    const overrides: Record<string, any> = {};
-    overrides[property] = value;
-    this.runtime.setPropertyOverrides({
-      [nodeId]: overrides
-    });
+    this.runtime.setProperty(nodeId, property, value);
   }
 
   // Event Subscription
@@ -240,9 +190,6 @@ export class OpenSVGWebRuntime {
 
       if (this.runtime.getIsPlaying()) {
         this.runtime.advance(dt);
-        if (this.stateMachine) {
-          this.stateMachine.advance(dt);
-        }
       }
 
       this.renderCurrentFrame();
@@ -295,32 +242,24 @@ export class OpenSVGWebRuntime {
   }
 
   private handlePointerEvent(eventType: 'onClick' | 'onHoverEnter' | 'onHoverLeave', event: MouseEvent | PointerEvent): void {
-    if (!this.canvas || !this.document) return;
+    if (!this.canvas) return;
 
-    const rect = this.canvas.getBoundingClientRect();
-    const scaleX = (this.document.scene.width || 800) / rect.width;
-    const scaleY = (this.document.scene.height || 600) / rect.height;
+    const sceneState = this.runtime.getEvaluatedSceneState();
+    const viewport = sceneState.renderScene.viewport;
 
-    const canvasX = (event.clientX - rect.left) * scaleX;
-    const canvasY = (event.clientY - rect.top) * scaleY;
+    const canvasPt = screenToCanvasPoint(event.clientX, event.clientY, this.canvas);
+    const scenePt = canvasToScenePoint(canvasPt, viewport.width, viewport.height, this.canvas);
 
-    // Check hit on nodes from top to bottom
-    const nodes = this.document.nodes;
-    const order = [...(this.document.nodeOrder || [])].reverse();
-
-    for (const id of order) {
-      const node = nodes[id];
-      if (!node || !node.visible) continue;
-
-      if (
-        canvasX >= node.x &&
-        canvasX <= node.x + node.width &&
-        canvasY >= node.y &&
-        canvasY <= node.y + node.height
-      ) {
-        this.emitEvent('nodeInteraction', { nodeId: id, eventType, x: canvasX, y: canvasY });
-        break;
-      }
+    // Precise SVG Geometry Hit Testing in topological Z-order
+    const hitNode = hitTestScene(sceneState, scenePt);
+    if (hitNode) {
+      this.emitEvent('nodeInteraction', {
+        nodeId: hitNode.id,
+        nodeName: hitNode.name,
+        eventType,
+        x: scenePt.x,
+        y: scenePt.y
+      });
     }
   }
 
