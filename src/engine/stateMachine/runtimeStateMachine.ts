@@ -89,6 +89,44 @@ export class StateMachineRuntime {
   }
 
   /**
+   * Reconciles definition changes without resetting input values or active layer states.
+   */
+  public reconcileDefinition(definition: StateMachineDefinition): void {
+    this.definition = JSON.parse(JSON.stringify(definition));
+
+    // Preserve existing input values
+    for (const inp of this.definition.inputs) {
+      const existing = this.inputs.get(inp.id) || this.inputs.get(inp.name);
+      const cloned = {
+        ...inp,
+        value: existing ? existing.value : inp.value,
+        fired: existing ? existing.fired : inp.fired
+      };
+      this.inputs.set(inp.id, cloned);
+      this.inputs.set(inp.name, cloned);
+    }
+
+    // Preserve existing layer states if layer still exists
+    for (const layer of this.definition.layers) {
+      const existingLayer = this.layerStates.get(layer.id);
+      if (existingLayer) {
+        const stateExists = layer.states.some((s) => s.id === existingLayer.currentStateId);
+        if (!stateExists) {
+          existingLayer.currentStateId = layer.defaultStateId;
+        }
+      } else {
+        this.layerStates.set(layer.id, {
+          layerId: layer.id,
+          currentStateId: layer.defaultStateId,
+          transitionProgress: 1.0,
+          isTransitioning: false,
+          timeInState: 0
+        });
+      }
+    }
+  }
+
+  /**
    * Resets state machine to initial states and inputs
    */
   public reset(): void {

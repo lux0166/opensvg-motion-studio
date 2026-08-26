@@ -137,6 +137,76 @@ export class OpenSVGRuntime {
     this.propertyOverrides = {};
   }
 
+  /**
+   * Reconciles document structure and definitions without wiping active runtime state
+   * (preserves clock position, active state machine states, input values, transition progress, and event history).
+   */
+  public reconcile(docOrProject: OpenSVGDocument | SceneProject): void {
+    if ('format' in docOrProject && docOrProject.format === 'opensvg') {
+      const doc = docOrProject as OpenSVGDocument;
+      const converted = convertNativeDocumentToProject(doc);
+      this.project = createRuntimeSnapshot(converted);
+
+      // 1. Reconcile State Machines (preserve existing runtime state if machine exists)
+      if (doc.stateMachines && doc.stateMachines.length > 0) {
+        const nextMap = new Map<string, StateMachineRuntime>();
+        for (const sm of doc.stateMachines) {
+          const existing = this.stateMachineRuntimes.get(sm.id);
+          if (existing) {
+            existing.reconcileDefinition(sm);
+            nextMap.set(sm.id, existing);
+            if (sm.name) nextMap.set(sm.name, existing);
+          } else {
+            const newRuntime = new StateMachineRuntime(sm);
+            nextMap.set(sm.id, newRuntime);
+            if (sm.name) nextMap.set(sm.name, newRuntime);
+          }
+        }
+        this.stateMachineRuntimes = nextMap;
+      } else {
+        this.stateMachineRuntimes.clear();
+      }
+
+      // 2. Reconcile Document Interactions
+      this.interactions = doc.interactions ? [...doc.interactions] : [];
+
+      // 3. Reconcile Components
+      if (doc.components && doc.components.length > 0) {
+        if (!this.componentRegistry) {
+          this.componentRegistry = new ComponentRegistry();
+        }
+        for (const comp of doc.components) {
+          this.componentRegistry.register(comp);
+        }
+      }
+      this.componentInstances = doc.componentInstances ? [...doc.componentInstances] : [];
+
+      // 4. Reconcile Asset Store
+      if (doc.assets) {
+        this.assetStore.loadManifest(doc.assets);
+      }
+
+      // 5. Reconcile Data Bindings
+      if (doc.bindings && doc.bindings.length > 0) {
+        if (!this.dataBindingEngine) {
+          this.dataBindingEngine = new DataBindingEngine();
+        }
+        for (const b of doc.bindings) {
+          this.dataBindingEngine.registerBinding(b);
+        }
+      }
+
+      // 6. Reconcile Constraints
+      this.constraints = doc.constraints ? [...doc.constraints] : [];
+    } else {
+      this.project = createRuntimeSnapshot(docOrProject as SceneProject);
+    }
+
+    // Update clock duration/fps without resetting currentTime or isPlaying
+    this.clock.setDuration(this.project.duration || 1);
+    this.clock.setFps(this.project.fps || 60);
+  }
+
   public setInteractions(interactions: DocumentInteraction[]): void {
     this.interactions = [...interactions];
   }

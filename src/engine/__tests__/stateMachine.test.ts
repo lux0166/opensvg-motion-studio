@@ -1,4 +1,4 @@
-﻿import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { executeTriggerAction, handleNodeTriggerEvent } from '../stateMachine';
 import { SceneNode, NodeTrigger } from '../types';
 import { useStudioStore } from '../../store/useStudioStore';
@@ -67,17 +67,23 @@ describe('Interactive State Machine Engine', () => {
     expect(setPlaying).toHaveBeenCalledWith(true);
   });
 
-  it('manages triggers in studio store', () => {
+  it('manages document interactions in studio store', () => {
     useStudioStore.setState({
-      nodes: { 'btn-play': { ...interactiveNode, triggers: [] } },
-      nodeOrder: ['btn-play'],
-      selectedId: 'btn-play'
+      interactions: []
     });
 
-    useStudioStore.getState().addTrigger('btn-play', triggerJump);
-    expect(useStudioStore.getState().nodes['btn-play'].triggers?.length).toBe(1);
+    useStudioStore.getState().addInteraction({
+      id: 'inter-1',
+      targetNodeId: 'btn-play',
+      event: 'click',
+      action: {
+        type: 'seek',
+        time: 2.5
+      }
+    });
+    expect(useStudioStore.getState().interactions.length).toBe(1);
 
-    useStudioStore.getState().removeTrigger('btn-play', 'trig-1');
-    expect(useStudioStore.getState().nodes['btn-play'].triggers?.length).toBe(0);
+    useStudioStore.getState().removeInteraction('inter-1');
+    expect(useStudioStore.getState().interactions.length).toBe(0);
   });
 });

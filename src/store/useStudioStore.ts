@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { immer } from 'zustand/middleware/immer';
-import { FrameNode, SceneNode, SceneProject, ToolMode, TimelineMode, BezierPoint, CubicBezierCurve, AudioTrackConfig, NodeTrigger, TimelineMarker, DocumentTab } from '../engine/types';
+import { FrameNode, SceneNode, SceneProject, ToolMode, TimelineMode, BezierPoint, CubicBezierCurve, AudioTrackConfig, TimelineMarker, DocumentTab } from '../engine/types';
 import { SnapLine } from '../engine/snapping';
 import { StudioSnapshot, createStudioSnapshot, MAX_HISTORY_STEPS } from '../engine/history';
 import { BooleanOpType, executeBooleanOperation } from '../engine/booleanOps';
@@ -258,10 +258,6 @@ interface StudioState {
   reorderTabs: (sourceIndex: number, destinationIndex: number) => void;
   closeOtherTabs: (tabId: string) => void;
   closeTabsToRight: (tabId: string) => void;
-
-  // Interactive State Machine Triggers
-  addTrigger: (nodeId: string, trigger: NodeTrigger) => void;
-  removeTrigger: (nodeId: string, triggerId: string) => void;
 
   // Motion Presets & Transitions Engine
   isPresetsModalOpen: boolean;
@@ -1230,27 +1226,6 @@ export const useStudioStore = create<StudioState>()(
         if (!currentActiveStillExists) {
           loadTabState(state, state.tabs[state.tabs.length - 1]);
         }
-      }),
-
-    addTrigger: (nodeId, trigger) =>
-      set((state) => {
-        pushDraftSnapshot(state);
-        const node = state.nodes[nodeId];
-        if (!node) return;
-        if (!node.triggers) node.triggers = [];
-        node.triggers.push(trigger);
-        state.toastMessage = `Added ${trigger.event} trigger`;
-        state.toastType = 'success';
-      }),
-
-    removeTrigger: (nodeId, triggerId) =>
-      set((state) => {
-        pushDraftSnapshot(state);
-        const node = state.nodes[nodeId];
-        if (!node || !node.triggers) return;
-        node.triggers = node.triggers.filter((t) => t.id !== triggerId);
-        state.toastMessage = 'Removed trigger';
-        state.toastType = 'info';
       }),
 
     isPresetsModalOpen: false,

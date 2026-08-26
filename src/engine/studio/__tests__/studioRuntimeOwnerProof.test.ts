@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { StudioRuntimeOwner } from '../studioRuntimeOwner';
+import { StudioRuntimeOwner, studioSessionManager } from '../studioRuntimeOwner';
 import { useStudioStore } from '../../../store/useStudioStore';
 import { getNodeChildren, getTopLevelNodes } from '../../hierarchy/sceneGraph';
 import { getToolDefinition } from '../../tools/toolRegistry';
@@ -229,5 +229,152 @@ describe('GATE UI-2: Studio Runtime Owner & Full Semantics Parity', () => {
       expect(typeof def.label).toBe('string');
       expect(typeof def.shortcut).toBe('string');
     }
+  });
+
+  it('proves syncStudioDocument performs non-destructive reconciliation and preserves active interaction state', () => {
+    const owner = new StudioRuntimeOwner('tab-preserve');
+
+    const rootFrame: FrameNode = {
+      id: 'root-1',
+      name: 'Root Frame',
+      type: 'frame',
+      visible: true,
+      locked: false,
+      clipContent: true,
+      x: 0,
+      y: 0,
+      width: 800,
+      height: 600,
+      rotation: 0,
+      scaleX: 1,
+      scaleY: 1,
+      opacity: 1,
+      borderRadius: 0,
+      fill: '#ffffff',
+      canvasBg: '#ffffff',
+      tracks: []
+    };
+
+    const buttonNode: SceneNode = {
+      id: 'btn-main',
+      name: 'Interactive Button',
+      type: 'rect',
+      visible: true,
+      locked: false,
+      x: 100,
+      y: 100,
+      width: 200,
+      height: 60,
+      rotation: 0,
+      scaleX: 1,
+      scaleY: 1,
+      opacity: 1,
+      borderRadius: 8,
+      fill: '#3b82f6',
+      tracks: []
+    };
+
+    const stateMachine = {
+      id: 'sm-btn',
+      name: 'Button Machine',
+      inputs: [{ id: 'in-hover', name: 'isHovered', type: 'boolean' as const, value: false }],
+      layers: [
+        {
+          id: 'layer-btn',
+          name: 'Main Layer',
+          defaultStateId: 'st-idle',
+          states: [
+            {
+              id: 'st-idle',
+              name: 'Idle State',
+              type: 'animation' as const,
+              propertyOverrides: { 'btn-main': { fill: '#3b82f6' } }
+            },
+            {
+              id: 'st-hover',
+              name: 'Hovered State',
+              type: 'animation' as const,
+              propertyOverrides: { 'btn-main': { fill: '#ef4444' } }
+            }
+          ],
+          transitions: [
+            {
+              id: 'tr-hover',
+              fromStateId: 'st-idle',
+              toStateId: 'st-hover',
+              duration: 0.1,
+              conditions: [{ inputId: 'in-hover', operator: '==' as const, value: true }]
+            }
+          ]
+        }
+      ]
+    };
+
+    owner.syncStudioDocument({
+      rootFrame,
+      nodes: { 'btn-main': buttonNode },
+      nodeOrder: ['btn-main'],
+      duration: 3.0,
+      fps: 60,
+      stateMachines: [stateMachine],
+      interactions: [
+        {
+          id: 'inter-hover-enter',
+          targetNodeId: 'btn-main',
+          event: 'pointerenter',
+          action: { type: 'setInput', inputName: 'isHovered', value: true }
+        }
+      ]
+    });
+
+    // Hover button -> State transitions to st-hover (fill = #ef4444)
+    owner.dispatchInteraction('btn-main', 'pointerenter');
+    owner.advance(0.15);
+    let evaluated = owner.getEvaluatedSceneState();
+    expect(evaluated.evaluatedNodes['btn-main'].fill).toBe('#ef4444');
+
+    // Subsequent React store changes (e.g. user renamed node) trigger syncStudioDocument
+    const updatedNode = { ...buttonNode, name: 'Interactive Button Renamed' };
+    owner.syncStudioDocument({
+      rootFrame,
+      nodes: { 'btn-main': updatedNode },
+      nodeOrder: ['btn-main'],
+      duration: 3.0,
+      fps: 60,
+      stateMachines: [stateMachine],
+      interactions: [
+        {
+          id: 'inter-hover-enter',
+          targetNodeId: 'btn-main',
+          event: 'pointerenter',
+          action: { type: 'setInput', inputName: 'isHovered', value: true }
+        }
+      ]
+    });
+
+    // INVARIANT CHECK: Active state is PRESERVED (does NOT reset to st-idle / #3b82f6)
+    evaluated = owner.getEvaluatedSceneState();
+    expect(evaluated.evaluatedNodes['btn-main'].fill).toBe('#ef4444');
+    expect(evaluated.evaluatedNodes['btn-main'].name).toBe('Interactive Button Renamed');
+  });
+
+  it('proves StudioSessionManager isolates runtime state across multiple document tabs', () => {
+    const tabARuntime = studioSessionManager.getSession('tab-A');
+    const tabBRuntime = studioSessionManager.getSession('tab-B');
+
+    expect(tabARuntime).not.toBe(tabBRuntime);
+
+    tabARuntime.seek(1.5);
+    tabBRuntime.seek(0.5);
+
+    expect(tabARuntime.getCurrentTime()).toBeCloseTo(1.5, 2);
+    expect(tabBRuntime.getCurrentTime()).toBeCloseTo(0.5, 2);
+
+    // Switching active tab does not cross-contaminate runtime state
+    studioSessionManager.setActiveTab('tab-A');
+    expect(studioSessionManager.getActiveSession().getCurrentTime()).toBeCloseTo(1.5, 2);
+
+    studioSessionManager.setActiveTab('tab-B');
+    expect(studioSessionManager.getActiveSession().getCurrentTime()).toBeCloseTo(0.5, 2);
   });
 });

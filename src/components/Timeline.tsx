@@ -1,6 +1,6 @@
 import React, { useRef, useEffect, useMemo } from 'react';
 import { useStudioStore } from '../store/useStudioStore';
-import { studioRuntimeOwner } from '../engine/studio/studioRuntimeOwner';
+import { studioSessionManager } from '../engine/studio/studioRuntimeOwner';
 import {
   Gem,
   Sparkles,
@@ -12,6 +12,7 @@ import {
 
 export const Timeline: React.FC = () => {
   const {
+    activeTabId,
     isPlaying,
     setPlaying,
     currentTime,
@@ -37,6 +38,8 @@ export const Timeline: React.FC = () => {
     showToast
   } = useStudioStore();
 
+  const runtimeOwner = studioSessionManager.getSession(activeTabId || 'tab-1');
+
   const gridRef = useRef<HTMLDivElement | null>(null);
   const audioElementRef = useRef<HTMLAudioElement | null>(null);
 
@@ -61,15 +64,15 @@ export const Timeline: React.FC = () => {
     }
   }, [currentTime]);
 
-  // Playback Loop driven directly by canonical studioRuntimeOwner
+  // Playback Loop driven directly by canonical tab runtimeOwner
   useEffect(() => {
     if (!isPlaying) {
-      studioRuntimeOwner.pause();
+      runtimeOwner.pause();
       return;
     }
 
-    studioRuntimeOwner.seek(currentTime);
-    studioRuntimeOwner.play();
+    runtimeOwner.seek(currentTime);
+    runtimeOwner.play();
 
     let animId: number;
     let lastTime = performance.now();
@@ -78,11 +81,11 @@ export const Timeline: React.FC = () => {
       const dt = (now - lastTime) / 1000;
       lastTime = now;
 
-      studioRuntimeOwner.advance(dt);
-      const nextTime = studioRuntimeOwner.getCurrentTime();
+      runtimeOwner.advance(dt);
+      const nextTime = runtimeOwner.getCurrentTime();
       setCurrentTime(nextTime);
 
-      if (!studioRuntimeOwner.getIsPlaying()) {
+      if (!runtimeOwner.getIsPlaying()) {
         setPlaying(false);
       } else {
         animId = requestAnimationFrame(loopFn);
@@ -94,7 +97,7 @@ export const Timeline: React.FC = () => {
     return () => {
       if (animId) cancelAnimationFrame(animId);
     };
-  }, [isPlaying, duration, loop]);
+  }, [runtimeOwner, isPlaying, duration, loop]);
 
   const rulerTicks = useMemo(() => {
     const d = Math.max(0.1, duration);

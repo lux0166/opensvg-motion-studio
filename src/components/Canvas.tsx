@@ -1,6 +1,7 @@
 import React, { useRef, useEffect, useState, useMemo } from 'react';
 import { useStudioStore } from '../store/useStudioStore';
-import { studioRuntimeOwner } from '../engine/studio/studioRuntimeOwner';
+import { studioSessionManager } from '../engine/studio/studioRuntimeOwner';
+import { hitTestScene } from '../engine/interaction/geometryHitTest';
 import { renderCanvasScene, MarqueeRect } from '../engine/renderer';
 import { computeSnapping } from '../engine/snapping';
 import { importSvgString } from '../engine/svgImporter';
@@ -8,6 +9,8 @@ import { Minus, Plus, Maximize2, Square, UploadCloud } from 'lucide-react';
 
 export const Canvas: React.FC = () => {
   const {
+    activeTabId,
+    tabs,
     rootFrame,
     nodes,
     nodeOrder,
@@ -45,6 +48,9 @@ export const Canvas: React.FC = () => {
     showToast
   } = useStudioStore();
 
+  const currentTab = tabs.find((t) => t.id === activeTabId);
+  const runtimeOwner = studioSessionManager.getSession(activeTabId || 'tab-1');
+
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
 
@@ -79,9 +85,11 @@ export const Canvas: React.FC = () => {
     };
   }, []);
 
-  // Synchronize full document semantics with StudioRuntimeOwner
+  // Synchronize full document semantics with StudioRuntimeOwner non-destructively
   useEffect(() => {
-    studioRuntimeOwner.syncStudioDocument({
+    runtimeOwner.syncStudioDocument({
+      id: currentTab?.id,
+      createdAt: currentTab?.createdAt,
       rootFrame,
       nodes,
       nodeOrder,
@@ -96,6 +104,9 @@ export const Canvas: React.FC = () => {
       assets
     });
   }, [
+    runtimeOwner,
+    currentTab?.id,
+    currentTab?.createdAt,
     rootFrame,
     nodes,
     nodeOrder,
@@ -112,8 +123,9 @@ export const Canvas: React.FC = () => {
 
   // Canonical runtime evaluation pipeline for Studio Canvas Preview
   const evaluatedScene = useMemo(() => {
-    return studioRuntimeOwner.getEvaluatedSceneState(currentTime);
+    return runtimeOwner.getEvaluatedSceneState(currentTime);
   }, [
+    runtimeOwner,
     rootFrame,
     nodes,
     nodeOrder,
@@ -286,24 +298,13 @@ export const Canvas: React.FC = () => {
       }
     }
 
-    // 9. Hit Test Nodes on Canvas
-    let clickedId: string | null = null;
-    for (let i = evaluatedNodes.length - 1; i >= 0; i--) {
-      const n = evaluatedNodes[i];
-      if (
-        mouseX >= n.x &&
-        mouseX <= n.x + n.width &&
-        mouseY >= n.y &&
-        mouseY <= n.y + n.height
-      ) {
-        clickedId = n.id;
-        break;
-      }
-    }
+    // 9. Canonical Geometry Hit Test Nodes on Canvas
+    const hitResult = hitTestScene(evaluatedScene, { x: mouseX, y: mouseY }, { ignoreInvisible: true, ignoreLocked: false });
+    const clickedId = hitResult ? hitResult.evaluatedNode.id : null;
 
     if (clickedId) {
-      studioRuntimeOwner.dispatchInteraction(clickedId, 'pointerdown');
-      studioRuntimeOwner.dispatchInteraction(clickedId, 'click');
+      runtimeOwner.dispatchInteraction(clickedId, 'pointerdown');
+      runtimeOwner.dispatchInteraction(clickedId, 'click');
 
       if (e.shiftKey) {
         toggleSelectId(clickedId, true);
@@ -329,32 +330,21 @@ export const Canvas: React.FC = () => {
       return;
     }
 
-    // Hover hit test & interaction dispatch
+    // Canonical Geometry Hover Hit Test
     const rect = canvasRef.current?.getBoundingClientRect();
     if (!rect) return;
     const mouseX = Math.round((e.clientX - rect.left) / zoom);
     const mouseY = Math.round((e.clientY - rect.top) / zoom);
 
-    let currentHitId: string | null = null;
-    for (let i = evaluatedNodes.length - 1; i >= 0; i--) {
-      const n = evaluatedNodes[i];
-      if (
-        mouseX >= n.x &&
-        mouseX <= n.x + n.width &&
-        mouseY >= n.y &&
-        mouseY <= n.y + n.height
-      ) {
-        currentHitId = n.id;
-        break;
-      }
-    }
+    const hitResult = hitTestScene(evaluatedScene, { x: mouseX, y: mouseY }, { ignoreInvisible: true, ignoreLocked: false });
+    const currentHitId = hitResult ? hitResult.evaluatedNode.id : null;
 
     if (currentHitId !== hoveredNodeId) {
       if (hoveredNodeId) {
-        studioRuntimeOwner.dispatchInteraction(hoveredNodeId, 'pointerleave');
+        runtimeOwner.dispatchInteraction(hoveredNodeId, 'pointerleave');
       }
       if (currentHitId) {
-        studioRuntimeOwner.dispatchInteraction(currentHitId, 'pointerenter');
+        runtimeOwner.dispatchInteraction(currentHitId, 'pointerenter');
       }
       setHoveredNodeId(currentHitId);
     }
@@ -363,7 +353,7 @@ export const Canvas: React.FC = () => {
   const handleMouseUp = () => {
     setIsPanning(false);
     if (hoveredNodeId) {
-      studioRuntimeOwner.dispatchInteraction(hoveredNodeId, 'pointerup');
+      runtimeOwner.dispatchInteraction(hoveredNodeId, 'pointerup');
     }
   };
 
