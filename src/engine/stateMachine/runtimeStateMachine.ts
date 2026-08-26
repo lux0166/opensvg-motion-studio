@@ -165,27 +165,27 @@ export class StateMachineRuntime {
 
       state.timeInState += dt;
 
-      // 1. If not transitioning, check for new transition triggers
-      if (!state.isTransitioning) {
-        for (const trans of layer.transitions) {
-          if (trans.fromStateId === state.currentStateId || trans.fromStateId === 'any') {
-            if (this.evaluateConditions(trans.conditions)) {
-              // Trigger transition
-              state.previousStateId = state.currentStateId;
-              state.currentStateId = trans.toStateId;
-              state.timeInState = 0;
-              state.transitionProgress = 0;
-              state.isTransitioning = trans.duration > 0;
-              if (!state.isTransitioning) {
-                state.transitionProgress = 1.0;
-              }
-              break;
+      // Check outgoing transitions (both when idle and during interruption)
+      for (const trans of layer.transitions) {
+        if (trans.fromStateId === state.currentStateId || trans.fromStateId === 'any') {
+          // Avoid re-triggering current active transition in the same direction
+          if (trans.toStateId === state.currentStateId && state.isTransitioning) continue;
+          if (this.evaluateConditions(trans.conditions)) {
+            // Trigger transition
+            state.previousStateId = state.currentStateId;
+            state.currentStateId = trans.toStateId;
+            state.timeInState = 0;
+            state.transitionProgress = 0;
+            state.isTransitioning = trans.duration > 0;
+            if (!state.isTransitioning) {
+              state.transitionProgress = 1.0;
             }
+            break;
           }
         }
       }
 
-      // 2. Advance ongoing transition
+      // Advance ongoing transition
       if (state.isTransitioning) {
         const trans = layer.transitions.find(
           (t) => t.fromStateId === state.previousStateId && t.toStateId === state.currentStateId

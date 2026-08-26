@@ -128,6 +128,7 @@ export class OpenSVGRuntime {
    */
   public seek(time: number): void {
     this.clock.seek(time);
+    this.stateMachineRuntime?.seek(time);
   }
 
   /**
@@ -135,6 +136,7 @@ export class OpenSVGRuntime {
    */
   public reset(): void {
     this.clock.reset();
+    this.stateMachineRuntime?.reset();
   }
 
   public play(): void {
