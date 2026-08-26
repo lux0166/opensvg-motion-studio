@@ -6,6 +6,15 @@ import {
 import { SceneProject, FrameNode } from '../types';
 import { migrateProjectToLatest } from '../persistence/schemaMigration';
 
+const VALID_INTERACTION_EVENTS: Set<string> = new Set([
+  'pointerenter',
+  'pointerleave',
+  'pointerdown',
+  'pointerup',
+  'click',
+  'dblclick'
+]);
+
 /**
  * Recursively sort keys of an object to ensure deterministic serialization (Rule CORE-11 & Section 6)
  */
@@ -24,7 +33,8 @@ function sortObjectKeys<T>(obj: T): T {
 }
 
 /**
- * Validates structural integrity of an OpenSVG document payload with strict error & warning reporting
+ * Validates structural and semantic integrity of an OpenSVG document payload with deep validation
+ * Standardized per P0-3, P1-1, P1-2, P1-3 Strict Format Semantics.
  */
 export function validateDocument(docOrJson: any): DocumentValidationResult {
   const errors: string[] = [];
@@ -55,8 +65,14 @@ export function validateDocument(docOrJson: any): DocumentValidationResult {
     errors.push(`Invalid format identifier: Expected 'opensvg', received '${doc.format}'.`);
   }
 
+  // 1. Version compatibility check (P1-3)
   if (!doc.schemaVersion || typeof doc.schemaVersion !== 'string') {
     errors.push('Missing or invalid schemaVersion.');
+  } else {
+    const major = doc.schemaVersion.split('.')[0];
+    if (major !== '2') {
+      errors.push(`Unsupported schemaVersion '${doc.schemaVersion}'. Supported major versions: 2.x.x.`);
+    }
   }
 
   if (!doc.metadata || typeof doc.metadata !== 'object') {
@@ -91,7 +107,46 @@ export function validateDocument(docOrJson: any): DocumentValidationResult {
     errors.push('Missing or invalid nodeOrder array.');
   }
 
-  // Interaction validation
+  const nodeMap = doc.nodes && typeof doc.nodes === 'object' ? doc.nodes : {};
+
+  // 2. Hierarchy validation & Cycle Detection (P1-1 & P1-2)
+  if (doc.nodes && typeof doc.nodes === 'object') {
+    for (const [nodeId, node] of Object.entries(nodeMap)) {
+      if (node && typeof node === 'object' && (node as any).parentId) {
+        const parentId = (node as any).parentId;
+        if (!nodeMap[parentId]) {
+          errors.push(`Node '${nodeId}' references non-existent parentId '${parentId}'.`);
+        }
+      }
+    }
+
+    // Depth-First-Search cycle detector
+    const visited = new Set<string>();
+    const stack = new Set<string>();
+
+    function checkCycle(id: string): boolean {
+      visited.add(id);
+      stack.add(id);
+      const current = nodeMap[id];
+      if (current && current.parentId && nodeMap[current.parentId]) {
+        if (stack.has(current.parentId)) return true;
+        if (!visited.has(current.parentId) && checkCycle(current.parentId)) return true;
+      }
+      stack.delete(id);
+      return false;
+    }
+
+    for (const id of Object.keys(nodeMap)) {
+      if (!visited.has(id)) {
+        if (checkCycle(id)) {
+          errors.push(`Cyclic hierarchy detected involving node '${id}'.`);
+          break;
+        }
+      }
+    }
+  }
+
+  // 3. Deep Interaction Validation (P0-3)
   if (doc.interactions) {
     if (!Array.isArray(doc.interactions)) {
       errors.push('Property "interactions" must be an array.');
@@ -101,17 +156,85 @@ export function validateDocument(docOrJson: any): DocumentValidationResult {
           errors.push(`Interaction at index ${idx} is not an object.`);
         } else {
           if (!inter.id) errors.push(`Interaction at index ${idx} is missing "id".`);
-          if (!inter.targetNodeId) errors.push(`Interaction at index ${idx} is missing "targetNodeId".`);
-          if (!inter.event) errors.push(`Interaction at index ${idx} is missing "event".`);
+          if (!inter.targetNodeId) {
+            errors.push(`Interaction at index ${idx} is missing "targetNodeId".`);
+          } else if (inter.targetNodeId !== '*' && !nodeMap[inter.targetNodeId]) {
+            errors.push(`Interaction '${inter.id || idx}' targets non-existent node '${inter.targetNodeId}'.`);
+          }
+
+          if (!inter.event) {
+            errors.push(`Interaction at index ${idx} is missing "event".`);
+          } else if (!VALID_INTERACTION_EVENTS.has(inter.event)) {
+            errors.push(`Interaction '${inter.id || idx}' has invalid event '${inter.event}'.`);
+          }
+
           if (!inter.action || typeof inter.action !== 'object') {
             errors.push(`Interaction at index ${idx} is missing valid "action" object.`);
+          } else {
+            const act = inter.action;
+            if (act.type === 'setInput' && (!act.inputName || typeof act.inputName !== 'string')) {
+              errors.push(`Interaction '${inter.id || idx}' action 'setInput' requires valid 'inputName'.`);
+            } else if (act.type === 'fireTrigger' && (!act.triggerName || typeof act.triggerName !== 'string')) {
+              errors.push(`Interaction '${inter.id || idx}' action 'fireTrigger' requires valid 'triggerName'.`);
+            } else if (act.type === 'setState' && (!act.stateId || typeof act.stateId !== 'string')) {
+              errors.push(`Interaction '${inter.id || idx}' action 'setState' requires valid 'stateId'.`);
+            } else if (act.type === 'seek' && (typeof act.time !== 'number' || act.time < 0)) {
+              errors.push(`Interaction '${inter.id || idx}' action 'seek' requires non-negative 'time'.`);
+            }
           }
         }
       });
     }
   }
 
-  // Asset validation
+  // 4. State Machine Structural Validation (P0-3)
+  if (doc.stateMachines) {
+    if (!Array.isArray(doc.stateMachines)) {
+      errors.push('Property "stateMachines" must be an array.');
+    } else {
+      doc.stateMachines.forEach((sm: any, smIdx: number) => {
+        if (!sm || typeof sm !== 'object') {
+          errors.push(`StateMachine at index ${smIdx} is not an object.`);
+        } else {
+          if (!sm.id) errors.push(`StateMachine at index ${smIdx} is missing "id".`);
+          if (sm.layers && Array.isArray(sm.layers)) {
+            sm.layers.forEach((layer: any, lIdx: number) => {
+              const stateIds = new Set((layer.states || []).map((s: any) => s.id));
+              if (layer.defaultStateId && !stateIds.has(layer.defaultStateId)) {
+                errors.push(`Layer '${layer.id || lIdx}' in StateMachine '${sm.id}' references unknown defaultStateId '${layer.defaultStateId}'.`);
+              }
+              if (layer.transitions && Array.isArray(layer.transitions)) {
+                layer.transitions.forEach((tr: any, trIdx: number) => {
+                  if (tr.fromStateId && !stateIds.has(tr.fromStateId)) {
+                    errors.push(`Transition '${tr.id || trIdx}' in layer '${layer.id}' references unknown fromStateId '${tr.fromStateId}'.`);
+                  }
+                  if (tr.toStateId && !stateIds.has(tr.toStateId)) {
+                    errors.push(`Transition '${tr.id || trIdx}' in layer '${layer.id}' references unknown toStateId '${tr.toStateId}'.`);
+                  }
+                });
+              }
+            });
+          }
+        }
+      });
+    }
+  }
+
+  // 5. Component Instance Validation (P0-1)
+  if (doc.componentInstances) {
+    if (!Array.isArray(doc.componentInstances)) {
+      errors.push('Property "componentInstances" must be an array.');
+    } else {
+      const defIds = new Set((doc.components || []).map((c: any) => c.id));
+      doc.componentInstances.forEach((inst: any, idx: number) => {
+        if (!inst.componentDefId || !defIds.has(inst.componentDefId)) {
+          errors.push(`ComponentInstance '${inst.id || idx}' references unknown componentDefId '${inst.componentDefId}'.`);
+        }
+      });
+    }
+  }
+
+  // 6. Asset Manifest Validation (P0-2)
   if (doc.assets && typeof doc.assets === 'object') {
     for (const [id, asset] of Object.entries(doc.assets)) {
       if (!asset || typeof asset !== 'object') {
@@ -141,7 +264,7 @@ export function serializeDocument(doc: OpenSVGDocument, pretty: boolean = false)
 }
 
 /**
- * Parses and validates an OpenSVG document from raw JSON string with graceful error handling
+ * Parses and validates an OpenSVG document from raw JSON string with strict semantic error reporting
  */
 export function parseDocument(rawJson: string): OpenSVGDocument {
   if (!rawJson || typeof rawJson !== 'string') {
@@ -210,6 +333,7 @@ export function convertProjectToNativeDocument(
     stateMachines: extras.stateMachines ? JSON.parse(JSON.stringify(extras.stateMachines)) : undefined,
     interactions: extras.interactions ? JSON.parse(JSON.stringify(extras.interactions)) : undefined,
     components: extras.components ? JSON.parse(JSON.stringify(extras.components)) : undefined,
+    componentInstances: extras.componentInstances ? JSON.parse(JSON.stringify(extras.componentInstances)) : undefined,
     bindings: extras.bindings ? JSON.parse(JSON.stringify(extras.bindings)) : undefined,
     constraints: extras.constraints ? JSON.parse(JSON.stringify(extras.constraints)) : undefined,
     assets: extras.assets ? JSON.parse(JSON.stringify(extras.assets)) : undefined
@@ -256,7 +380,9 @@ export function convertNativeDocumentToProject(doc: OpenSVGDocument): SceneProje
     fps: doc.scene.fps,
     rootFrame,
     nodes: JSON.parse(JSON.stringify(doc.nodes || {})),
-    nodeOrder: [...(doc.nodeOrder || [])]
+    nodeOrder: [...(doc.nodeOrder || [])],
+    stateMachines: doc.stateMachines ? JSON.parse(JSON.stringify(doc.stateMachines)) : undefined,
+    interactions: doc.interactions ? JSON.parse(JSON.stringify(doc.interactions)) : undefined
   };
 
   return project;

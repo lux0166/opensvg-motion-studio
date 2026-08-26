@@ -151,7 +151,7 @@ export class OpenSVGWebRuntime {
   }
 
   public setState(stateNameOrLayerId: string, stateName?: string): void {
-    this.runtime.setState(stateNameOrLayerId, stateName);
+    this.runtime.setState(stateNameOrLayerId, stateName || stateNameOrLayerId);
     this.emitEvent('stateChange', { state: stateName || stateNameOrLayerId });
   }
 

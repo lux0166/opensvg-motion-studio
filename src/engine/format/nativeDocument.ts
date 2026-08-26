@@ -1,6 +1,6 @@
 import { SceneNode, FrameNode } from '../types';
 import { StateMachineDefinition } from '../stateMachine/runtimeStateMachine';
-import { ComponentDefinition } from '../components/componentSystem';
+import { ComponentDefinition, ComponentInstance } from '../components/componentSystem';
 import { DataBinding } from '../binding/dataBinding';
 import { Constraint } from '../constraints/constraintSolver';
 import { DocumentInteraction } from '../interaction/interactionModel';
@@ -57,6 +57,7 @@ export interface OpenSVGDocument {
   stateMachines?: StateMachineDefinition[];
   interactions?: DocumentInteraction[];
   components?: ComponentDefinition[];
+  componentInstances?: ComponentInstance[];
   bindings?: DataBinding[];
   constraints?: Constraint[];
   assets?: Record<string, AssetManifestEntry>;

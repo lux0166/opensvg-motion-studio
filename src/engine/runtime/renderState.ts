@@ -15,7 +15,8 @@ import { composeTransform, multiplyMatrices } from '../transform/matrix2D';
 export function deriveRenderScene(
   project: SceneProject,
   evaluatedNodes: SceneNode[],
-  precomputedTransforms?: Record<string, { worldTransform: Matrix2D; totalOpacity: number }>
+  precomputedTransforms?: Record<string, { worldTransform: Matrix2D; totalOpacity: number }>,
+  customNodeOrder?: string[]
 ): RenderScene {
   const nodeMap: Record<string, SceneNode> = {};
   for (const n of evaluatedNodes) {
@@ -157,6 +158,14 @@ export function deriveRenderScene(
   const rootHeight = project.rootFrame?.height ?? 600;
   const rootBg = project.rootFrame?.fill || project.rootFrame?.canvasBg || '#ffffff';
 
+  const order = customNodeOrder || project.nodeOrder || [];
+  const drawOrder: string[] = order.filter((id) => nodeMap[id]?.visible);
+  for (const node of evaluatedNodes) {
+    if (node.visible && !drawOrder.includes(node.id)) {
+      drawOrder.push(node.id);
+    }
+  }
+
   return {
     id: project.id,
     viewport: {
@@ -166,6 +175,6 @@ export function deriveRenderScene(
       background: rootBg
     },
     nodes: renderNodes,
-    drawOrder: project.nodeOrder.filter((id) => nodeMap[id]?.visible)
+    drawOrder
   };
 }

@@ -10,11 +10,12 @@ import { OpenSVGDocument } from '../format/nativeDocument';
 import { convertNativeDocumentToProject } from '../format/documentParser';
 import { createRuntimeSnapshot } from './runtimeSnapshot';
 import { DocumentInteraction, InteractionEventType, InteractionAction } from '../interaction/interactionModel';
+import { AssetStore } from '../assets/assetStore';
 
 /**
  * OpenSVG Single Runtime Owner (Headless Runtime Kernel)
  * Standardized according to CORE_ENGINE_DEPTH.md, Section 13 & OPENSVG_CURRENT_STRATEGIC_ROADMAP.md (Section 1).
- * INVARIANT: Sole runtime owner of Clock, StateMachine, ComponentRegistry, DataBindings, Constraints, and Document Interactions.
+ * INVARIANT: Sole runtime owner of Clock, Multi-StateMachines, ComponentRegistry, ComponentInstances, AssetStore, DataBindings, Constraints, and Document Interactions.
  */
 export class OpenSVGRuntime {
   private clock: RuntimeClock;
@@ -23,7 +24,8 @@ export class OpenSVGRuntime {
   private componentRegistry?: ComponentRegistry;
   private componentInstances: ComponentInstance[] = [];
   private dataBindingEngine?: DataBindingEngine;
-  private stateMachineRuntime?: StateMachineRuntime;
+  private stateMachineRuntimes: Map<string, StateMachineRuntime> = new Map();
+  private assetStore: AssetStore = new AssetStore();
   private interactions: DocumentInteraction[] = [];
   private propertyOverrides: Record<string, Partial<SceneNode>> = {};
 
@@ -69,21 +71,24 @@ export class OpenSVGRuntime {
       const converted = convertNativeDocumentToProject(doc);
       this.project = createRuntimeSnapshot(converted);
 
-      // Initialize State Machine if present
+      // 1. Initialize Multi-State-Machines if present
+      this.stateMachineRuntimes.clear();
       if (doc.stateMachines && doc.stateMachines.length > 0) {
-        this.stateMachineRuntime = new StateMachineRuntime(doc.stateMachines[0]);
-      } else {
-        this.stateMachineRuntime = undefined;
+        for (const sm of doc.stateMachines) {
+          const runtime = new StateMachineRuntime(sm);
+          this.stateMachineRuntimes.set(sm.id, runtime);
+          if (sm.name) this.stateMachineRuntimes.set(sm.name, runtime);
+        }
       }
 
-      // Initialize Document Interactions if present
+      // 2. Initialize Document Interactions if present
       if (doc.interactions && doc.interactions.length > 0) {
         this.interactions = [...doc.interactions];
       } else {
         this.interactions = [];
       }
 
-      // Initialize Components if present
+      // 3. Initialize Component Definitions & Instances
       if (doc.components && doc.components.length > 0) {
         this.componentRegistry = new ComponentRegistry();
         for (const comp of doc.components) {
@@ -92,9 +97,17 @@ export class OpenSVGRuntime {
       } else {
         this.componentRegistry = undefined;
       }
-      this.componentInstances = [];
 
-      // Initialize Data Bindings if present
+      if (doc.componentInstances && doc.componentInstances.length > 0) {
+        this.componentInstances = [...doc.componentInstances];
+      } else {
+        this.componentInstances = [];
+      }
+
+      // 4. Initialize Asset Store
+      this.assetStore.loadManifest(doc.assets);
+
+      // 5. Initialize Data Bindings if present
       if (doc.bindings && doc.bindings.length > 0) {
         this.dataBindingEngine = new DataBindingEngine();
         for (const b of doc.bindings) {
@@ -104,7 +117,7 @@ export class OpenSVGRuntime {
         this.dataBindingEngine = undefined;
       }
 
-      // Initialize Constraints if present
+      // 6. Initialize Constraints if present
       if (doc.constraints && doc.constraints.length > 0) {
         this.constraints = [...doc.constraints];
       } else {
@@ -113,6 +126,9 @@ export class OpenSVGRuntime {
     } else {
       this.project = createRuntimeSnapshot(docOrProject as SceneProject);
       this.interactions = [];
+      this.stateMachineRuntimes.clear();
+      this.componentInstances = [];
+      this.assetStore.clear();
     }
 
     this.clock.setDuration(this.project.duration || 1);
@@ -127,6 +143,10 @@ export class OpenSVGRuntime {
 
   public getInteractions(): DocumentInteraction[] {
     return [...this.interactions];
+  }
+
+  public getAssetStore(): AssetStore {
+    return this.assetStore;
   }
 
   /**
@@ -144,13 +164,13 @@ export class OpenSVGRuntime {
   private executeInteractionAction(action: InteractionAction): void {
     switch (action.type) {
       case 'setInput':
-        this.stateMachineRuntime?.setInput(action.inputName, action.value);
+        this.setInput(action.inputName, action.value);
         break;
       case 'fireTrigger':
-        this.stateMachineRuntime?.fireTrigger(action.triggerName);
+        this.fireTrigger(action.triggerName);
         break;
       case 'setState':
-        this.stateMachineRuntime?.forceState(action.layerId || '', action.stateId);
+        this.setState(action.layerId || '', action.stateId);
         break;
       case 'seek':
         this.seek(action.time);
@@ -180,8 +200,8 @@ export class OpenSVGRuntime {
     this.dataBindingEngine = engine;
   }
 
-  public setStateMachineRuntime(runtime: StateMachineRuntime): void {
-    this.stateMachineRuntime = runtime;
+  public setStateMachineRuntime(runtime: StateMachineRuntime, id: string = 'sm-default'): void {
+    this.stateMachineRuntimes.set(id, runtime);
   }
 
   public setPropertyOverrides(overrides: Record<string, Partial<SceneNode>>): void {
@@ -200,8 +220,8 @@ export class OpenSVGRuntime {
    */
   public advance(dt: number): void {
     this.clock.advance(dt);
-    if (this.stateMachineRuntime) {
-      this.stateMachineRuntime.advance(dt);
+    for (const sm of this.getUniqueStateMachineRuntimes()) {
+      sm.advance(dt);
     }
   }
 
@@ -210,7 +230,9 @@ export class OpenSVGRuntime {
    */
   public seek(time: number): void {
     this.clock.seek(time);
-    this.stateMachineRuntime?.seek(time);
+    for (const sm of this.getUniqueStateMachineRuntimes()) {
+      sm.seek(time);
+    }
   }
 
   /**
@@ -218,7 +240,9 @@ export class OpenSVGRuntime {
    */
   public reset(): void {
     this.clock.reset();
-    this.stateMachineRuntime?.reset();
+    for (const sm of this.getUniqueStateMachineRuntimes()) {
+      sm.reset();
+    }
   }
 
   public play(): void {
@@ -249,23 +273,60 @@ export class OpenSVGRuntime {
     return this.clock.getIsPlaying();
   }
 
-  // State Machine control forwarding
-  public setBoolean(inputName: string, value: boolean): void {
-    this.stateMachineRuntime?.setInput(inputName, value);
+  // Multi-State Machine control forwarding
+  public setInput(inputNameOrId: string, value: boolean | number, stateMachineId?: string): void {
+    if (stateMachineId) {
+      const sm = this.stateMachineRuntimes.get(stateMachineId);
+      sm?.setInput(inputNameOrId, value);
+      return;
+    }
+
+    for (const sm of this.getUniqueStateMachineRuntimes()) {
+      if (sm.getInput(inputNameOrId)) {
+        sm.setInput(inputNameOrId, value);
+      }
+    }
   }
 
-  public setNumber(inputName: string, value: number): void {
-    this.stateMachineRuntime?.setInput(inputName, value);
+  public setBoolean(inputName: string, value: boolean, stateMachineId?: string): void {
+    this.setInput(inputName, value, stateMachineId);
   }
 
-  public fireTrigger(triggerName: string): void {
-    this.stateMachineRuntime?.fireTrigger(triggerName);
+  public setNumber(inputName: string, value: number, stateMachineId?: string): void {
+    this.setInput(inputName, value, stateMachineId);
   }
 
-  public setState(stateNameOrLayerId: string, stateName?: string): void {
-    const layerId = stateName ? stateNameOrLayerId : 'layer-main';
-    const targetState = stateName || stateNameOrLayerId;
-    this.stateMachineRuntime?.forceState(layerId, targetState);
+  public fireTrigger(triggerName: string, stateMachineId?: string): void {
+    if (stateMachineId) {
+      const sm = this.stateMachineRuntimes.get(stateMachineId);
+      sm?.fireTrigger(triggerName);
+      return;
+    }
+
+    for (const sm of this.getUniqueStateMachineRuntimes()) {
+      if (sm.getInput(triggerName)) {
+        sm.fireTrigger(triggerName);
+      }
+    }
+  }
+
+  /**
+   * Sets state machine state without assuming any default layer name
+   */
+  public setState(layerIdOrMachineId: string, stateIdOrLayerId: string, stateId?: string): void {
+    if (stateId) {
+      // (stateMachineId, layerId, stateId)
+      const sm = this.stateMachineRuntimes.get(layerIdOrMachineId);
+      sm?.forceState(stateIdOrLayerId, stateId);
+      return;
+    }
+
+    // (layerId, stateId) -> apply to first matching state machine
+    const layerId = layerIdOrMachineId;
+    const targetState = stateIdOrLayerId;
+    for (const sm of this.getUniqueStateMachineRuntimes()) {
+      sm.forceState(layerId, targetState);
+    }
   }
 
   // Data Binding forwarding
@@ -277,13 +338,14 @@ export class OpenSVGRuntime {
    * Single Source of Evaluation Truth: Runs the canonical evaluation pipeline
    */
   public getEvaluatedSceneState(): EvaluatedSceneState {
+    const runtimes = this.getUniqueStateMachineRuntimes();
     return evaluateScenePipeline(this.project, {
       time: this.clock.getCurrentTime(),
       constraints: this.constraints,
       componentRegistry: this.componentRegistry,
       componentInstances: this.componentInstances,
       dataBindingEngine: this.dataBindingEngine,
-      stateMachineRuntime: this.stateMachineRuntime,
+      stateMachineRuntime: runtimes.length > 0 ? runtimes : undefined,
       externalPropertyOverrides: this.propertyOverrides
     });
   }
@@ -295,7 +357,15 @@ export class OpenSVGRuntime {
     return this.getEvaluatedSceneState().renderScene;
   }
 
-  public getStateMachineRuntime(): StateMachineRuntime | undefined {
-    return this.stateMachineRuntime;
+  public getStateMachineRuntime(idOrName?: string): StateMachineRuntime | undefined {
+    if (idOrName) {
+      return this.stateMachineRuntimes.get(idOrName);
+    }
+    const runtimes = this.getUniqueStateMachineRuntimes();
+    return runtimes[0];
+  }
+
+  private getUniqueStateMachineRuntimes(): StateMachineRuntime[] {
+    return Array.from(new Set(this.stateMachineRuntimes.values()));
   }
 }

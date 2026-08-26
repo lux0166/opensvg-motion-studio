@@ -105,11 +105,44 @@ export class ComponentRegistry {
 
     // Apply local property overrides
     for (const [key, val] of Object.entries(instance.overrides)) {
-      if (val !== undefined) {
+      if (val !== undefined && !key.includes('.')) {
         (resolved as any)[key] = val;
       }
     }
 
     return resolved;
+  }
+
+  /**
+   * Resolves a ComponentInstance into its full node hierarchy including child nodes (Rule CORE-08)
+   */
+  public resolveInstanceHierarchy(instance: ComponentInstance): SceneNode[] {
+    const root = this.resolveInstance(instance);
+    const def = this.definitions.get(instance.componentDefId);
+    if (!def || !def.childNodes || def.childNodes.length === 0) {
+      return [root];
+    }
+
+    const resolvedChildren: SceneNode[] = def.childNodes.map((child, idx) => {
+      const childClone: SceneNode = JSON.parse(JSON.stringify(child));
+      childClone.id = `${instance.id}-child-${child.id || idx}`;
+      childClone.parentId = instance.id;
+
+      // Apply child-targeted overrides
+      const childOverrideKey = child.id;
+      if (instance.overrides[childOverrideKey] && typeof instance.overrides[childOverrideKey] === 'object') {
+        Object.assign(childClone, instance.overrides[childOverrideKey]);
+      }
+      for (const [key, val] of Object.entries(instance.overrides)) {
+        if (key.startsWith(`${child.id}.`)) {
+          const propName = key.split('.')[1];
+          (childClone as any)[propName] = val;
+        }
+      }
+
+      return childClone;
+    });
+
+    return [root, ...resolvedChildren];
   }
 }

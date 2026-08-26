@@ -5,6 +5,7 @@ import { OpenSVGWebRuntime } from '../../webRuntime/openSVGWebRuntime';
 import { evaluateScenePipeline } from '../../runtime/evaluationPipeline';
 import { StateMachineRuntime } from '../../stateMachine/runtimeStateMachine';
 import { hitTestScene, worldToLocalPoint, isPointInPathGeometry } from '../../interaction/geometryHitTest';
+import { validateDocument, serializeDocument, parseDocument } from '../../format/documentParser';
 
 /**
  * OpenSVG Runtime Certification Suite
@@ -646,5 +647,472 @@ describe('OpenSVG Runtime Certification Suite (Formal Product Proof Gates)', () 
       expect(runtime.getStateMachineRuntime()?.getInput('shieldArmed')?.value).toBe(false);
     });
   });
+
+  // --------------------------------------------------------------------------
+  // GATE 7: Native Format Closure (Comprehensive Multi-Subsystem Runtime Execution)
+  // --------------------------------------------------------------------------
+  describe('Gate 7: Native Format Closure (2 State Machines, 2 Components, 2 Instances, 2 Bindings, 2 Constraints, 3 Interactions, Assets & Complex Hierarchy)', () => {
+    it('certifies end-to-end format closure with zero semantic loss across all runtime subsystems', () => {
+      const closureDocument: OpenSVGDocument = {
+        format: 'opensvg',
+        schemaVersion: '2.0.0',
+        metadata: {
+          id: 'doc-certified-closure',
+          title: 'Native Format Closure Certified Spec',
+          author: 'OpenSVG Certification Authority',
+          createdAt: 1700000000000,
+          updatedAt: 1700000000000
+        },
+        scene: {
+          width: 1200,
+          height: 900,
+          fps: 60,
+          duration: 5.0,
+          background: '#0f172a',
+          clipContent: true
+        },
+        nodes: {
+          'root-chassis': {
+            id: 'root-chassis',
+            name: 'Chassis Frame',
+            type: 'rect',
+            visible: true,
+            locked: false,
+            x: 50,
+            y: 50,
+            width: 1100,
+            height: 800,
+            rotation: 0,
+            scaleX: 1,
+            scaleY: 1,
+            opacity: 1,
+            fill: '#1e293b',
+            borderRadius: 24,
+            tracks: []
+          },
+          'reactor-core': {
+            id: 'reactor-core',
+            name: 'Reactor Core',
+            type: 'circle',
+            visible: true,
+            locked: false,
+            parentId: 'root-chassis',
+            x: 200,
+            y: 200,
+            width: 160,
+            height: 160,
+            rotation: 0,
+            scaleX: 1,
+            scaleY: 1,
+            opacity: 1,
+            borderRadius: 0,
+            fill: '#0ea5e9',
+            tracks: [
+              {
+                id: 'tr-reactor-pulse',
+                property: 'opacity',
+                label: 'Core Pulse',
+                unit: '',
+                keyframes: [
+                  { id: 'k1', time: 0, value: 0.8 },
+                  { id: 'k2', time: 2.5, value: 1.0 },
+                  { id: 'k3', time: 5.0, value: 0.8 }
+                ]
+              }
+            ]
+          },
+          'status-display': {
+            id: 'status-display',
+            name: 'Status Display Text',
+            type: 'text',
+            visible: true,
+            locked: false,
+            parentId: 'root-chassis',
+            x: 400,
+            y: 200,
+            width: 300,
+            height: 60,
+            rotation: 0,
+            scaleX: 1,
+            scaleY: 1,
+            opacity: 1,
+            borderRadius: 0,
+            textContent: 'REACTOR NOMINAL',
+            fontSize: 24,
+            fill: '#f8fafc',
+            tracks: []
+          },
+          'action-trigger-btn': {
+            id: 'action-trigger-btn',
+            name: 'Action Trigger Button',
+            type: 'rect',
+            visible: true,
+            locked: false,
+            parentId: 'root-chassis',
+            x: 400,
+            y: 300,
+            width: 220,
+            height: 60,
+            rotation: 0,
+            scaleX: 1,
+            scaleY: 1,
+            opacity: 1,
+            fill: '#3b82f6',
+            borderRadius: 12,
+            tracks: []
+          },
+          'aim-pointer': {
+            id: 'aim-pointer',
+            name: 'Aiming Pointer',
+            type: 'rect',
+            visible: true,
+            locked: false,
+            parentId: 'root-chassis',
+            x: 700,
+            y: 200,
+            width: 80,
+            height: 20,
+            rotation: 0,
+            scaleX: 1,
+            scaleY: 1,
+            opacity: 1,
+            borderRadius: 0,
+            fill: '#64748b',
+            tracks: []
+          }
+        },
+        nodeOrder: ['root-chassis', 'reactor-core', 'status-display', 'action-trigger-btn', 'aim-pointer'],
+
+        // 1. Two Independent State Machines
+        stateMachines: [
+          {
+            id: 'sm-reactor-controller',
+            name: 'Reactor Machine',
+            inputs: [
+              { id: 'inp-overload', name: 'isOverloaded', type: 'boolean', value: false },
+              { id: 'trig-vent', name: 'triggerVent', type: 'trigger', value: false }
+            ],
+            layers: [
+              {
+                id: 'layer-reactor-power',
+                name: 'Power Layer',
+                defaultStateId: 'state-normal',
+                states: [
+                  {
+                    id: 'state-normal',
+                    name: 'Normal',
+                    type: 'animation',
+                    propertyOverrides: { 'reactor-core': { fill: '#0ea5e9' } }
+                  },
+                  {
+                    id: 'state-hyper',
+                    name: 'Hypercharge',
+                    type: 'animation',
+                    propertyOverrides: { 'reactor-core': { fill: '#f59e0b' } }
+                  },
+                  {
+                    id: 'state-vented',
+                    name: 'Vented',
+                    type: 'animation',
+                    propertyOverrides: { 'reactor-core': { fill: '#10b981' } }
+                  }
+                ],
+                transitions: [
+                  {
+                    id: 'tr-p1',
+                    fromStateId: 'state-normal',
+                    toStateId: 'state-hyper',
+                    duration: 0.1,
+                    conditions: [{ inputId: 'inp-overload', operator: '==', value: true }]
+                  },
+                  {
+                    id: 'tr-p2',
+                    fromStateId: 'state-hyper',
+                    toStateId: 'state-normal',
+                    duration: 0.1,
+                    conditions: [{ inputId: 'inp-overload', operator: '==', value: false }]
+                  },
+                  {
+                    id: 'tr-p3',
+                    fromStateId: 'state-hyper',
+                    toStateId: 'state-vented',
+                    duration: 0.1,
+                    conditions: [{ inputId: 'trig-vent', operator: '==', value: true }]
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            id: 'sm-hud-alert',
+            name: 'HUD Alert Machine',
+            inputs: [
+              { id: 'inp-hud-warning', name: 'hudWarningActive', type: 'boolean', value: false }
+            ],
+            layers: [
+              {
+                id: 'layer-hud',
+                name: 'HUD Layer',
+                defaultStateId: 'state-hud-idle',
+                states: [
+                  {
+                    id: 'state-hud-idle',
+                    name: 'HUD Idle',
+                    type: 'animation',
+                    propertyOverrides: { 'action-trigger-btn': { fill: '#3b82f6' } }
+                  },
+                  {
+                    id: 'state-hud-alert',
+                    name: 'HUD Alert',
+                    type: 'animation',
+                    propertyOverrides: { 'action-trigger-btn': { fill: '#ef4444' } }
+                  }
+                ],
+                transitions: [
+                  {
+                    id: 'tr-h1',
+                    fromStateId: 'state-hud-idle',
+                    toStateId: 'state-hud-alert',
+                    duration: 0.1,
+                    conditions: [{ inputId: 'inp-hud-warning', operator: '==', value: true }]
+                  }
+                ]
+              }
+            ]
+          }
+        ],
+
+        // 2. Two Component Definitions (including childNodes hierarchy)
+        components: [
+          {
+            id: 'comp-shield-badge',
+            name: 'Shield Badge Component',
+            rootNode: {
+              id: 'comp-badge-root',
+              name: 'Badge Root',
+              type: 'rect',
+              visible: true,
+              locked: false,
+              x: 0,
+              y: 0,
+              width: 140,
+              height: 140,
+              rotation: 0,
+              scaleX: 1,
+              scaleY: 1,
+              opacity: 1,
+              fill: '#6366f1',
+              borderRadius: 16,
+              tracks: []
+            },
+            childNodes: [
+              {
+                id: 'badge-icon',
+                name: 'Badge Icon',
+                type: 'circle',
+                visible: true,
+                locked: false,
+                x: 35,
+                y: 35,
+                width: 70,
+                height: 70,
+                rotation: 0,
+                scaleX: 1,
+                scaleY: 1,
+                opacity: 1,
+                borderRadius: 0,
+                fill: '#ffffff',
+                tracks: []
+              }
+            ]
+          },
+          {
+            id: 'comp-energy-bar',
+            name: 'Energy Bar Component',
+            rootNode: {
+              id: 'comp-energy-root',
+              name: 'Energy Root',
+              type: 'rect',
+              visible: true,
+              locked: false,
+              x: 0,
+              y: 0,
+              width: 300,
+              height: 30,
+              rotation: 0,
+              scaleX: 1,
+              scaleY: 1,
+              opacity: 1,
+              borderRadius: 0,
+              fill: '#22c55e',
+              tracks: []
+            }
+          }
+        ],
+
+        // 3. Two Component Instances
+        componentInstances: [
+          {
+            id: 'inst-badge-alpha',
+            name: 'Shield Badge Alpha',
+            componentDefId: 'comp-shield-badge',
+            x: 800,
+            y: 100,
+            overrides: { fill: '#4f46e5' }
+          },
+          {
+            id: 'inst-energy-meter',
+            name: 'Main Energy Meter',
+            componentDefId: 'comp-energy-bar',
+            x: 800,
+            y: 300,
+            overrides: { scaleX: 1.0 }
+          }
+        ],
+
+        // 4. Two Data Bindings
+        bindings: [
+          {
+            id: 'bind-energy-level',
+            sourcePath: 'telemetry.energyScale',
+            targetNodeId: 'inst-energy-meter',
+            targetProperty: 'scaleX'
+          },
+          {
+            id: 'bind-status-label',
+            sourcePath: 'telemetry.statusText',
+            targetNodeId: 'status-display',
+            targetProperty: 'textContent'
+          }
+        ],
+
+        // 5. Two Constraints
+        constraints: [
+          {
+            id: 'constraint-distance',
+            type: 'distance',
+            ownerId: 'aim-pointer',
+            targetId: 'reactor-core',
+            strength: 1.0,
+            enabled: true
+          },
+          {
+            id: 'constraint-scale',
+            type: 'scale',
+            ownerId: 'status-display',
+            targetId: 'root-chassis',
+            strength: 1.0,
+            enabled: true
+          }
+        ],
+
+        // 6. Three Document-Defined Interactions
+        interactions: [
+          {
+            id: 'inter-hover-enter',
+            targetNodeId: 'action-trigger-btn',
+            event: 'pointerenter',
+            action: { type: 'setInput', inputName: 'isOverloaded', value: true }
+          },
+          {
+            id: 'inter-hover-leave',
+            targetNodeId: 'action-trigger-btn',
+            event: 'pointerleave',
+            action: { type: 'setInput', inputName: 'isOverloaded', value: false }
+          },
+          {
+            id: 'inter-click-vent',
+            targetNodeId: 'action-trigger-btn',
+            event: 'click',
+            action: { type: 'fireTrigger', triggerName: 'triggerVent' }
+          }
+        ],
+
+        // 7. Embedded Asset
+        assets: {
+          'reactor-texture': {
+            id: 'reactor-texture',
+            name: 'Reactor Glow Texture',
+            type: 'image',
+            mimeType: 'image/png',
+            dataUrl: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAYAAABytg0kAAAAEklEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg=='
+          }
+        }
+      };
+
+      // Step 1: Deep Schema Validation
+      const validation = validateDocument(closureDocument);
+      expect(validation.valid).toBe(true);
+      expect(validation.errors).toEqual([]);
+
+      // Step 2: Deterministic Serialization & Parsing
+      const serializedJson = serializeDocument(closureDocument, true);
+      expect(serializedJson).toContain('"schemaVersion": "2.0.0"');
+      expect(serializedJson).toContain('"componentInstances"');
+      expect(serializedJson).toContain('"reactor-texture"');
+
+      const reloadedDoc = parseDocument(serializedJson);
+      expect(reloadedDoc.componentInstances?.length).toBe(2);
+      expect(reloadedDoc.stateMachines?.length).toBe(2);
+      expect(reloadedDoc.bindings?.length).toBe(2);
+      expect(reloadedDoc.constraints?.length).toBe(2);
+
+      // Step 3: Standalone Runtime Initialization
+      const runtime = new OpenSVGRuntime(5.0, 60);
+      runtime.load(reloadedDoc);
+
+      // 3.1 Verify AssetStore loaded embedded texture
+      const assetStore = runtime.getAssetStore();
+      expect(assetStore.size).toBe(1);
+      expect(assetStore.getAsset('reactor-texture')?.status).toBe('ready');
+
+      // 3.2 Verify Component Instances & Child Hierarchy Materialized
+      let evalState = runtime.getEvaluatedSceneState();
+      expect(evalState.evaluatedNodes['inst-badge-alpha']).toBeDefined();
+      expect(evalState.evaluatedNodes['inst-badge-alpha'].fill).toBe('#4f46e5'); // applied override
+      expect(evalState.evaluatedNodes['inst-badge-alpha-child-badge-icon']).toBeDefined();
+      expect(evalState.evaluatedNodes['inst-energy-meter']).toBeDefined();
+
+      // 3.3 Verify Data Bindings Execution
+      runtime.setBindingValue('telemetry.energyScale', 0.65);
+      runtime.setBindingValue('telemetry.statusText', 'SYSTEM CRITICAL');
+      evalState = runtime.getEvaluatedSceneState();
+      expect(evalState.evaluatedNodes['inst-energy-meter'].scaleX).toBe(0.65);
+      expect(evalState.evaluatedNodes['status-display'].textContent).toBe('SYSTEM CRITICAL');
+
+      // 3.4 Verify Interaction Dispatches & Multi-State-Machine Transitions
+      // Initial Reactor fill is normal (#0ea5e9)
+      expect(evalState.evaluatedNodes['reactor-core'].fill).toBe('#0ea5e9');
+
+      // User hovers on action button -> 'isOverloaded: true' -> Reactor becomes Hypercharge (#f59e0b)
+      runtime.dispatchInteraction('action-trigger-btn', 'pointerenter');
+      runtime.advance(0.1);
+      evalState = runtime.getEvaluatedSceneState();
+      expect(evalState.evaluatedNodes['reactor-core'].fill).toBe('#f59e0b');
+
+      // User clicks action button -> 'triggerVent' -> Reactor becomes Vented (#10b981)
+      runtime.dispatchInteraction('action-trigger-btn', 'click');
+      runtime.advance(0.1);
+      evalState = runtime.getEvaluatedSceneState();
+      expect(evalState.evaluatedNodes['reactor-core'].fill).toBe('#10b981');
+
+      // User triggers HUD Warning on Second State Machine without disturbing Reactor
+      runtime.setBoolean('hudWarningActive', true);
+      runtime.advance(0.1);
+      evalState = runtime.getEvaluatedSceneState();
+      expect(evalState.evaluatedNodes['action-trigger-btn'].fill).toBe('#ef4444');
+      expect(evalState.evaluatedNodes['reactor-core'].fill).toBe('#10b981'); // Intact!
+
+      // 3.5 Verify Final Render Scene Completeness
+      const renderScene = runtime.getRenderState();
+      expect(renderScene.nodes.length).toBeGreaterThanOrEqual(7);
+      expect(renderScene.drawOrder.length).toBe(renderScene.nodes.length);
+      for (const node of renderScene.nodes) {
+        expect(node.worldTransform).toBeDefined();
+        expect(typeof node.opacity).toBe('number');
+      }
+    });
+  });
 });
+
 

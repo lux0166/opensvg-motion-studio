@@ -36,7 +36,7 @@ export interface EvaluationPipelineOptions {
   componentInstances?: ComponentInstance[];
   componentRegistry?: ComponentRegistry;
   dataBindingEngine?: DataBindingEngine;
-  stateMachineRuntime?: StateMachineRuntime;
+  stateMachineRuntime?: StateMachineRuntime | StateMachineRuntime[];
   externalPropertyOverrides?: Record<string, Partial<SceneNode>>;
 }
 
@@ -49,32 +49,35 @@ export function computeCanonicalWorldTransforms(
   nodeOrder: string[]
 ): Record<string, { worldTransform: Matrix2D; totalOpacity: number }> {
   const result: Record<string, { worldTransform: Matrix2D; totalOpacity: number }> = {};
-  const visiting = new Set<string>();
   const visited = new Set<string>();
+  const visiting = new Set<string>();
 
   function resolveNodeTransform(nodeId: string): { worldTransform: Matrix2D; totalOpacity: number } {
     if (visited.has(nodeId)) {
       return result[nodeId];
     }
 
-    const node = nodes[nodeId];
-    if (!node) {
-      const identity: Matrix2D = { a: 1, b: 0, c: 0, d: 1, e: 0, f: 0 };
-      return { worldTransform: identity, totalOpacity: 1 };
-    }
-
     if (visiting.has(nodeId)) {
       console.warn(`Hierarchy cycle detected for node: ${nodeId}; breaking cycle.`);
       const identity: Matrix2D = { a: 1, b: 0, c: 0, d: 1, e: 0, f: 0 };
-      return { worldTransform: identity, totalOpacity: 1 };
+      result[nodeId] = { worldTransform: identity, totalOpacity: 1 };
+      return result[nodeId];
     }
 
     visiting.add(nodeId);
+    const node = nodes[nodeId];
 
-    // Calculate local transform
+    if (!node) {
+      visiting.delete(nodeId);
+      visited.add(nodeId);
+      const identity: Matrix2D = { a: 1, b: 0, c: 0, d: 1, e: 0, f: 0 };
+      result[nodeId] = { worldTransform: identity, totalOpacity: 1 };
+      return result[nodeId];
+    }
+
     const localMatrix = composeTransform(
       {
-        translation: { x: node.x, y: node.y },
+        translation: { x: node.x || 0, y: node.y || 0 },
         rotation: node.rotation || 0,
         scale: { x: node.scaleX ?? 1, y: node.scaleY ?? 1 },
         pivot: { x: node.pivotX ?? 0.5, y: node.pivotY ?? 0.5 }
@@ -138,14 +141,18 @@ export function evaluateScenePipeline(
   let nodeOrder = [...(project.nodeOrder || Object.keys(originalNodes))];
   const workingNodes: Record<string, SceneNode> = { ...originalNodes };
 
-  // Phase 1: Component Instance Resolution
+  // Phase 1: Component Instance Resolution (with full child hierarchy)
   if (options.componentRegistry && options.componentInstances) {
     for (const inst of options.componentInstances) {
       try {
-        const resolvedNode = options.componentRegistry.resolveInstance(inst);
-        workingNodes[resolvedNode.id] = resolvedNode;
-        if (!nodeOrder.includes(resolvedNode.id)) {
-          nodeOrder.push(resolvedNode.id);
+        const resolvedNodes = options.componentRegistry.resolveInstanceHierarchy
+          ? options.componentRegistry.resolveInstanceHierarchy(inst)
+          : [options.componentRegistry.resolveInstance(inst)];
+        for (const resolvedNode of resolvedNodes) {
+          workingNodes[resolvedNode.id] = resolvedNode;
+          if (!nodeOrder.includes(resolvedNode.id)) {
+            nodeOrder.push(resolvedNode.id);
+          }
         }
       } catch (err) {
         console.warn(`Failed to resolve component instance ${inst.id}:`, err);
@@ -177,7 +184,12 @@ export function evaluateScenePipeline(
 
   // Phase 4: State Machine Runtime Evaluation (Consuming active state overrides & transition blending)
   if (options.stateMachineRuntime) {
-    applyStateMachineToScene(evaluatedMap, options.stateMachineRuntime);
+    const smRuntimes = Array.isArray(options.stateMachineRuntime)
+      ? options.stateMachineRuntime
+      : [options.stateMachineRuntime];
+    for (const smRuntime of smRuntimes) {
+      applyStateMachineToScene(evaluatedMap, smRuntime);
+    }
   }
 
   // Phase 5: External Property Overrides
@@ -226,7 +238,7 @@ export function evaluateScenePipeline(
   }
 
   // Phase 9: Derive Render State (pure mapping)
-  const renderScene = deriveRenderScene(project, evaluatedList, transformMap);
+  const renderScene = deriveRenderScene(project, evaluatedList, transformMap, nodeOrder);
 
   return {
     projectId: project.id,
