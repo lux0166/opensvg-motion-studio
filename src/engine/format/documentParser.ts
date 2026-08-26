@@ -26,9 +26,22 @@ function sortObjectKeys<T>(obj: T): T {
 /**
  * Validates structural integrity of an OpenSVG document payload with strict error & warning reporting
  */
-export function validateDocument(doc: any): DocumentValidationResult {
+export function validateDocument(docOrJson: any): DocumentValidationResult {
   const errors: string[] = [];
   const warnings: string[] = [];
+
+  let doc = docOrJson;
+  if (typeof docOrJson === 'string') {
+    try {
+      doc = JSON.parse(docOrJson);
+    } catch (err: any) {
+      return {
+        valid: false,
+        errors: [`JSON Syntax Error while validating document: ${err.message}`],
+        warnings: []
+      };
+    }
+  }
 
   if (!doc || typeof doc !== 'object') {
     return {

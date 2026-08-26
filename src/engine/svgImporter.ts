@@ -1,4 +1,4 @@
-﻿import { SceneNode, BezierPoint } from './types';
+import { SceneNode, BezierPoint } from './types';
 
 /**
  * Parses SVG path `d` attribute into BezierPoint array
@@ -104,7 +104,7 @@ export function importSvgString(svgText: string): SvgImportResult {
 
   elements.forEach((el, idx) => {
     const tagName = el.tagName.toLowerCase();
-    const id = `svg-node-${Date.now()}-${idx}`;
+    const id = el.getAttribute('id') || `svg-node-${Date.now()}-${idx}`;
     const fill = el.getAttribute('fill') || '#3b82f6';
     const stroke = el.getAttribute('stroke') || undefined;
     const strokeWidth = el.getAttribute('stroke-width') ? parseFloat(el.getAttribute('stroke-width')!) : undefined;
