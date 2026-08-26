@@ -73,7 +73,7 @@ describe('State Machine Runtime Pipeline Integration (Section 3 & 7)', () => {
             name: 'Idle State',
             type: 'animation',
             propertyOverrides: {
-              'status-badge': { fill: '#3b82f6', scaleX: 1.0 }
+              'status-badge': { fill: '#000000', scaleX: 1.0 }
             }
           },
           {
@@ -81,7 +81,7 @@ describe('State Machine Runtime Pipeline Integration (Section 3 & 7)', () => {
             name: 'Success State',
             type: 'animation',
             propertyOverrides: {
-              'status-badge': { fill: '#10b981', scaleX: 1.1 }
+              'status-badge': { fill: '#ffffff', scaleX: 2.0 }
             }
           },
           {
@@ -98,7 +98,7 @@ describe('State Machine Runtime Pipeline Integration (Section 3 & 7)', () => {
             id: 'tr-to-success',
             fromStateId: 'state-idle',
             toStateId: 'state-success',
-            duration: 0,
+            duration: 1.0, // 1 second smooth transition
             conditions: [{ inputId: 'inp-success', operator: '==', value: true }]
           },
           {
@@ -116,18 +116,38 @@ describe('State Machine Runtime Pipeline Integration (Section 3 & 7)', () => {
   it('directly drives EvaluatedSceneState properties when State Machine transitions states', () => {
     const sm = new StateMachineRuntime(smDef);
 
-    // Initial state: idle -> blue (#3b82f6)
+    // Initial state: idle -> fill: #000000, scaleX: 1.0
     const initialScene = evaluateScenePipeline(project, { time: 0, stateMachineRuntime: sm });
-    expect(initialScene.evaluatedNodes['status-badge'].fill).toBe('#3b82f6');
+    expect(initialScene.evaluatedNodes['status-badge'].fill).toBe('#000000');
     expect(initialScene.evaluatedNodes['status-badge'].scaleX).toBe(1.0);
 
-    // Trigger state transition: isSuccess = true
-    sm.setInput('isSuccess', true);
+    // Trigger state transition: isError = true (0s duration)
+    sm.setInput('isError', true);
     sm.advance(0.016);
 
-    const successScene = evaluateScenePipeline(project, { time: 0.016, stateMachineRuntime: sm });
-    expect(successScene.evaluatedNodes['status-badge'].fill).toBe('#10b981');
-    expect(successScene.evaluatedNodes['status-badge'].scaleX).toBe(1.1);
+    const errorScene = evaluateScenePipeline(project, { time: 0.016, stateMachineRuntime: sm });
+    expect(errorScene.evaluatedNodes['status-badge'].fill).toBe('#ef4444');
+    expect(errorScene.evaluatedNodes['status-badge'].scaleX).toBe(0.95);
+  });
+
+  it('smoothly blends properties between previous and next state during transition', () => {
+    const sm = new StateMachineRuntime(smDef);
+
+    // Trigger transition with 1.0s duration to success state (from #000000, scaleX: 1.0 to #ffffff, scaleX: 2.0)
+    sm.setInput('isSuccess', true);
+    sm.advance(0.5); // 50% transition progress
+
+    const midScene = evaluateScenePipeline(project, { time: 0.5, stateMachineRuntime: sm });
+    // ScaleX at 50% must be 1.0 + (2.0 - 1.0) * 0.5 = 1.5
+    expect(midScene.evaluatedNodes['status-badge'].scaleX).toBeCloseTo(1.5, 2);
+    // Color at 50% between #000000 and #ffffff must be #808080 (128, 128, 128)
+    expect(midScene.evaluatedNodes['status-badge'].fill).toBe('#808080');
+
+    // Complete transition to 1.0s
+    sm.advance(0.5);
+    const completedScene = evaluateScenePipeline(project, { time: 1.0, stateMachineRuntime: sm });
+    expect(completedScene.evaluatedNodes['status-badge'].scaleX).toBe(2.0);
+    expect(completedScene.evaluatedNodes['status-badge'].fill).toBe('#ffffff');
   });
 
   it('seeks state machine deterministically forward and backward keeping state in sync with clock', () => {

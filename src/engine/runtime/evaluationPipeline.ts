@@ -4,6 +4,7 @@ import { Constraint, solveAllConstraints } from '../constraints/constraintSolver
 import { ComponentRegistry, ComponentInstance } from '../components/componentSystem';
 import { DataBindingEngine } from '../binding/dataBinding';
 import { StateMachineRuntime } from '../stateMachine/runtimeStateMachine';
+import { applyStateMachineToScene } from '../stateMachine/stateEvaluator';
 import { composeTransform, multiplyMatrices } from '../transform/matrix2D';
 import { deriveRenderScene } from './renderState';
 import { RenderScene, RenderNodeState, Matrix2D } from './coreContracts';
@@ -174,25 +175,9 @@ export function evaluateScenePipeline(
     }
   }
 
-  // Phase 4: State Machine Runtime Evaluation (Consuming active state overrides directly)
+  // Phase 4: State Machine Runtime Evaluation (Consuming active state overrides & transition blending)
   if (options.stateMachineRuntime) {
-    const def = options.stateMachineRuntime.getDefinition();
-    for (const layer of def.layers) {
-      const layerState = options.stateMachineRuntime.getLayerState(layer.id);
-      if (layerState) {
-        const activeState = layer.states.find((s) => s.id === layerState.currentStateId);
-        if (activeState && activeState.propertyOverrides) {
-          for (const [nodeId, overrides] of Object.entries(activeState.propertyOverrides)) {
-            if (evaluatedMap[nodeId]) {
-              evaluatedMap[nodeId] = {
-                ...evaluatedMap[nodeId],
-                ...overrides
-              };
-            }
-          }
-        }
-      }
-    }
+    applyStateMachineToScene(evaluatedMap, options.stateMachineRuntime);
   }
 
   // Phase 5: External Property Overrides
