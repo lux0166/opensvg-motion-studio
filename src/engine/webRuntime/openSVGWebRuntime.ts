@@ -19,7 +19,7 @@ export type WebRuntimeEventListener = (eventType: string, payload: any) => void;
  * OpenSVG Web Runtime Adapter
  * Standardized per OPENSVG_CURRENT_STRATEGIC_ROADMAP.md (Section 1 & 13)
  * INVARIANT: OpenSVGWebRuntime is a thin adapter around OpenSVGRuntime.
- * It does NOT duplicate evaluation, state machine, or playback ownership.
+ * Pointer interaction drives StateMachine inputs & triggers, producing responsive animations.
  */
 export class OpenSVGWebRuntime {
   private runtime: OpenSVGRuntime;
@@ -31,6 +31,7 @@ export class OpenSVGWebRuntime {
   private lastTimestamp: number = 0;
   private options: Required<WebRuntimeOptions>;
   private isMounted: boolean = false;
+  private hoveredNodeId: string | null = null;
 
   // Pointer event listeners bound to canvas
   private boundPointerDown?: (e: PointerEvent) => void;
@@ -220,11 +221,11 @@ export class OpenSVGWebRuntime {
   }
 
   private bindInteractions(canvas: HTMLCanvasElement): void {
-    this.boundPointerDown = (e) => this.handlePointerEvent('onHoverEnter', e);
-    this.boundPointerUp = (e) => this.handlePointerEvent('onHoverLeave', e);
-    this.boundPointerMove = (e) => this.handlePointerEvent('onHoverEnter', e);
-    this.boundPointerLeave = (e) => this.handlePointerEvent('onHoverLeave', e);
-    this.boundClick = (e) => this.handlePointerEvent('onClick', e);
+    this.boundPointerDown = (e) => this.handlePointerDown(e);
+    this.boundPointerUp = (e) => this.handlePointerUp(e);
+    this.boundPointerMove = (e) => this.handlePointerMove(e);
+    this.boundPointerLeave = (e) => this.handlePointerLeave(e);
+    this.boundClick = (e) => this.handleClick(e);
 
     canvas.addEventListener('pointerdown', this.boundPointerDown);
     canvas.addEventListener('pointerup', this.boundPointerUp);
@@ -241,24 +242,125 @@ export class OpenSVGWebRuntime {
     if (this.boundClick) canvas.removeEventListener('click', this.boundClick);
   }
 
-  private handlePointerEvent(eventType: 'onClick' | 'onHoverEnter' | 'onHoverLeave', event: MouseEvent | PointerEvent): void {
-    if (!this.canvas) return;
-
+  private getScenePoint(event: MouseEvent | PointerEvent) {
+    if (!this.canvas) return null;
     const sceneState = this.runtime.getEvaluatedSceneState();
     const viewport = sceneState.renderScene.viewport;
 
     const canvasPt = screenToCanvasPoint(event.clientX, event.clientY, this.canvas);
     const scenePt = canvasToScenePoint(canvasPt, viewport.width, viewport.height, this.canvas);
 
-    // Precise SVG Geometry Hit Testing in topological Z-order
-    const hitNode = hitTestScene(sceneState, scenePt);
+    return { scenePt, sceneState };
+  }
+
+  private handlePointerDown(event: PointerEvent): void {
+    const data = this.getScenePoint(event);
+    if (!data) return;
+
+    const hitNode = hitTestScene(data.sceneState, data.scenePt);
+    if (hitNode) {
+      this.runtime.setBoolean('isPressed', true);
+      this.runtime.setBoolean('pressed', true);
+      this.runtime.fireTrigger('onPointerDown');
+      this.runtime.fireTrigger('press');
+
+      this.emitEvent('nodeInteraction', {
+        nodeId: hitNode.id,
+        nodeName: hitNode.name,
+        eventType: 'onPointerDown',
+        x: data.scenePt.x,
+        y: data.scenePt.y
+      });
+    }
+  }
+
+  private handlePointerUp(event: PointerEvent): void {
+    const data = this.getScenePoint(event);
+    if (!data) return;
+
+    this.runtime.setBoolean('isPressed', false);
+    this.runtime.setBoolean('pressed', false);
+    this.runtime.fireTrigger('onPointerUp');
+
+    const hitNode = hitTestScene(data.sceneState, data.scenePt);
     if (hitNode) {
       this.emitEvent('nodeInteraction', {
         nodeId: hitNode.id,
         nodeName: hitNode.name,
-        eventType,
-        x: scenePt.x,
-        y: scenePt.y
+        eventType: 'onPointerUp',
+        x: data.scenePt.x,
+        y: data.scenePt.y
+      });
+    }
+  }
+
+  private handlePointerMove(event: PointerEvent): void {
+    const data = this.getScenePoint(event);
+    if (!data) return;
+
+    const hitNode = hitTestScene(data.sceneState, data.scenePt);
+    const currentHitId = hitNode ? hitNode.id : null;
+
+    if (currentHitId !== this.hoveredNodeId) {
+      if (this.hoveredNodeId && !currentHitId) {
+        // Hover leave
+        this.runtime.setBoolean('isHovered', false);
+        this.runtime.setBoolean('hover', false);
+        this.runtime.fireTrigger('onHoverLeave');
+        this.emitEvent('nodeInteraction', {
+          nodeId: this.hoveredNodeId,
+          eventType: 'onHoverLeave',
+          x: data.scenePt.x,
+          y: data.scenePt.y
+        });
+      }
+
+      if (currentHitId) {
+        // Hover enter
+        this.runtime.setBoolean('isHovered', true);
+        this.runtime.setBoolean('hover', true);
+        this.runtime.fireTrigger('onHoverEnter');
+        this.emitEvent('nodeInteraction', {
+          nodeId: currentHitId,
+          nodeName: hitNode!.name,
+          eventType: 'onHoverEnter',
+          x: data.scenePt.x,
+          y: data.scenePt.y
+        });
+      }
+
+      this.hoveredNodeId = currentHitId;
+    }
+  }
+
+  private handlePointerLeave(_event?: PointerEvent): void {
+    if (this.hoveredNodeId) {
+      this.runtime.setBoolean('isHovered', false);
+      this.runtime.setBoolean('hover', false);
+      this.runtime.setBoolean('isPressed', false);
+      this.runtime.fireTrigger('onHoverLeave');
+      this.emitEvent('nodeInteraction', {
+        nodeId: this.hoveredNodeId,
+        eventType: 'onHoverLeave'
+      });
+      this.hoveredNodeId = null;
+    }
+  }
+
+  private handleClick(event: MouseEvent): void {
+    const data = this.getScenePoint(event);
+    if (!data) return;
+
+    const hitNode = hitTestScene(data.sceneState, data.scenePt);
+    if (hitNode) {
+      this.runtime.fireTrigger('onClick');
+      this.runtime.fireTrigger('click');
+      this.emitEvent('nodeInteraction', {
+        nodeId: hitNode.id,
+        nodeName: hitNode.name,
+        eventType: 'onClick',
+        x: data.scenePt.x,
+        y: data.scenePt.y
       });
     }
   }

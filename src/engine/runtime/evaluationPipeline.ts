@@ -40,7 +40,8 @@ export interface EvaluationPipelineOptions {
 }
 
 /**
- * Resolves world transforms for all nodes in topological hierarchy order with cycle detection (Rule CORE-02 & P1)
+ * Resolves world transforms for all nodes in topological hierarchy order with visited-set cycle detection (Rule CORE-02 & P1)
+ * Invariant: No artificial depth limit (arbitrarily deep hierarchy is supported safely).
  */
 export function computeCanonicalWorldTransforms(
   nodes: Record<string, SceneNode>,
@@ -50,13 +51,13 @@ export function computeCanonicalWorldTransforms(
   const visiting = new Set<string>();
   const visited = new Set<string>();
 
-  function resolveNodeTransform(nodeId: string, depth: number = 0): { worldTransform: Matrix2D; totalOpacity: number } {
+  function resolveNodeTransform(nodeId: string): { worldTransform: Matrix2D; totalOpacity: number } {
     if (visited.has(nodeId)) {
       return result[nodeId];
     }
 
     const node = nodes[nodeId];
-    if (!node || depth > 30) {
+    if (!node) {
       const identity: Matrix2D = { a: 1, b: 0, c: 0, d: 1, e: 0, f: 0 };
       return { worldTransform: identity, totalOpacity: 1 };
     }
@@ -85,7 +86,7 @@ export function computeCanonicalWorldTransforms(
     let totalOpacity = node.opacity ?? 1;
 
     if (node.parentId && nodes[node.parentId]) {
-      const parentResult = resolveNodeTransform(node.parentId, depth + 1);
+      const parentResult = resolveNodeTransform(node.parentId);
       worldTransform = multiplyMatrices(parentResult.worldTransform, localMatrix);
       totalOpacity *= parentResult.totalOpacity;
     }
@@ -119,10 +120,11 @@ export function computeCanonicalWorldTransforms(
  * 2. Component / Instance Resolution (ComponentRegistry)
  * 3. Animation Track Evaluation (Keyframes / Spring / Motion Path)
  * 4. Data Binding Resolution (DataBindingEngine)
- * 5. State Machine / External Property Overrides
- * 6. Constraint Solver Execution (with cycle breaking)
- * 7. Canonical World Transform Resolution (topological hierarchy)
- * 8. Evaluated Scene State & Render Scene Derivation
+ * 5. State Machine Runtime Active State Resolution (StateMachineRuntime)
+ * 6. External Property Overrides
+ * 7. Constraint Solver Execution (with cycle breaking)
+ * 8. Canonical World Transform Resolution (topological hierarchy)
+ * 9. Evaluated Scene State & Render Scene Derivation
  * 
  * INVARIANT: Zero mutation of input SceneProject during evaluation.
  */
@@ -172,7 +174,28 @@ export function evaluateScenePipeline(
     }
   }
 
-  // Phase 4: State Machine / External Property Overrides
+  // Phase 4: State Machine Runtime Evaluation (Consuming active state overrides directly)
+  if (options.stateMachineRuntime) {
+    const def = options.stateMachineRuntime.getDefinition();
+    for (const layer of def.layers) {
+      const layerState = options.stateMachineRuntime.getLayerState(layer.id);
+      if (layerState) {
+        const activeState = layer.states.find((s) => s.id === layerState.currentStateId);
+        if (activeState && activeState.propertyOverrides) {
+          for (const [nodeId, overrides] of Object.entries(activeState.propertyOverrides)) {
+            if (evaluatedMap[nodeId]) {
+              evaluatedMap[nodeId] = {
+                ...evaluatedMap[nodeId],
+                ...overrides
+              };
+            }
+          }
+        }
+      }
+    }
+  }
+
+  // Phase 5: External Property Overrides
   if (options.externalPropertyOverrides) {
     for (const [nodeId, overrides] of Object.entries(options.externalPropertyOverrides)) {
       if (evaluatedMap[nodeId]) {
@@ -184,16 +207,16 @@ export function evaluateScenePipeline(
     }
   }
 
-  // Phase 5: Constraint Solving
+  // Phase 6: Constraint Solving
   if (options.constraints && options.constraints.length > 0) {
     const solvedMap = solveAllConstraints(evaluatedMap, options.constraints);
     Object.assign(evaluatedMap, solvedMap);
   }
 
-  // Phase 6: Canonical World Transform Resolution
+  // Phase 7: Canonical World Transform Resolution
   const transformMap = computeCanonicalWorldTransforms(evaluatedMap, nodeOrder);
 
-  // Phase 7: Build EvaluatedNodeStates and evaluated node list
+  // Phase 8: Build EvaluatedNodeStates and evaluated node list
   const nodeStates: Record<string, EvaluatedNodeState> = {};
   const evaluatedList: SceneNode[] = [];
 
@@ -217,7 +240,7 @@ export function evaluateScenePipeline(
     }
   }
 
-  // Phase 8: Derive Render State
+  // Phase 9: Derive Render State (pure mapping)
   const renderScene = deriveRenderScene(project, evaluatedList, transformMap);
 
   return {

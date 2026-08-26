@@ -1,3 +1,5 @@
+import { SceneNode } from '../types';
+
 /**
  * OpenSVG State Machine Runtime v2
  * Adheres strictly to CORE_ENGINE_DEPTH.md (Section 8) & RUNTIME_FOUNDATION_IMPLEMENTATION_PLAN.md (CORE-06)
@@ -24,6 +26,7 @@ export interface MachineState {
   type: StateType;
   timelineId?: string;
   duration?: number;
+  propertyOverrides?: Record<string, Partial<SceneNode>>;
 }
 
 export type ConditionOperator = '==' | '!=' | '>' | '<' | '>=' | '<=' | 'fired';
@@ -73,9 +76,6 @@ export interface ReplayEvent {
   value?: any;
 }
 
-/**
- * State Machine Runtime v2 Kernel
- */
 export class StateMachineRuntime {
   private definition: StateMachineDefinition;
   private inputs: Map<string, StateMachineInput> = new Map();
@@ -167,7 +167,6 @@ export class StateMachineRuntime {
 
       // Handle ongoing transition
       if (state.isTransitioning) {
-        // Find transition duration
         const trans = layer.transitions.find(
           (t) => t.fromStateId === state.previousStateId && t.toStateId === state.currentStateId
         );
@@ -201,17 +200,45 @@ export class StateMachineRuntime {
       }
     }
 
-    // Reset fired triggers at the end of advance frame
+    // Reset trigger inputs after transition evaluation
     for (const inp of this.inputs.values()) {
-      if (inp.type === 'trigger') {
+      if (inp.type === 'trigger' && inp.fired) {
         inp.fired = false;
       }
     }
   }
 
   /**
-   * Evaluates all transition conditions
+   * Seeks state machine deterministically to time t by replaying recorded events
    */
+  public seek(targetTime: number, stepDt: number = 0.016): void {
+    const savedEvents = [...this.recordedEvents];
+    this.reset();
+
+    let t = 0;
+    let eventIdx = 0;
+
+    while (t <= targetTime) {
+      while (eventIdx < savedEvents.length && savedEvents[eventIdx].timestamp <= t) {
+        const ev = savedEvents[eventIdx];
+        if (ev.action === 'setInput' && ev.value !== undefined) {
+          const input = this.inputs.get(ev.inputId);
+          if (input) input.value = ev.value;
+        } else if (ev.action === 'fireTrigger') {
+          const input = this.inputs.get(ev.inputId);
+          if (input) input.fired = true;
+        }
+        eventIdx++;
+      }
+
+      this.advance(stepDt);
+      t += stepDt;
+    }
+
+    this.currentTime = targetTime;
+    this.recordedEvents = savedEvents;
+  }
+
   private evaluateConditions(conditions: TransitionCondition[]): boolean {
     if (!conditions || conditions.length === 0) return true;
 
@@ -254,6 +281,18 @@ export class StateMachineRuntime {
    */
   public getLayerState(layerId: string): LayerRuntimeState | undefined {
     return this.layerStates.get(layerId);
+  }
+
+  public getLayerStates(): Map<string, LayerRuntimeState> {
+    return this.layerStates;
+  }
+
+  public getDefinition(): StateMachineDefinition {
+    return this.definition;
+  }
+
+  public getCurrentTime(): number {
+    return this.currentTime;
   }
 
   /**

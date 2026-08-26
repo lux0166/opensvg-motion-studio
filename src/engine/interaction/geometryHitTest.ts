@@ -1,7 +1,8 @@
 import { EvaluatedSceneState, EvaluatedNodeState } from '../runtime/evaluationPipeline';
-import { SceneNode } from '../types';
+import { SceneNode, BezierPoint } from '../types';
 import { Vec2, Matrix2D } from '../runtime/coreContracts';
 import { invertMatrix, transformPoint } from '../transform/matrix2D';
+import { evalCubicBezier } from '../geometry/geometryCore';
 
 export interface HitTestOptions {
   ignoreLocked?: boolean;
@@ -101,7 +102,7 @@ export function isPointInCircle(localPoint: Vec2, width: number, height: number)
 }
 
 /**
- * Ray-casting algorithm for polygon containment test
+ * Ray-casting algorithm for polygon containment test (Jordan Curve Theorem)
  */
 export function isPointInPolygon(point: Vec2, polygonPoints: Vec2[]): boolean {
   let inside = false;
@@ -121,23 +122,54 @@ export function isPointInPolygon(point: Vec2, polygonPoints: Vec2[]): boolean {
 }
 
 /**
- * Hit test for bezier path points and compound sub-paths
+ * Flattens a cubic Bezier path into fine linear polygon segments using Geometry Core
+ */
+export function flattenBezierPath(points: BezierPoint[], samplesPerSegment: number = 10): Vec2[] {
+  if (!points || points.length < 2) return [];
+
+  const flattened: Vec2[] = [{ x: points[0].x, y: points[0].y }];
+
+  for (let i = 1; i < points.length; i++) {
+    const p0 = points[i - 1];
+    const p3 = points[i];
+
+    const cp1: Vec2 = { x: p0.cp2x ?? p0.x, y: p0.cp2y ?? p0.y };
+    const cp2: Vec2 = { x: p3.cp1x ?? p3.x, y: p3.cp1y ?? p3.y };
+
+    const isLinear = cp1.x === p0.x && cp1.y === p0.y && cp2.x === p3.x && cp2.y === p3.y;
+
+    if (isLinear) {
+      flattened.push({ x: p3.x, y: p3.y });
+    } else {
+      for (let s = 1; s <= samplesPerSegment; s++) {
+        const t = s / samplesPerSegment;
+        const pt = evalCubicBezier(p0, cp1, cp2, p3, t);
+        flattened.push(pt);
+      }
+    }
+  }
+
+  return flattened;
+}
+
+/**
+ * Exact hit testing for Bezier paths and compound sub-paths using true cubic Bezier flattening
  */
 export function isPointInPathGeometry(
   localPoint: Vec2,
-  pathPoints?: any[],
-  subPaths?: any[][],
+  pathPoints?: BezierPoint[],
+  subPaths?: BezierPoint[][],
   fillRule: 'nonzero' | 'evenodd' = 'nonzero'
 ): boolean {
-  const pathsToTest: any[][] = subPaths && subPaths.length > 0 ? subPaths : pathPoints ? [pathPoints] : [];
+  const pathsToTest: BezierPoint[][] = subPaths && subPaths.length > 0 ? subPaths : pathPoints ? [pathPoints] : [];
   if (pathsToTest.length === 0) return false;
 
   let totalCrossings = 0;
 
   for (const pts of pathsToTest) {
-    if (!pts || pts.length < 3) continue;
-    const poly: Vec2[] = pts.map((p) => ({ x: p.x, y: p.y }));
-    if (isPointInPolygon(localPoint, poly)) {
+    if (!pts || pts.length < 2) continue;
+    const flattenedPoly = flattenBezierPath(pts, 12);
+    if (flattenedPoly.length >= 3 && isPointInPolygon(localPoint, flattenedPoly)) {
       totalCrossings++;
     }
   }
