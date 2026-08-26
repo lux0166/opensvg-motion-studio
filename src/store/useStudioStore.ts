@@ -10,8 +10,11 @@ import { scaleKeyframes, reverseKeyframes, createKeyframeClipboard, pasteKeyfram
 import { WorkspaceLayoutState, WORKSPACE_PRESETS, PanelId, SnapPosition, DockContainer, ActiveDraggingState, DragHoverTargetState } from '../engine/workspaceTypes';
 import { DocumentInteraction } from '../engine/interaction/interactionModel';
 import { StateMachineDefinition } from '../engine/stateMachine/runtimeStateMachine';
-import { OpenSVGDocument } from '../engine/format/nativeDocument';
+import { OpenSVGDocument, AssetManifestEntry } from '../engine/format/nativeDocument';
 import { serializeDocument, parseDocument } from '../engine/format/documentParser';
+import { Constraint } from '../engine/constraints/constraintSolver';
+import { DataBinding } from '../engine/binding/dataBinding';
+import { ComponentDefinition, ComponentInstance } from '../engine/components/componentSystem';
 
 function pushDraftSnapshot(state: any) {
   const snap = createStudioSnapshot(state.rootFrame, state.nodes, state.nodeOrder);
@@ -293,6 +296,21 @@ interface StudioState {
   removeStateMachine: (id: string) => void;
   setStateMachines: (sms: StateMachineDefinition[]) => void;
 
+  constraints: Constraint[];
+  setConstraints: (constraints: Constraint[]) => void;
+
+  bindings: DataBinding[];
+  setBindings: (bindings: DataBinding[]) => void;
+
+  components: ComponentDefinition[];
+  setComponents: (components: ComponentDefinition[]) => void;
+
+  componentInstances: ComponentInstance[];
+  setComponentInstances: (instances: ComponentInstance[]) => void;
+
+  assets: Record<string, AssetManifestEntry>;
+  setAssets: (assets: Record<string, AssetManifestEntry>) => void;
+
   // Native OpenSVG Document Serialization & Deserialization
   exportOpenSVGDocument: () => string;
   loadOpenSVGDocument: (osvgOrDoc: string | OpenSVGDocument) => void;
@@ -376,6 +394,17 @@ export const useStudioStore = create<StudioState>()(
 
     interactions: [],
     stateMachines: [],
+    constraints: [],
+    bindings: [],
+    components: [],
+    componentInstances: [],
+    assets: {},
+
+    setConstraints: (constraints) => set({ constraints }),
+    setBindings: (bindings) => set({ bindings }),
+    setComponents: (components) => set({ components }),
+    setComponentInstances: (componentInstances) => set({ componentInstances }),
+    setAssets: (assets) => set({ assets }),
 
     // History implementation
     pushSnapshot: () =>
@@ -1509,7 +1538,12 @@ export const useStudioStore = create<StudioState>()(
         nodes: state.nodes,
         nodeOrder: state.nodeOrder,
         stateMachines: state.stateMachines.length > 0 ? state.stateMachines : undefined,
-        interactions: state.interactions.length > 0 ? state.interactions : undefined
+        interactions: state.interactions.length > 0 ? state.interactions : undefined,
+        constraints: state.constraints.length > 0 ? state.constraints : undefined,
+        bindings: state.bindings.length > 0 ? state.bindings : undefined,
+        components: state.components.length > 0 ? state.components : undefined,
+        componentInstances: state.componentInstances.length > 0 ? state.componentInstances : undefined,
+        assets: Object.keys(state.assets).length > 0 ? state.assets : undefined
       };
       return serializeDocument(doc, true);
     },
@@ -1549,6 +1583,11 @@ export const useStudioStore = create<StudioState>()(
         state.nodeOrder = [...doc.nodeOrder];
         state.stateMachines = doc.stateMachines ? [...doc.stateMachines] : [];
         state.interactions = doc.interactions ? [...doc.interactions] : [];
+        state.constraints = doc.constraints ? [...doc.constraints] : [];
+        state.bindings = doc.bindings ? [...doc.bindings] : [];
+        state.components = doc.components ? [...doc.components] : [];
+        state.componentInstances = doc.componentInstances ? [...doc.componentInstances] : [];
+        state.assets = doc.assets ? { ...doc.assets } : {};
         state.selectedId = state.nodeOrder[0] || null;
         state.selectedIds = state.selectedId ? [state.selectedId] : [];
         state.toastMessage = `Loaded OpenSVG: ${doc.metadata.title || 'Document'}`;

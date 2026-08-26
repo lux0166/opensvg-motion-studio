@@ -1,6 +1,6 @@
 import React, { useRef, useEffect, useState, useMemo } from 'react';
 import { useStudioStore } from '../store/useStudioStore';
-import { evaluateScenePipeline } from '../engine/runtime/evaluationPipeline';
+import { studioRuntimeOwner } from '../engine/studio/studioRuntimeOwner';
 import { renderCanvasScene, MarqueeRect } from '../engine/renderer';
 import { computeSnapping } from '../engine/snapping';
 import { importSvgString } from '../engine/svgImporter';
@@ -14,6 +14,13 @@ export const Canvas: React.FC = () => {
     duration,
     fps,
     currentTime,
+    stateMachines,
+    interactions,
+    constraints,
+    bindings,
+    components,
+    componentInstances,
+    assets,
     selectedId,
     selectedIds,
     setSelectedId,
@@ -47,6 +54,7 @@ export const Canvas: React.FC = () => {
   const [marqueeRect, setMarqueeRect] = useState<MarqueeRect | null>(null);
   const [editingTextId, setEditingTextId] = useState<string | null>(null);
   const [isDraggingFile, setIsDraggingFile] = useState(false);
+  const [hoveredNodeId, setHoveredNodeId] = useState<string | null>(null);
 
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
@@ -71,28 +79,61 @@ export const Canvas: React.FC = () => {
     };
   }, []);
 
+  // Synchronize full document semantics with StudioRuntimeOwner
+  useEffect(() => {
+    studioRuntimeOwner.syncStudioDocument({
+      rootFrame,
+      nodes,
+      nodeOrder,
+      duration,
+      fps,
+      stateMachines,
+      interactions,
+      constraints,
+      bindings,
+      components,
+      componentInstances,
+      assets
+    });
+  }, [
+    rootFrame,
+    nodes,
+    nodeOrder,
+    duration,
+    fps,
+    stateMachines,
+    interactions,
+    constraints,
+    bindings,
+    components,
+    componentInstances,
+    assets
+  ]);
+
   // Canonical runtime evaluation pipeline for Studio Canvas Preview
   const evaluatedScene = useMemo(() => {
-    return evaluateScenePipeline(
-      {
-        id: 'studio-preview-project',
-        name: rootFrame.name,
-        version: '2.0.0',
-        duration,
-        fps,
-        rootFrame,
-        nodes,
-        nodeOrder
-      },
-      {
-        time: currentTime
-      }
-    );
-  }, [rootFrame, nodes, nodeOrder, duration, fps, currentTime]);
+    return studioRuntimeOwner.getEvaluatedSceneState(currentTime);
+  }, [
+    rootFrame,
+    nodes,
+    nodeOrder,
+    duration,
+    fps,
+    currentTime,
+    stateMachines,
+    interactions,
+    constraints,
+    bindings,
+    components,
+    componentInstances,
+    assets
+  ]);
 
-  const evaluatedNodes = evaluatedScene.nodeOrder
-    .map((id) => evaluatedScene.evaluatedNodes[id])
-    .filter(Boolean);
+  const evaluatedNodes: import('../engine/types').SceneNode[] = (
+    evaluatedScene.nodeOrder
+      .map((id: string) => evaluatedScene.evaluatedNodes[id])
+      .filter(Boolean) as import('../engine/types').SceneNode[]
+  );
 
   // Render Loop on Canvas 2D
   useEffect(() => {
@@ -261,6 +302,8 @@ export const Canvas: React.FC = () => {
     }
 
     if (clickedId) {
+      studioRuntimeOwner.dispatchInteraction(clickedId, 'pointerdown');
+      studioRuntimeOwner.dispatchInteraction(clickedId, 'click');
 
       if (e.shiftKey) {
         toggleSelectId(clickedId, true);
@@ -277,6 +320,50 @@ export const Canvas: React.FC = () => {
       }
       // Activate Marquee Drag Selection
       initMarqueeDrag(e, mouseX, mouseY);
+    }
+  };
+
+  const handleMouseMove = (e: React.MouseEvent) => {
+    if (isPanning) {
+      setPan(e.clientX - panStart.x, e.clientY - panStart.y);
+      return;
+    }
+
+    // Hover hit test & interaction dispatch
+    const rect = canvasRef.current?.getBoundingClientRect();
+    if (!rect) return;
+    const mouseX = Math.round((e.clientX - rect.left) / zoom);
+    const mouseY = Math.round((e.clientY - rect.top) / zoom);
+
+    let currentHitId: string | null = null;
+    for (let i = evaluatedNodes.length - 1; i >= 0; i--) {
+      const n = evaluatedNodes[i];
+      if (
+        mouseX >= n.x &&
+        mouseX <= n.x + n.width &&
+        mouseY >= n.y &&
+        mouseY <= n.y + n.height
+      ) {
+        currentHitId = n.id;
+        break;
+      }
+    }
+
+    if (currentHitId !== hoveredNodeId) {
+      if (hoveredNodeId) {
+        studioRuntimeOwner.dispatchInteraction(hoveredNodeId, 'pointerleave');
+      }
+      if (currentHitId) {
+        studioRuntimeOwner.dispatchInteraction(currentHitId, 'pointerenter');
+      }
+      setHoveredNodeId(currentHitId);
+    }
+  };
+
+  const handleMouseUp = () => {
+    setIsPanning(false);
+    if (hoveredNodeId) {
+      studioRuntimeOwner.dispatchInteraction(hoveredNodeId, 'pointerup');
     }
   };
 
@@ -627,15 +714,7 @@ export const Canvas: React.FC = () => {
     window.addEventListener('mouseup', onUp);
   };
 
-  const handleMouseMove = (e: React.MouseEvent) => {
-    if (isPanning) {
-      setPan(e.clientX - panStart.x, e.clientY - panStart.y);
-    }
-  };
 
-  const handleMouseUp = () => {
-    setIsPanning(false);
-  };
 
   const handleWheel = (e: React.WheelEvent) => {
     if (e.ctrlKey || e.metaKey) {

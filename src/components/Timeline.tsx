@@ -1,6 +1,6 @@
-import React, { useRef, useEffect } from 'react';
+import React, { useRef, useEffect, useMemo } from 'react';
 import { useStudioStore } from '../store/useStudioStore';
-import { RuntimeClock } from '../engine/runtime/runtimeClock';
+import { studioRuntimeOwner } from '../engine/studio/studioRuntimeOwner';
 import {
   Gem,
   Sparkles,
@@ -61,13 +61,15 @@ export const Timeline: React.FC = () => {
     }
   }, [currentTime]);
 
-  // Playback Loop driven directly by canonical RuntimeClock
+  // Playback Loop driven directly by canonical studioRuntimeOwner
   useEffect(() => {
-    if (!isPlaying) return;
+    if (!isPlaying) {
+      studioRuntimeOwner.pause();
+      return;
+    }
 
-    const clock = new RuntimeClock(duration, 60, loop ? 'loop' : 'once');
-    clock.seek(currentTime);
-    clock.play();
+    studioRuntimeOwner.seek(currentTime);
+    studioRuntimeOwner.play();
 
     let animId: number;
     let lastTime = performance.now();
@@ -76,11 +78,11 @@ export const Timeline: React.FC = () => {
       const dt = (now - lastTime) / 1000;
       lastTime = now;
 
-      clock.advance(dt);
-      const nextTime = clock.getCurrentTime();
+      studioRuntimeOwner.advance(dt);
+      const nextTime = studioRuntimeOwner.getCurrentTime();
       setCurrentTime(nextTime);
 
-      if (!clock.getIsPlaying()) {
+      if (!studioRuntimeOwner.getIsPlaying()) {
         setPlaying(false);
       } else {
         animId = requestAnimationFrame(loopFn);
@@ -93,6 +95,22 @@ export const Timeline: React.FC = () => {
       if (animId) cancelAnimationFrame(animId);
     };
   }, [isPlaying, duration, loop]);
+
+  const rulerTicks = useMemo(() => {
+    const d = Math.max(0.1, duration);
+    let step = 0.5;
+    if (d <= 1) step = 0.1;
+    else if (d <= 3) step = 0.5;
+    else if (d <= 10) step = 1.0;
+    else if (d <= 30) step = 2.0;
+    else step = 5.0;
+
+    const ticks: number[] = [];
+    for (let t = 0; t <= d + 0.001; t += step) {
+      ticks.push(Number(t.toFixed(2)));
+    }
+    return ticks;
+  }, [duration]);
 
   // Keyboard Shortcuts: Space for Play/Pause, M for Marker
   useEffect(() => {
@@ -291,7 +309,7 @@ export const Timeline: React.FC = () => {
 
           {/* Time Ruler / Header */}
           <div className="h-8 border-b border-slate-200/80 dark:border-zinc-800 bg-white/80 dark:bg-zinc-900/80 relative flex items-center select-none text-[10px] font-mono text-slate-400 dark:text-zinc-500">
-            {[0, 0.5, 1.0, 1.5, 2.0, 2.5, 3.0].map((t) => {
+            {rulerTicks.map((t) => {
               const pos = (t / duration) * 100;
               return (
                 <div

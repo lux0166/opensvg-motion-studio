@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useStudioStore } from '../store/useStudioStore';
 import { ToolMode } from '../engine/types';
+import { TOOL_REGISTRY } from '../engine/tools/toolRegistry';
 import { importSvgString } from '../engine/svgImporter';
 import { toggleThemeWithAnimation } from '../hooks/useThemeSwitcher';
 import {
@@ -200,11 +201,11 @@ export const Header: React.FC = () => {
   };
 
   const tools: { id: ToolMode; label: string; icon: React.ReactNode }[] = [
-    { id: 'select', label: 'Select Tool (V)', icon: <MousePointer className="w-3.5 h-3.5" /> },
-    { id: 'direct-select', label: 'Transform / Direct Select (A)', icon: <Crop className="w-3.5 h-3.5" /> },
-    { id: 'frame', label: 'Frame Tool (F)', icon: <Square className="w-3.5 h-3.5" /> },
-    { id: 'pen', label: 'Pen Tool (P)', icon: <PenTool className="w-3.5 h-3.5" /> },
-    { id: 'hand', label: 'Hand / Pan Tool (H)', icon: <Hand className="w-3.5 h-3.5" /> },
+    { id: 'select', label: TOOL_REGISTRY.select.label, icon: <MousePointer className="w-3.5 h-3.5" /> },
+    { id: 'direct-select', label: TOOL_REGISTRY['direct-select'].label, icon: <Crop className="w-3.5 h-3.5" /> },
+    { id: 'frame', label: TOOL_REGISTRY.frame.label, icon: <Square className="w-3.5 h-3.5" /> },
+    { id: 'pen', label: TOOL_REGISTRY.pen.label, icon: <PenTool className="w-3.5 h-3.5" /> },
+    { id: 'hand', label: TOOL_REGISTRY.hand.label, icon: <Hand className="w-3.5 h-3.5" /> },
   ];
 
   const handleAddShape = (type: 'rect' | 'circle' | 'star') => {

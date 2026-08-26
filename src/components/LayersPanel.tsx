@@ -2,6 +2,7 @@ import React from 'react';
 import { useStudioStore } from '../store/useStudioStore';
 import { Square, Eye, EyeOff, Lock, Unlock, ChevronDown, Folder, Circle, Star, PenTool, Type } from 'lucide-react';
 import { SceneNode } from '../engine/types';
+import { getNodeChildren, getTopLevelNodes } from '../engine/hierarchy/sceneGraph';
 
 export const LayersPanel: React.FC = () => {
   const {
@@ -35,7 +36,7 @@ export const LayersPanel: React.FC = () => {
     if (!node) return null;
 
     const isSelected = selectedIds.includes(id) || selectedId === id;
-    const childIds = node.childrenIds || nodeOrder.filter((cid) => nodes[cid]?.parentId === id);
+    const childIds = getNodeChildren(id, nodes, nodeOrder);
 
     return (
       <React.Fragment key={id}>
@@ -112,7 +113,7 @@ export const LayersPanel: React.FC = () => {
   };
 
   // Top-level nodes (nodes that have no parentId)
-  const topLevelOrder = nodeOrder.filter((id) => !nodes[id]?.parentId);
+  const topLevelOrder = getTopLevelNodes(nodes, nodeOrder);
 
   return (
     <aside className="w-full h-full min-h-0 bg-white dark:bg-zinc-900 flex flex-col z-10 select-none overflow-hidden">
